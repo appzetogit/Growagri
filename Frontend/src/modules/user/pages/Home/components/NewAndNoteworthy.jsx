@@ -1,10 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { createOptimizedScrollAnimation, createOptimizedStaggerAnimation } from '../../../../../utils/optimizedScrollTrigger';
 import SimpleServiceCard from '../../../components/common/SimpleServiceCard';
-import waterPurifierImage from '../../../../../assets/images/pages/Home/NewAndNoteworthy/water-purifiers.png';
-import bathroomCleaningImage from '../../../../../assets/images/pages/Home/NewAndNoteworthy/bathroom-cleaning.png';
-import hairStudioImage from '../../../../../assets/images/pages/Home/NewAndNoteworthy/hair-studio.png';
-import acRepairImage from '../../../../../assets/images/pages/Home/NewAndNoteworthy/ac-repair.png';
 
 const NewAndNoteworthy = React.memo(({ services, onServiceClick }) => {
   const sectionRef = useRef(null);

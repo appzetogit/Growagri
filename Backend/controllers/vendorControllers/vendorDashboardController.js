@@ -164,7 +164,7 @@ const getDashboardStats = async (req, res) => {
 
     // Fetch Global Settings to pass dynamic payout percentage to the app
     const globalSettings = await Settings.findOne({ type: 'global' });
-    const servicePayoutPercentage = globalSettings?.servicePayoutPercentage ?? 70;
+    const servicePayoutPercentage = require('../../utils/constants').serviceSplitPct(globalSettings);
 
     res.status(200).json({
       success: true,
@@ -460,11 +460,85 @@ const getEquipmentROIAnalytics = async (req, res) => {
   }
 };
 
+/**
+ * Get comprehensive earnings summary for vendor
+ * Returns: { today, week, month, total, history }
+ */
+const getEarningsSummary = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const vendorObjectId = new mongoose.Types.ObjectId(vendorId);
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Aggregate paid bills for vendor
+    const [todayResult, weekResult, monthResult, totalResult, recentBills] = await Promise.all([
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid', paidAt: { $gte: startOfToday } } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
+      ]),
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid', paidAt: { $gte: startOfWeek } } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
+      ]),
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid', paidAt: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
+      ]),
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
+      ]),
+      VendorBill.find({ vendorId: vendorObjectId, status: 'paid' })
+        .populate('bookingId', 'serviceName serviceType scheduledDate scheduledTime address customerName')
+        .sort({ paidAt: -1, createdAt: -1 })
+        .limit(30)
+        .lean()
+    ]);
+
+    const todayEarnings = todayResult[0]?.total || 0;
+    const weekEarnings = weekResult[0]?.total || 0;
+    const monthEarnings = monthResult[0]?.total || 0;
+    const totalEarnings = totalResult[0]?.total || 0;
+
+    const history = recentBills.map(b => ({
+      id: b._id.toString(),
+      bookingId: b.bookingId?._id ? b.bookingId._id.toString() : (b.bookingId || ''),
+      service: b.bookingId?.serviceName || b.bookingId?.serviceType || 'Agricultural Service',
+      amount: b.vendorTotalEarning || 0,
+      totalAmount: b.grandTotal || 0,
+      commission: b.companyRevenue || 0,
+      tax: b.totalGST || 0,
+      date: b.paidAt || b.createdAt,
+      status: b.status,
+      customerName: b.bookingId?.customerName || 'Farmer'
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        today: todayEarnings,
+        week: weekEarnings,
+        month: monthEarnings,
+        total: totalEarnings,
+        history
+      }
+    });
+  } catch (error) {
+    console.error('Get earnings summary error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch earnings summary' });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRevenueAnalytics,
   getWorkerPerformance,
   getServicePerformance,
-  getEquipmentROIAnalytics
+  getEquipmentROIAnalytics,
+  getEarningsSummary
 };
 

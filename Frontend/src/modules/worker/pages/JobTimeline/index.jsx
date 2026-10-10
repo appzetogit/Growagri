@@ -148,12 +148,9 @@ const JobTimeline = () => {
   };
 
   const handleCompleteJob = async () => {
-    if (workPhotos.length === 0) {
-      // Allow mocking for now if no photo upload UI present in modal
-    }
     try {
       setActionLoading(true);
-      const response = await workerService.completeJob(id, { workPhotos: workPhotos.length > 0 ? workPhotos : ['https://placehold.co/400'] });
+      const response = await workerService.completeJob(id, { workPhotos });
       if (response.success) {
         toast.success('Work marked done');
         setIsWorkDoneModalOpen(false);

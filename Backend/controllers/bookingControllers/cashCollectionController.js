@@ -1,8 +1,12 @@
 const Booking = require('../../models/Booking');
 const Vendor = require('../../models/Vendor');
 const Transaction = require('../../models/Transaction');
-const { PAYMENT_STATUS } = require('../../utils/constants');
+const { PAYMENT_STATUS, BOOKING_STATUS, USER_ROLES } = require('../../utils/constants');
 const { recordBookingEarning } = require('../../services/earningTrackerService');
+
+// Only the vendor or worker assigned to the booking may handle its cash
+const actorFilter = (req) => req.userRole === USER_ROLES.VENDOR ? { vendorId: req.user._id } : { workerId: req.user._id };
+const CLOSED_STATUSES = [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.REJECTED].filter(Boolean);
 
 /**
  * Initiate Cash Collection
@@ -11,14 +15,17 @@ const { recordBookingEarning } = require('../../services/earningTrackerService')
 exports.initiateCashCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findOne({ _id: id, ...actorFilter(req) });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    if (booking.paymentStatus === 'SUCCESS') {
-      return res.status(400).json({ success: false, message: 'Payment has already been completed online.' });
+    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.cashCollected) {
+      return res.status(400).json({ success: false, message: 'Payment has already been completed.' });
+    }
+    if (CLOSED_STATUSES.includes(booking.status)) {
+      return res.status(400).json({ success: false, message: `Booking is ${booking.status}` });
     }
 
     // Allow cash, pay_at_home, plan_benefit, AND online (in case user switches to cash at the door)
@@ -122,32 +129,33 @@ exports.initiateCashCollection = async (req, res) => {
 exports.confirmCashCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    const { otp, amount, extraItems } = req.body;
+    const { otp, extraItems } = req.body;
     const userId = req.user._id;
-    const userRole = req.user.role;
+    const userRole = req.userRole === USER_ROLES.VENDOR ? 'vendor' : 'worker';
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findOne({ _id: id, ...actorFilter(req) });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    if (booking.paymentStatus === 'SUCCESS') {
+    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
       return res.status(400).json({ success: false, message: 'Payment has already been completed online.' });
     }
+    if (!booking.customerConfirmationOTP) {
+      return res.status(400).json({ success: false, message: 'Send the bill OTP to the customer first.' });
+    }
 
-    // OTP Verification
+    // OTP Verification (always required; '0000' only for plan-benefit with nothing to pay, or in development)
     const isPlanBenefitNoExtras = booking.paymentMethod === 'plan_benefit' && otp === '0000';
-
-    if (!isPlanBenefitNoExtras && booking.customerConfirmationOTP && otp && booking.customerConfirmationOTP !== otp) {
-      if (process.env.NODE_ENV !== 'development' || otp !== '0000') {
-        return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter the code sent to the customer.' });
-      }
+    const isDevBypass = process.env.NODE_ENV === 'development' && otp === '0000';
+    if (!isPlanBenefitNoExtras && !isDevBypass && (!otp || booking.customerConfirmationOTP !== String(otp))) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter the code sent to the customer.' });
     }
 
     // --- ATOMIC LOCK AGAINST RACE CONDITIONS ---
     const updateResult = await Booking.updateOne(
-      { _id: booking._id, cashCollected: { $ne: true } },
+      { _id: booking._id, cashCollected: { $ne: true }, paymentStatus: { $ne: PAYMENT_STATUS.SUCCESS } },
       { $set: { cashCollected: true } }
     );
 
@@ -160,7 +168,8 @@ exports.confirmCashCollection = async (req, res) => {
       });
     }
 
-    const collectionAmount = amount || booking.finalAmount;
+    // Amount was finalised at initiate time (and by the VendorBill below); never trust the client here
+    const collectionAmount = booking.finalAmount;
 
     // Store extra items in workDoneDetails (for display)
     if (extraItems && Array.isArray(extraItems) && extraItems.length > 0) {
@@ -359,7 +368,7 @@ exports.confirmCashCollection = async (req, res) => {
 exports.customerConfirmPayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findOne({ _id: id, userId: req.user._id });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });

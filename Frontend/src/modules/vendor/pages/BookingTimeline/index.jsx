@@ -270,7 +270,7 @@ const BookingTimeline = () => {
 
   // Handle modal closing if payment is detected
   useEffect(() => {
-    if (booking?.paymentStatus === 'SUCCESS') {
+    if (booking?.paymentStatus?.toLowerCase() === 'success' || booking?.paymentStatus?.toLowerCase() === 'paid') {
       // payment was successful
     }
   }, [booking?.paymentStatus]);
@@ -535,10 +535,13 @@ const BookingTimeline = () => {
       title: 'Collect Payment',
       icon: FiCheckCircle,
       action: (() => {
-        if (booking?.status === 'completed' || booking?.status === 'COMPLETED' || booking?.paymentStatus === 'SUCCESS' || booking?.paymentStatus === 'paid') return null;
+        const isPaid = ['success', 'paid', 'completed'].includes(booking?.paymentStatus?.toLowerCase()) || 
+                       booking?.isPaid || 
+                       booking?.paymentMethod === 'plan_benefit';
+        if (booking?.status === 'completed' || booking?.status === 'COMPLETED' || isPaid) return null;
 
         // If online payment and bill is already generated, let them click to view the bill on the billing page
-        if (booking?.vendorBillId && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home' && booking?.paymentMethod !== 'plan_benefit') {
+        if (booking?.vendorBillId && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home') {
           return () => navigate(`/vendor/booking/${id}/billing`);
         }
 
@@ -551,7 +554,21 @@ const BookingTimeline = () => {
         }
         return null;
       })(),
-      description: (booking?.vendorBillId && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home' && booking?.paymentMethod !== 'plan_benefit') ? 'Waiting for customer to pay online' : 'Collect cash or wait for online payment',
+      description: (() => {
+        const isOnlinePaid = ['success', 'paid', 'completed'].includes(booking?.paymentStatus?.toLowerCase()) || 
+                             (booking?.isPaid && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home') ||
+                             (booking?.status === 'completed' && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home' && booking?.paymentMethod !== 'plan_benefit');
+        const isPlanBenefit = booking?.paymentMethod === 'plan_benefit' || booking?.paymentStatus?.toLowerCase() === 'plan_covered';
+        const isCashCollected = booking?.cashCollected === true || booking?.paymentStatus?.toLowerCase() === 'collected_by_vendor';
+
+        if (isOnlinePaid) return 'Already Paid';
+        if (isPlanBenefit) return 'Paid via Plan Benefits';
+        if (isCashCollected) return 'Already Paid (Cash Collected)';
+        if (booking?.vendorBillId && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home') {
+          return 'Waiting for customer to pay online';
+        }
+        return 'Collect cash or wait for online payment';
+      })(),
     },
     {
       id: 9,
@@ -718,7 +735,7 @@ const BookingTimeline = () => {
                                 stage.id === 6 ? (isAgriBooking ? (requiresDriver === false ? 'Handover Equipment' : 'Start Engine') : 'Mark Workdone') :
                                   stage.id === 6.5 ? (isAgriBooking ? (requiresDriver === false ? 'Collect Equipment' : 'End Trip / Collection') : 'Mark Workdone') :
                                     stage.id === 7 ? (
-                                      (booking?.paymentStatus === 'SUCCESS' || booking?.paymentStatus === 'paid')
+                                      (['success', 'paid', 'completed'].includes(booking?.paymentStatus?.toLowerCase()) || booking?.isPaid)
                                         ? 'Online Payment Done'
                                         : (booking?.vendorBillId ? 'View Bill' : 'Collect Payment')
                                     ) :
@@ -727,7 +744,7 @@ const BookingTimeline = () => {
                       )}
 
                       {/* Online Payment Status Badge for Stage 7 */}
-                      {stage.id === 7 && (booking?.paymentStatus === 'SUCCESS' || booking?.paymentStatus === 'paid') && !isCompleted && (
+                      {stage.id === 7 && (['success', 'paid', 'completed'].includes(booking?.paymentStatus?.toLowerCase()) || booking?.isPaid) && !isCompleted && (
                         <div className="mt-2 flex items-center gap-1.5 text-green-600 font-bold text-xs bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
                           <FiCheckCircle className="w-4 h-4" />
                           ONLINE PAYMENT RECEIVED

@@ -9,6 +9,7 @@ import { getBookingById, assignWorker as assignWorkerApi } from '../../services/
 import { createWorker } from '../../services/workerService';
 import maintenanceService from '../../services/maintenanceService';
 import { isWithinInterval, parseISO } from 'date-fns';
+import api from '../../../../services/api';
 
 const AssignWorker = () => {
   const { id } = useParams();
@@ -72,21 +73,7 @@ const AssignWorker = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    if (!baseUrl) {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        baseUrl = 'http://localhost:5000';
-      } else {
-        baseUrl = window.location.origin;
-      }
-    }
-    baseUrl = baseUrl.replace(/\/api$/, '');
-    const response = await fetch(`${baseUrl}/api/image/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
+    const { data } = await api.post('/image/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     if (!data.success) throw new Error(data.message || 'Upload failed');
     return data.imageUrl;
   };

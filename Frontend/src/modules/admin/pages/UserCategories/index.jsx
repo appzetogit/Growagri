@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import { ensureIds, loadCatalog } from "./utils";
 import HomePage from "./pages/HomePage";
@@ -13,7 +14,7 @@ import { cityService } from "../../services/cityService";
 const UserCategories = () => {
   const [catalog, setCatalog] = useState(() => ensureIds(loadCatalog()));
   const [cities, setCities] = useState([]);
-  const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('adminSelectedCity') || '');
+  const [selectedCity, setSelectedCity] = useState('');
 
   useEffect(() => {
     const handler = () => setCatalog(ensureIds(loadCatalog()));
@@ -22,36 +23,23 @@ const UserCategories = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCity) {
-      localStorage.setItem('adminSelectedCity', selectedCity);
-    } else {
+    // Clear any previously persisted adminSelectedCity so this page always opens on Default (All India)
+    try {
       localStorage.removeItem('adminSelectedCity');
+    } catch (_e) {
+      void _e;
     }
-  }, [selectedCity]);
+  }, []);
 
   // Fetch cities once for the parent container
   useEffect(() => {
     const fetchCities = async () => {
       try {
-        let currentCities = cities;
         if (cities.length === 0) {
           const response = await cityService.getAll();
           if (response.success) {
-            currentCities = (response.cities || []).filter(city => city.isActive);
+            const currentCities = (response.cities || []).filter(city => city.isActive);
             setCities(currentCities);
-          }
-        }
-
-        // Auto-select default or first city if none selected
-        if (!selectedCity && currentCities.length > 0) {
-          const defaultCity = currentCities.find(c => c.isDefault);
-          // Handle potentially different ID formats
-          const cityId = defaultCity
-            ? (defaultCity._id || defaultCity.id)
-            : (currentCities[0]._id || currentCities[0].id);
-
-          if (cityId) {
-            setSelectedCity(cityId);
           }
         }
       } catch (error) {
@@ -59,7 +47,7 @@ const UserCategories = () => {
       }
     };
     fetchCities();
-  }, [selectedCity, cities.length]);
+  }, [cities.length]);
 
   // Get admin role to control UI visibility
   const isAdminSuper = (() => {
@@ -67,7 +55,8 @@ const UserCategories = () => {
       const storedData = sessionStorage.getItem('adminData') || localStorage.getItem('adminData');
       const stored = JSON.parse(storedData || '{}');
       return (stored.role || 'admin') === 'super_admin';
-    } catch (e) {
+    } catch (_e) {
+      void _e;
       return false;
     }
   })();

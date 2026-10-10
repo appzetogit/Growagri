@@ -38,7 +38,7 @@ const lazyLoad = (importFunc) => {
 const Home = lazyLoad(() => import('../pages/Home'));
 const Rewards = lazyLoad(() => import('../pages/Rewards'));
 const Account = lazyLoad(() => import('../pages/Account'));
-const Native = lazyLoad(() => import('../pages/Native'));
+const MySubscription = lazyLoad(() => import('../pages/MySubscription'));
 const Cart = lazyLoad(() => import('../pages/Cart'));
 const Checkout = lazyLoad(() => import('../pages/Checkout'));
 const MyBookings = lazyLoad(() => import('../pages/MyBookings'));
@@ -46,6 +46,7 @@ const BookingDetails = lazyLoad(() => import('../pages/BookingDetails'));
 const BookingTrack = lazyLoad(() => import('../pages/BookingTrack'));
 const BookingConfirmation = lazyLoad(() => import('../pages/BookingConfirmation'));
 const Settings = lazyLoad(() => import('../pages/Settings'));
+const Language = lazyLoad(() => import('../pages/Language'));
 const ManagePaymentMethods = lazyLoad(() => import('../pages/ManagePaymentMethods'));
 const ManageAddresses = lazyLoad(() => import('../pages/ManageAddresses'));
 const Wallet = lazyLoad(() => import('../pages/Wallet'));
@@ -67,12 +68,14 @@ const WeatherReport = lazyLoad(() => import('../pages/WeatherReport'));
 const Marketplace = lazyLoad(() => import('../pages/Marketplace'));
 const MachineryExplorer = lazyLoad(() => import('../pages/Machinery/MachineryExplorer'));
 const EquipmentDetail = lazyLoad(() => import('../pages/Machinery/EquipmentDetail'));
+const MachineryCheckout = lazyLoad(() => import('../pages/Machinery/MachineryCheckout'));
 const SoilTesting = lazyLoad(() => import('../pages/SoilTesting'));
 const AgriMarket = lazyLoad(() => import('../pages/AgriMarket'));
 const AgriProductDetail = lazyLoad(() => import('../pages/AgriMarket/ProductDetail'));
 const MyAgriOrders = lazyLoad(() => import('../pages/AgriMarket/MyOrders'));
 const AgriOrderPayment = lazyLoad(() => import('../pages/AgriMarket/OrderPayment'));
 const AgriCart = lazyLoad(() => import('../pages/AgriMarket/AgriCart'));
+const SchemeDetails = lazyLoad(() => import('../pages/Schemes/SchemeDetails'));
 
 // Lightweight loading fallback - no logo to avoid iOS rejection
 const LoadingFallback = () => (
@@ -106,7 +109,8 @@ const UserRoutes = () => {
                        location.pathname.includes('/privacy') ||
                        location.pathname.includes('/faq') ||
                        location.pathname.includes('/help-support') ||
-                       location.pathname.includes('/cancellation-policy');
+                       location.pathname.includes('/cancellation-policy') ||
+                       location.pathname.includes('/schemes');
 
   return (
     <ErrorBoundary>
@@ -121,7 +125,7 @@ const UserRoutes = () => {
 
               {/* Protected routes (auth required) */}
               <Route path="/" element={<ProtectedRoute userType="user"><Home /></ProtectedRoute>} />
-              <Route path="/native" element={<ProtectedRoute userType="user"><Native /></ProtectedRoute>} />
+              <Route path="/my-subscription" element={<ProtectedRoute userType="user"><MySubscription /></ProtectedRoute>} />
 
               <Route path="/rewards" element={<ProtectedRoute userType="user"><Rewards /></ProtectedRoute>} />
               <Route path="/account" element={<ProtectedRoute userType="user"><Account /></ProtectedRoute>} />
@@ -132,6 +136,7 @@ const UserRoutes = () => {
               <Route path="/booking/:id/track" element={<ProtectedRoute userType="user"><BookingTrack /></ProtectedRoute>} />
               <Route path="/booking-confirmation/:id" element={<ProtectedRoute userType="user"><BookingConfirmation /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute userType="user"><Settings /></ProtectedRoute>} />
+              <Route path="/language" element={<Language />} />
               <Route path="/manage-payment-methods" element={<ProtectedRoute userType="user"><ManagePaymentMethods /></ProtectedRoute>} />
               <Route path="/manage-addresses" element={<ProtectedRoute userType="user"><ManageAddresses /></ProtectedRoute>} />
               <Route path="/wallet" element={<ProtectedRoute userType="user"><Wallet /></ProtectedRoute>} />
@@ -150,6 +155,7 @@ const UserRoutes = () => {
               <Route path="/weather" element={<ProtectedRoute userType="user"><WeatherReport /></ProtectedRoute>} />
               <Route path="/marketplace" element={<ProtectedRoute userType="user"><Marketplace /></ProtectedRoute>} />
               <Route path="/machinery-explorer" element={<ProtectedRoute userType="user"><MachineryExplorer /></ProtectedRoute>} />
+              <Route path="/machinery/checkout" element={<ProtectedRoute userType="user"><MachineryCheckout /></ProtectedRoute>} />
               <Route path="/machinery/:id" element={<ProtectedRoute userType="user"><EquipmentDetail /></ProtectedRoute>} />
               <Route path="/soil-testing" element={<ProtectedRoute userType="user"><SoilTesting /></ProtectedRoute>} />
               <Route path="/agri-marketplace" element={<ProtectedRoute userType="user"><AgriMarket /></ProtectedRoute>} />
@@ -157,6 +163,7 @@ const UserRoutes = () => {
               <Route path="/my-agri-orders" element={<ProtectedRoute userType="user"><MyAgriOrders /></ProtectedRoute>} />
               <Route path="/order-payment/:id" element={<ProtectedRoute userType="user"><AgriOrderPayment /></ProtectedRoute>} />
               <Route path="/agri-cart" element={<ProtectedRoute userType="user"><AgriCart /></ProtectedRoute>} />
+              <Route path="/schemes/:id" element={<SchemeDetails />} />
             </Routes>
           </PageTransition>
         </Suspense>

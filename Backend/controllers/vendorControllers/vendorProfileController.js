@@ -239,14 +239,13 @@ const updateProfile = async (req, res) => {
       }
     }
 
-    await vendor.save();
+    await vendor.save({ validateModifiedOnly: true });
 
-    // Sync equipment cityIds if vendor updated city
-    const VendorEquipment = require('../../models/VendorEquipment');
-    await VendorEquipment.updateMany(
-      { vendorId: vendor._id },
-      { cityIds: vendor.cityId ? [vendor.cityId] : [] }
-    );
+    // Sync equipment cityIds only when the address change resolved a city (never wipe them on a name/photo edit)
+    if (address && vendor.cityId) {
+      const VendorEquipment = require('../../models/VendorEquipment');
+      await VendorEquipment.updateMany({ vendorId: vendor._id }, { cityIds: [vendor.cityId] });
+    }
 
     res.status(200).json({
       success: true,
@@ -270,9 +269,11 @@ const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Update vendor profile error:', error);
-    res.status(500).json({
+    res.status(error.name === 'ValidationError' ? 400 : 500).json({
       success: false,
-      message: 'Failed to update profile. Please try again.'
+      message: error.name === 'ValidationError'
+        ? Object.values(error.errors).map(e => e.message).join(', ')
+        : 'Failed to update profile. Please try again.'
     });
   }
 };

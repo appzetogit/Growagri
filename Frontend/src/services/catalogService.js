@@ -31,25 +31,46 @@ export const categoryService = {
   // Create new category
   create: async (data) => {
     const response = await api.post('/admin/categories', data);
+    broadcastCategoryChangeClient();
     return response.data;
   },
 
   // Update category
   update: async (id, data) => {
     const response = await api.put(`/admin/categories/${id}`, data);
+    broadcastCategoryChangeClient();
     return response.data;
   },
 
   // Delete category
   delete: async (id) => {
     const response = await api.delete(`/admin/categories/${id}`);
+    broadcastCategoryChangeClient();
     return response.data;
   },
 
   // Update category order
   updateOrder: async (id, homeOrder) => {
     const response = await api.patch(`/admin/categories/${id}/order`, { homeOrder });
+    broadcastCategoryChangeClient();
     return response.data;
+  }
+};
+
+const broadcastCategoryChangeClient = () => {
+  try {
+    apiCache.invalidatePrefix('public:');
+    localStorage.removeItem('cached_home_categories');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('categories_updated', { detail: { timestamp: Date.now() } }));
+      if (window.BroadcastChannel) {
+        const bc = new BroadcastChannel('groo_catalog_sync');
+        bc.postMessage({ type: 'CATEGORIES_UPDATED', timestamp: Date.now() });
+        bc.close();
+      }
+    }
+  } catch (e) {
+    console.warn('Category broadcast error:', e);
   }
 };
 
@@ -196,6 +217,31 @@ export const homeContentService = {
     if (params.cityId) queryParams.append('cityId', params.cityId);
 
     const response = await api.put(`/admin/home-content${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, data);
+
+    // Invalidate client caches and broadcast update across all tabs immediately
+    try {
+      apiCache.invalidatePrefix('public:');
+      localStorage.removeItem('cached_home_content');
+
+      const updateData = {
+        cityId: null, // Broadcast globally to all city views
+        homeContent: response.data?.homeContent,
+        timestamp: Date.now()
+      };
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('home_content_updated', { detail: updateData }));
+
+        if (window.BroadcastChannel) {
+          const bc = new BroadcastChannel('groo_catalog_sync');
+          bc.postMessage({ type: 'HOME_CONTENT_UPDATED', ...updateData });
+          bc.close();
+        }
+      }
+    } catch (e) {
+      console.warn('Catalog cache invalidation error:', e);
+    }
+
     return response.data;
   }
 };
@@ -209,19 +255,19 @@ export const publicCatalogService = {
   getCategories: async (params = {}) => {
     // Legacy support for passing cityId directly
     const normalizedParams = typeof params === 'string' ? { cityId: params } : params;
-    
+
     const queryParams = new URLSearchParams();
     if (normalizedParams.cityId) queryParams.append('cityId', normalizedParams.cityId);
     if (normalizedParams.type) queryParams.append('type', normalizedParams.type);
-    
+
     const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const cacheKey = `public:categories:${queryStr || 'default'}`;
     const cached = apiCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached && !normalizedParams.forceRefresh) return cached;
 
     const response = await api.get(`/public/categories${queryStr}`);
     if (response.data.success) {
-      apiCache.set(cacheKey, response.data, 300); // 5 minutes
+      apiCache.set(cacheKey, response.data, 30); // 30 seconds
     }
     return response.data;
   },
@@ -255,14 +301,17 @@ export const publicCatalogService = {
     if (params.parentSourceId) queryParams.append('parentSourceId', params.parentSourceId);
     if (params.pricing_context) queryParams.append('pricing_context', params.pricing_context);
     if (params.search) queryParams.append('search', params.search);
+    if (params.cityId) queryParams.append('cityId', params.cityId);
 
     const cacheKey = `public:services:${queryParams.toString()}`;
-    const cached = apiCache.get(cacheKey);
-    if (cached) return cached;
+    if (!params.forceRefresh) {
+      const cached = apiCache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     const response = await api.get(`/public/services${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
     if (response.data.success) {
-      apiCache.set(cacheKey, response.data, 120);
+      apiCache.set(cacheKey, response.data, 30);
     }
     return response.data;
   },
@@ -281,16 +330,18 @@ export const publicCatalogService = {
     return response.data;
   },
 
-  // Get home content (cached for 2 minutes)
-  getHomeContent: async (cityId) => {
+  // Get home content (cached for 1 minute unless forceRefresh is true)
+  getHomeContent: async (cityId, forceRefresh = false) => {
     const cacheKey = `public:homeContent:${cityId || 'default'}`;
-    const cached = apiCache.get(cacheKey);
-    if (cached) return cached;
+    if (!forceRefresh) {
+      const cached = apiCache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     const query = cityId ? `?cityId=${cityId}` : '';
     const response = await api.get(`/public/home-content${query}`);
     if (response.data.success) {
-      apiCache.set(cacheKey, response.data, 120); // 2 minutes
+      apiCache.set(cacheKey, response.data, 60); // 1 minute cache
     }
     return response.data;
   },
@@ -298,5 +349,12 @@ export const publicCatalogService = {
   // Invalidate all public caches (useful after admin updates)
   invalidateCache: () => {
     apiCache.invalidatePrefix('public:');
+    try {
+      localStorage.removeItem('cached_home_content');
+      localStorage.removeItem('cached_home_categories');
+    } catch {
+      return false;
+    }
   }
 };
+

@@ -13,33 +13,18 @@ const FAQSection = () => {
     const tabs = ['Farmer', 'Owner', 'General'];
     const API_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-    const mockFaqs = [
-        { question: "Is registration free on GROO?", answer: "Yes, registration for both farmers and shop/machine owners is completely free. You only pay for the services you use or when you make a sale.", category: "General", color: "blue" },
-        { question: "How do I book a tractor or harvester?", answer: "Simply login as a farmer, browse 'Agricultural Services', choose your machine, select a vendor based on ratings, and pick your date to confirm the booking.", category: "Farmer", color: "green" },
-        { question: "How can I register my shop or machinery?", answer: "Click on 'Join as Vendor', enter your business details and upload necessary documents. Once approved by the admin, you can start listing your items.", category: "Owner", color: "orange" },
-        { question: "Can I set my own rental prices for machines?", answer: "Yes, as an owner, you have full control over your pricing. You can set hourly or per-acre rates and update them anytime from your dashboard.", category: "Owner", color: "orange" },
-        { question: "How do I track my seed or fertilizer order?", answer: "You can see the real-time status of your order in the 'My Orders' section of the app. You will also get notifications when your order is out for delivery.", category: "Farmer", color: "green" },
-        { question: "What if a machine breaks down during the work?", answer: "Vendors are responsible for machine maintenance. If a breakdown occurs, you can contact the vendor directly through the app to request a replacement or repair.", category: "Farmer", color: "green" },
-        { question: "When and how will I receive my payments?", answer: "Payments for completed services are credited to your GROO wallet. You can withdraw this money to your bank account anytime via UPI or Bank Transfer.", category: "Owner", color: "orange" },
-        { question: "Can I cancel my booking if my plans change?", answer: "Yes, you can cancel your booking. However, please check the vendor's cancellation policy as some may have a small fee if cancelled at the last moment.", category: "Farmer", color: "green" },
-        { question: "How do I contact support for help?", answer: "You can use the 'Help & Support' section in the app to chat with us or call our helpline number available on the contact page.", category: "General", color: "blue" },
-        { question: "Is my personal data safe on GROO?", answer: "Absolutely. We use high-level encryption to ensure your data, location, and payment details are always secure and never shared without your permission.", category: "General", color: "blue" },
-        { question: "Can I rent heavy machines like JCB or Borewell?", answer: "Yes, GROO has a dedicated section for heavy machinery where you can find JCB, Cranes, and Borewell services for your farm needs.", category: "Farmer", color: "green" },
-        { question: "How do I manage multiple machines as an owner?", answer: "Our vendor dashboard allows you to add and manage multiple machines easily. You can see independent bookings and income for each machine in one place.", category: "Owner", color: "orange" }
-    ];
-
     useEffect(() => {
         const fetchFAQs = async () => {
             try {
                 const response = await axios.get(`${API_URL}/content/faq`);
-                if (response.data.success && response.data.data.length > 0) {
+                if (response.data.success && Array.isArray(response.data.data)) {
                     setFaqs(response.data.data);
                 } else {
-                    setFaqs(mockFaqs); // Fallback if no data in db
+                    setFaqs([]);
                 }
             } catch (error) {
                 console.error("Error fetching FAQs:", error);
-                setFaqs(mockFaqs); // Fallback on error
+                setFaqs([]);
             } finally {
                 setIsLoading(false);
             }

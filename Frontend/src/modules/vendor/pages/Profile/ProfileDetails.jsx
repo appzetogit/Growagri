@@ -47,12 +47,8 @@ const ProfileDetails = () => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        // Optimistic load from local storage
-        const localVendorData = JSON.parse(localStorage.getItem('vendorData') || '{}');
-        const vendorProfile = JSON.parse(localStorage.getItem('vendorProfile') || '{}');
-
-        // Merge sources, preferring vendorData (which might be fresher from other pages)
-        const storedData = { ...vendorProfile, ...localVendorData };
+        // Optimistic load from session vendorData
+        const storedData = JSON.parse(localStorage.getItem('vendorData') || '{}');
 
         if (Object.keys(storedData).length > 0) {
           // Format address if object

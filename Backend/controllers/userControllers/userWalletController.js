@@ -113,34 +113,30 @@ const verifyWalletTopup = async (req, res) => {
     const {
       razorpay_order_id,
       razorpay_payment_id,
-      razorpay_signature,
-      amount
+      razorpay_signature
     } = req.body;
 
-    // Verify signature
-    const { verifyPayment } = require('../../services/razorpayService');
-    const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-
-    if (!isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment signature'
-      });
+    // Verify with Razorpay; amount comes from the gateway, never the client
+    const { verifyAndClaimPayment, releasePayment } = require('../../services/razorpayService');
+    const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!verified.success) {
+      return res.status(verified.status).json({ success: false, message: verified.error });
     }
+    if (verified.notes.type !== 'wallet_topup' || verified.notes.userId !== userId.toString()) {
+      await releasePayment(razorpay_payment_id);
+      return res.status(400).json({ success: false, message: 'Payment does not belong to this wallet top-up' });
+    }
+    const amount = verified.amount;
 
-    // Get user
-    const user = await User.findById(userId);
+    const user = await User.findByIdAndUpdate(userId, { $inc: { 'wallet.balance': amount } }, { new: true });
     if (!user) {
+      await releasePayment(razorpay_payment_id);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-
-    // Add money to wallet
-    const previousBalance = user.wallet.balance || 0;
-    user.wallet.balance = previousBalance + amount;
-    await user.save();
+    const previousBalance = user.wallet.balance - amount;
 
     // Create Transaction Record
     const Transaction = require('../../models/Transaction');

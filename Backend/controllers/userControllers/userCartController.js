@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Cart = require('../../models/Cart');
 const Service = require('../../models/Service');
 const { validationResult } = require('express-validator');
@@ -9,16 +10,84 @@ const getUserCart = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    let cart = await Cart.findOne({ userId }).populate('items.serviceId', 'title iconUrl slug hourly_price land_price land_unit daily_price').populate('items.categoryId', 'title slug');
+    let cart = await Cart.findOne({ userId }).lean();
 
     if (!cart) {
-      // Create empty cart if doesn't exist
       cart = await Cart.create({ userId, items: [] });
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
     }
+
+    const VendorEquipment = require('../../models/VendorEquipment');
+    const Product = require('../../models/Product');
+    const Category = require('../../models/Category');
+
+    const populatedItems = await Promise.all((cart.items || []).map(async (item) => {
+      let populatedService = null;
+      let populatedCategory = null;
+
+      if (item.serviceId && mongoose.Types.ObjectId.isValid(item.serviceId)) {
+        // 1. Try Service first
+        populatedService = await Service.findById(item.serviceId)
+          .select('title iconUrl slug hourly_price land_price land_unit daily_price')
+          .lean();
+
+        // 2. Fallback to VendorEquipment
+        if (!populatedService) {
+          const equip = await VendorEquipment.findById(item.serviceId).lean();
+          if (equip) {
+            populatedService = {
+              _id: equip._id,
+              title: equip.name,
+              iconUrl: (equip.images && equip.images[0]) || '',
+              slug: (equip.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              hourly_price: Number(equip.pricing?.hourly?.price) || 0,
+              land_price: Number(equip.pricing?.land_based?.price) || 0,
+              land_unit: 'bigha',
+              daily_price: Number(equip.pricing?.daily?.price) || 0,
+              isVendorEquipment: true
+            };
+          }
+        }
+
+        // 3. Fallback to Product machinery
+        if (!populatedService) {
+          const prod = await Product.findById(item.serviceId).lean();
+          if (prod) {
+            populatedService = {
+              _id: prod._id,
+              title: prod.title,
+              iconUrl: prod.imageUrl || (prod.images && prod.images[0]) || '',
+              slug: prod.slug,
+              hourly_price: prod.unit === 'hour' ? prod.price : 0,
+              land_price: (prod.unit === 'acre' || prod.unit === 'bigha') ? prod.price : 0,
+              land_unit: prod.unit === 'bigha' ? 'bigha' : 'acre',
+              daily_price: prod.unit === 'day' ? prod.price : 0,
+              isProductMachinery: true
+            };
+          }
+        }
+      }
+
+      if (item.categoryId && mongoose.Types.ObjectId.isValid(item.categoryId)) {
+        populatedCategory = await Category.findById(item.categoryId)
+          .select('title slug')
+          .lean();
+      }
+
+      return {
+        ...item,
+        // Crucial: keep populated object or original ID string so serviceId is NEVER null!
+        serviceId: populatedService || item.serviceId,
+        categoryId: populatedCategory || item.categoryId
+      };
+    }));
 
     res.status(200).json({
       success: true,
-      data: cart.items || []
+      data: populatedItems
     });
   } catch (error) {
     console.error('Get user cart error:', error);
@@ -47,10 +116,14 @@ const addToCart = async (req, res) => {
     const {
       serviceId,
       categoryId,
+      equipmentId,
+      isVendorEquipment,
       title,
       description,
       icon,
       category,
+      categoryTitle,
+      categoryIcon,
       price,
       originalPrice,
       unitPrice,
@@ -60,20 +133,50 @@ const addToCart = async (req, res) => {
       vendorId,
       sectionTitle,
       sectionIcon,
+      sectionId,
+      brandId,
       card,
       hourly_price,
       land_price,
       land_unit,
-      daily_price
+      daily_price,
+      pricing_context,
+      parentSourceId,
+      scheduledDate,
+      timeSlot,
+      type
     } = req.body;
 
-    console.log(`[AddToCart] Request details - Title: ${title}, Section: ${sectionTitle}`);
+    console.log(`[AddToCart] Request details - Title: ${title}, ServiceId: ${serviceId}, Category: ${category}`);
 
-    // Verify service exists (only if serviceId is provided)
+    // Verify service exists (Service collection, or VendorEquipment / Product machinery fallback)
     let service = null;
+    let vendorEquipment = null;
+    let productDoc = null;
+    let resolvedVendorId = vendorId || null;
+    let resolvedEquipmentId = equipmentId || null;
+
     if (serviceId) {
-      service = await Service.findById(serviceId);
-      if (!service) {
+      const isValidObjectId = mongoose.Types.ObjectId.isValid(serviceId);
+      if (isValidObjectId) {
+        service = await Service.findById(serviceId);
+        if (!service) {
+          const VendorEquipment = require('../../models/VendorEquipment');
+          vendorEquipment = await VendorEquipment.findById(serviceId);
+          if (vendorEquipment) {
+            resolvedEquipmentId = vendorEquipment._id;
+            if (!resolvedVendorId && vendorEquipment.vendorId) {
+              resolvedVendorId = vendorEquipment.vendorId;
+            }
+          } else {
+            const Product = require('../../models/Product');
+            productDoc = await Product.findById(serviceId);
+          }
+        }
+      }
+
+      // If serviceId is provided, but not found in any collection AND title is missing, return 404
+      if (!service && !vendorEquipment && !productDoc && !title) {
         return res.status(404).json({
           success: false,
           message: 'Service not found'
@@ -93,46 +196,61 @@ const addToCart = async (req, res) => {
 
     // Check if item already exists in cart
     const existingItemIndex = cart.items.findIndex(
-      item => item.title === title && (!serviceId || item.serviceId?.toString() === serviceId)
+      item => item.title === title && (!serviceId || item.serviceId?.toString() === serviceId?.toString())
     );
+
+    const calculatedPrice = price !== undefined ? price : (unitPrice !== undefined ? unitPrice : (service?.basePrice || 0));
+    const calculatedUnitPrice = unitPrice !== undefined ? unitPrice : (price !== undefined ? price : (service?.basePrice || 0));
 
     if (existingItemIndex !== -1) {
       // Update quantity if item exists
       const existingItem = cart.items[existingItemIndex];
       const newCount = (existingItem.serviceCount || 1) + (serviceCount || 1);
-      const newPrice = existingItem.unitPrice * newCount;
+      const newPrice = (existingItem.unitPrice || calculatedUnitPrice) * newCount;
 
       cart.items[existingItemIndex].serviceCount = newCount;
       cart.items[existingItemIndex].price = newPrice;
     } else {
       // Add new item
       const newItem = {
-        title,
-        description: description || '',
-        icon: icon || '',
-        category,
-        price: price || unitPrice || 0,
+        title: title || service?.title || vendorEquipment?.name || productDoc?.title,
+        description: description || service?.description || vendorEquipment?.description || '',
+        icon: icon || service?.iconUrl || (vendorEquipment?.images && vendorEquipment.images[0]) || productDoc?.imageUrl || '',
+        category: category || service?.category || vendorEquipment?.requestedCategoryName || 'Agriculture',
+        categoryTitle: categoryTitle || category || service?.category || 'Agriculture',
+        categoryIcon: categoryIcon || null,
+        price: calculatedPrice,
         originalPrice: originalPrice || null,
-        unitPrice: unitPrice || price || 0,
+        unitPrice: calculatedUnitPrice,
         serviceCount: serviceCount || 1,
         rating: rating || '4.8',
         reviews: reviews || '10k+',
-        vendorId: vendorId || null,
+        vendorId: resolvedVendorId,
+        equipmentId: resolvedEquipmentId,
+        isVendorEquipment: !!(isVendorEquipment || vendorEquipment),
+        isProductMachinery: !!(productDoc && productDoc.type === 'machinery'),
+        type: type || (productDoc ? 'product' : 'service'),
         sectionTitle: sectionTitle || '',
         sectionIcon: sectionIcon || null,
+        sectionId: sectionId || brandId || null,
+        brandId: (brandId && mongoose.Types.ObjectId.isValid(brandId)) ? brandId : null,
         card: card || null,
+        scheduledDate: scheduledDate || null,
+        timeSlot: timeSlot || null,
+        pricing_context: pricing_context || 'any',
+        parentSourceId: parentSourceId || null,
         // Agriculture rental guideline prices
-        hourly_price: hourly_price || 0,
-        land_price:   land_price || 0,
-        land_unit:    land_unit || 'acre',
-        daily_price:  daily_price || 0,
+        hourly_price: hourly_price || service?.hourly_price || (vendorEquipment?.pricing?.hourly?.price ? Number(vendorEquipment.pricing.hourly.price) : 0),
+        land_price: land_price || service?.land_price || (vendorEquipment?.pricing?.land_based?.price ? Number(vendorEquipment.pricing.land_based.price) : 0),
+        land_unit: land_unit || service?.land_unit || 'acre',
+        daily_price: daily_price || service?.daily_price || (vendorEquipment?.pricing?.daily?.price ? Number(vendorEquipment.pricing.daily.price) : 0),
       };
 
-      // Only add serviceId and categoryId if they are provided
-      if (serviceId) newItem.serviceId = serviceId;
-      if (categoryId) newItem.categoryId = categoryId;
+      // Only add serviceId and categoryId if they are valid ObjectIds
+      if (serviceId && mongoose.Types.ObjectId.isValid(serviceId)) newItem.serviceId = serviceId;
+      if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) newItem.categoryId = categoryId;
 
-      console.log(`[AddToCart] Adding new item: ${title}`);
+      console.log(`[AddToCart] Adding new item: ${newItem.title}`);
       cart.items.push(newItem);
     }
 

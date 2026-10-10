@@ -15,6 +15,36 @@ const cartItemSchema = new mongoose.Schema({
     ref: 'Category',
     required: false
   },
+  equipmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'VendorEquipment',
+    default: null
+  },
+  isVendorEquipment: {
+    type: Boolean,
+    default: false
+  },
+  isProductMachinery: {
+    type: Boolean,
+    default: false
+  },
+  type: {
+    type: String,
+    default: 'service'
+  },
+  pricing_context: {
+    type: String,
+    default: 'any'
+  },
+  parentSourceId: {
+    type: String,
+    default: null
+  },
+  brandId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Brand',
+    default: null
+  },
   title: {
     type: String,
     required: true

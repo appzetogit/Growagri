@@ -6,34 +6,21 @@ import { themeColors } from '../../../../theme';
 import BottomNav from '../../components/layout/BottomNav';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { useCart } from '../../../../context/CartContext';
-import electricianIcon from '../../../../assets/images/icons/services/electrician.png';
-import womensSalonIcon from '../../../../assets/images/icons/services/womens-salon-spa-icon.png';
-import massageMenIcon from '../../../../assets/images/icons/services/massage-men-icon.png';
-import cleaningIcon from '../../../../assets/images/icons/services/cleaning-icon.png';
-import acApplianceRepairIcon from '../../../../assets/images/icons/services/ac-appliance-repair-icon.png';
+import { useLanguage } from '../../../../context/LanguageContext';
 import NotificationBell from '../../components/common/NotificationBell';
+
+const toAssetUrl = (url) => {
+  if (!url) return '';
+  let clean = url.replace('/api/upload', '/upload');
+  if (clean.startsWith('http')) return clean;
+  const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/api$/, '');
+  return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
+};
 
 const Cart = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { cartItems, isLoading: loading, removeItem, removeCategoryItems, updateItem, updateItemLocally } = useCart();
-
-  // Category icon mapping
-  const getCategoryIcon = (category) => {
-    const iconMap = {
-      'Electrician': electricianIcon,
-      'Electricity': electricianIcon,
-      "Women's Salon & Spa": womensSalonIcon,
-      'Salon for Women': womensSalonIcon,
-      'Salon Prime': womensSalonIcon,
-      'Massage for Men': massageMenIcon,
-      'Cleaning': cleaningIcon,
-      'Bathroom & Kitchen Cleaning': cleaningIcon,
-      'Sofa & Carpet Cleaning': cleaningIcon,
-      'AC Service and Repair': acApplianceRepairIcon,
-      'AC & Appliance Repair': acApplianceRepairIcon,
-    };
-    return iconMap[category] || electricianIcon; // Default icon
-  };
 
   const isMachinery = (item) => {
     return !!(item.hourly_price || item.land_price || item.daily_price || item.category === 'Agriculture' || item.categoryTitle === 'Agriculture');
@@ -200,7 +187,7 @@ const Cart = () => {
             </button>
             <div className="flex items-center gap-2">
               <FiShoppingCart className="w-5 h-5" style={{ color: themeColors.button }} />
-              <h1 className="text-xl font-extrabold text-black">Your Cart</h1>
+              <h1 className="text-xl font-extrabold text-black">{t('Your Cart')}</h1>
               {cartCount > 0 && (
                 <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
                   {cartCount}
@@ -248,7 +235,7 @@ const Cart = () => {
             <div className="space-y-4">
               {Object.entries(groupedItems).map(([category, items]) => {
                 const categoryTotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
-                const categoryIcon = getCategoryIcon(category);
+                const categoryIcon = toAssetUrl(items[0]?.icon || items[0]?.image);
                 const serviceCount = items.reduce((sum, item) => sum + (item.serviceCount || 1), 0);
 
                 return (
@@ -389,7 +376,7 @@ const Cart = () => {
                         onClick={() => handleAddServices(category)}
                         className="flex-1 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all active:scale-95"
                       >
-                        Add Services
+                        {t('Add Services')}
                       </button>
                       <button
                         onClick={() => handleCategoryCheckout(category)}
@@ -407,7 +394,7 @@ const Cart = () => {
                           e.target.style.boxShadow = `0 2px 6px ${themeColors.brand.teal}4D`;
                         }}
                       >
-                        Book
+                        {t('Book')}
                       </button>
                     </div>
                   </div>

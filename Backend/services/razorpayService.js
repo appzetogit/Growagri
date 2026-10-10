@@ -46,6 +46,8 @@ const createOrder = async (amount, currency = 'INR', receipt = null, notes = {})
     const order = await razorpay.orders.create(options);
 
     console.log('✅ Razorpay order created successfully:', order.id);
+    await razorpayOrders().insertOne({ _id: order.id, amount: order.amount, notes: order.notes || {}, createdAt: new Date() })
+      .catch(err => console.error('[Razorpay] could not store order locally:', err.message));
 
     return {
       success: true,
@@ -132,9 +134,51 @@ const refundPayment = async (paymentId, amount = null, notes = {}) => {
   }
 };
 
+const processedPayments = () => require('mongoose').connection.collection('processed_payments');
+const razorpayOrders = () => require('mongoose').connection.collection('razorpay_orders');
+
+/**
+ * The checkout signature is an HMAC of "order_id|payment_id" with our secret, which Razorpay only
+ * issues for a successful payment on that order — so a valid signature proves this payment paid
+ * this order. Amount and notes come from the order WE created (stored locally at creation; older
+ * orders are fetched from Razorpay). The payment id is then claimed so it can be used once.
+ * Returns { success:false, status, error } or { success:true, amount, amountPaise, notes }.
+ * Call releasePayment(paymentId) if crediting fails after a successful claim.
+ */
+const verifyAndClaimPayment = async (orderId, paymentId, signature) => {
+  if (!orderId || !paymentId || !signature || !verifyPayment(orderId, paymentId, signature)) {
+    return { success: false, status: 400, error: 'Invalid payment signature' };
+  }
+
+  let order = await razorpayOrders().findOne({ _id: orderId });
+  if (!order) {
+    if (!razorpay) return { success: false, status: 503, error: 'Payment gateway not configured' };
+    try {
+      const o = await razorpay.orders.fetch(orderId);
+      order = { amount: o.amount, notes: o.notes || {} };
+    } catch (error) {
+      console.error('[Razorpay] order fetch failed:', error.statusCode, JSON.stringify(error.error || error.message));
+      return { success: false, status: 502, error: error.error?.description || error.message || 'Could not verify payment with gateway' };
+    }
+  }
+
+  try {
+    await processedPayments().insertOne({ _id: paymentId, orderId, createdAt: new Date() });
+  } catch (error) {
+    if (error.code === 11000) return { success: false, status: 409, error: 'Payment already processed' };
+    throw error;
+  }
+
+  return { success: true, amount: order.amount / 100, amountPaise: order.amount, notes: order.notes || {} };
+};
+
+const releasePayment = (paymentId) => processedPayments().deleteOne({ _id: paymentId });
+
 module.exports = {
   createOrder,
   verifyPayment,
+  verifyAndClaimPayment,
+  releasePayment,
   getPaymentDetails,
   refundPayment
 };

@@ -14,7 +14,7 @@
     "@tailwindcss/vite": "^4.1.17",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
-    "firebase": "^12.7.0",
+    "firebase": "^9.14.0",
     "framer-motion": "^12.23.26",
     "gsap": "^3.13.0",
     "leaflet": "^1.9.4",

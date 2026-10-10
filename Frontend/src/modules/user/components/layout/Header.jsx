@@ -11,10 +11,12 @@ import CitySelectorModal from '../common/CitySelectorModal';
 import { useCity } from '../../../../context/CityContext';
 import { HiChevronDown } from 'react-icons/hi';
 import Sidebar from './Sidebar';
+import { useLanguage } from '../../../../context/LanguageContext';
 
 const Header = ({ location, onLocationClick }) => {
   const logoRef = useRef(null);
   const { currentCity } = useCity();
+  const { t } = useLanguage();
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -96,7 +98,7 @@ const Header = ({ location, onLocationClick }) => {
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                   }}>
-                    {location && location !== '...' ? location.split('-')[0].trim() : 'Select Location'}
+                    {location && location !== '...' ? location.split('-')[0].trim() : t('Select Location')}
                   </span>
                 </div>
                 <LocationSelector

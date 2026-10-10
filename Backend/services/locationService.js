@@ -94,6 +94,7 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
     const baseQuery = {
       approvalStatus: VENDOR_STATUS.APPROVED,
       isActive: true,
+      'wallet.isBlocked': { $ne: true }, // blocked for unpaid dues -> no new jobs
       ...queryFilters
     };
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiShoppingCart, FiArrowRight, FiPlus, FiTag } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import productService from '../../../services/productService';
-import { useCart } from '../../../../../context/CartContext';
+import { useEcommerceCart } from '../../../../../context/EcommerceCartContext';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../../theme';
 
@@ -16,13 +16,15 @@ const toAssetUrl = (url) => {
 };
 
 import { useCity } from '../../../../../context/CityContext';
+import { useLanguage } from '../../../../../context/LanguageContext';
 
 const AgriMarketplaceSection = () => {
     const navigate = useNavigate();
+    const { t } = useLanguage();
     const { activeCity } = useCity();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const { addToCart } = useCart();
+    const { addToCart } = useEcommerceCart();
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -46,23 +48,8 @@ const AgriMarketplaceSection = () => {
 
     const handleAddToCart = async (product) => {
         try {
-            const cartItemData = {
-                serviceId: product._id, // Products use same cart flow
-                categoryId: product.categoryId?._id || product.categoryId,
-                title: product.title,
-                description: product.description || '',
-                icon: toAssetUrl(product.imageUrl),
-                category: 'Marketplace',
-                categoryTitle: 'Agri Inputs',
-                price: product.discountPrice || product.price,
-                originalPrice: product.discountPrice ? product.price : null,
-                unitPrice: product.discountPrice || product.price,
-                serviceCount: 1,
-                vendorId: product.vendorId || null,
-                type: 'product' // New type indicator
-            };
-
-            const res = await addToCart(cartItemData);
+            // Seeds/fertilizers are store products -> agri (ecommerce) cart, not the service booking cart
+            const res = await addToCart(product._id, 1);
             if (res.success) {
                 toast.success(`${product.title} added to cart!`);
             }
@@ -77,14 +64,14 @@ const AgriMarketplaceSection = () => {
         <section className="px-5 mb-8">
             <div className="flex items-center justify-between mb-5">
                 <div>
-                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Agri Marketplace</h2>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('Agri Marketplace')}</h2>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quality Seeds & Fertilizers</p>
                 </div>
                 <button
                     onClick={() => navigate('/user/agri-marketplace')}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black transition-all active:scale-95"
                 >
-                    See All <FiArrowRight />
+                    {t('See All')} <FiArrowRight />
                 </button>
             </div>
 

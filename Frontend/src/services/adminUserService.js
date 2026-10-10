@@ -94,7 +94,7 @@ export const adminUserService = {
   // Update KYC status - approve or reject
   updateKycStatus: async (userId, status) => {
     try {
-      const response = await api.put(`/admin/users/${userId}/kyc-status`, { kyc_status: status });
+      const response = await api.put(`/admin/users/${userId}/kyc-status`, { status });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Failed to update KYC status' };

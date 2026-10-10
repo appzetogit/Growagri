@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { uploadShopLicense } = require('../../middleware/uploadMiddleware');
+const { authenticate } = require('../../middleware/authMiddleware');
 
 // Upload single file to Cloudinary
-router.post('/upload', uploadShopLicense, async (req, res) => {
+router.post('/upload', authenticate, uploadShopLicense, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({

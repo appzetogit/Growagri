@@ -1,6 +1,67 @@
 const multer = require('multer');
 
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// Native Cloudinary Multer Storage Engine (eliminates incompatible third-party dependencies)
+class CloudinaryStorage {
+  constructor(opts) {
+    if (!opts || !opts.cloudinary) {
+      throw new Error('`cloudinary` option is required for CloudinaryStorage');
+    }
+    this.cloudinary = opts.cloudinary;
+    this.params = opts.params || {};
+  }
+
+  async _getParams(req, file) {
+    let resolved = {};
+    if (typeof this.params === 'function') {
+      resolved = await this.params(req, file);
+    } else if (this.params && typeof this.params === 'object') {
+      resolved = { ...this.params };
+      for (const [key, value] of Object.entries(resolved)) {
+        if (typeof value === 'function') {
+          resolved[key] = await value(req, file);
+        }
+      }
+    }
+    return resolved;
+  }
+
+  _handleFile(req, file, cb) {
+    this._getParams(req, file)
+      .then((uploadParams) => {
+        const stream = this.cloudinary.uploader.upload_stream(
+          uploadParams,
+          (error, result) => {
+            if (error) {
+              return cb(error);
+            }
+            cb(null, {
+              path: result.secure_url || result.url,
+              secure_url: result.secure_url,
+              url: result.url,
+              public_id: result.public_id,
+              filename: result.public_id,
+              format: result.format,
+              resource_type: result.resource_type,
+              bytes: result.bytes,
+              ...result
+            });
+          }
+        );
+        file.stream.pipe(stream);
+      })
+      .catch((err) => cb(err));
+  }
+
+  _removeFile(req, file, cb) {
+    const publicId = file.filename || file.public_id;
+    if (publicId) {
+      this.cloudinary.uploader.destroy(publicId, { invalidate: true }, cb);
+    } else {
+      cb(null);
+    }
+  }
+}
+
 const cloudinary = require('../config/cloudinary');
 
 // Configure Cloudinary Storage with optimization

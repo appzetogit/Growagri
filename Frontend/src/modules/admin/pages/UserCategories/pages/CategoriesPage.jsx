@@ -208,7 +208,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
     });
 
     if (!val.success) {
-      toast.error(val.error.errors[0].message);
+      toast.error(val.error.issues[0].message);
       return;
     }
 

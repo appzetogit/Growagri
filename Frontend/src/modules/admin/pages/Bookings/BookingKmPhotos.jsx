@@ -42,8 +42,8 @@ const BookingKmPhotos = () => {
         try {
             setLoading(true);
             const res = await adminBookingService.getAllBookings({
-                page, limit: 15,
-                status: 'COMPLETED,IN_PROGRESS,STARTED'
+                page, limit: 50,
+                status: 'completed,in_progress,work_done,journey_started,visited,confirmed,assigned'
             });
             if (res.success) {
                 setBookings(res.data);
@@ -63,7 +63,8 @@ const BookingKmPhotos = () => {
         const hasEnd = !!b.end_kilometer_photo;
 
         const matchSearch = (b.bookingNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (b.userId?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+            (b.userId?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (b.serviceName || b.serviceId?.title || b.serviceCategory || '').toLowerCase().includes(searchQuery.toLowerCase());
 
         const matchFilter =
             filterType === 'all' ? true :
@@ -155,11 +156,11 @@ const BookingKmPhotos = () => {
                                                 <span className="font-bold text-gray-900 text-xs">#{booking.bookingNumber || booking._id?.slice(-6).toUpperCase()}</span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <p className="font-bold text-gray-900 text-xs">{booking.userId?.name || 'N/A'}</p>
-                                                <p className="text-[10px] text-gray-400">{booking.userId?.phone}</p>
+                                                <p className="font-bold text-gray-900 text-xs">{booking.userId?.name || 'Customer'}</p>
+                                                <p className="text-[10px] text-gray-400">{booking.userId?.phone || 'N/A'}</p>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <p className="text-xs text-gray-700 font-medium">{booking.serviceName}</p>
+                                                <p className="text-xs text-gray-700 font-medium">{booking.serviceName || booking.serviceId?.title || booking.serviceCategory || 'Equipment Rental'}</p>
                                             </td>
                                             <td className="px-4 py-3">
                                                 {hasStart
@@ -219,15 +220,15 @@ const BookingKmPhotos = () => {
                                 </div>
                                 <div>
                                     <span className="text-gray-500 font-semibold">Equipment:</span>
-                                    <span className="ml-2 font-bold text-gray-900">{selectedBooking.serviceName}</span>
+                                    <span className="ml-2 font-bold text-gray-900">{selectedBooking.serviceName || selectedBooking.serviceId?.title || selectedBooking.serviceCategory || 'Equipment Rental'}</span>
                                 </div>
                                 <div>
                                     <span className="text-gray-500 font-semibold">Farmer:</span>
-                                    <span className="ml-2 font-bold text-gray-900">{selectedBooking.userId?.name}</span>
+                                    <span className="ml-2 font-bold text-gray-900">{selectedBooking.userId?.name || 'Customer'}</span>
                                 </div>
                                 <div>
                                     <span className="text-gray-500 font-semibold">Amount:</span>
-                                    <span className="ml-2 font-bold text-green-700">₹{selectedBooking.finalAmount?.toLocaleString()}</span>
+                                    <span className="ml-2 font-bold text-green-700">₹{(selectedBooking.finalAmount || selectedBooking.price || 0).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>

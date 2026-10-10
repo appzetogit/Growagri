@@ -14,6 +14,23 @@ const BookingDetailsPage = () => {
     const navigate = useNavigate();
     const [booking, setBooking] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [overrideStatus, setOverrideStatus] = useState('');
+    const [acting, setActing] = useState(false);
+
+    const runAction = async (fn) => {
+        try {
+            setActing(true);
+            const res = await fn();
+            toast.success(res.message || 'Done');
+            fetchBookingDetails();
+        } catch (error) {
+            toast.error(error.message || 'Action failed');
+        } finally {
+            setActing(false);
+        }
+    };
+
+    const isPaid = ['success', 'collected_by_vendor'].includes(booking?.paymentStatus);
 
     const fetchBookingDetails = async () => {
         try {
@@ -166,6 +183,35 @@ const BookingDetailsPage = () => {
                             ))}
                         </div>
                     </div>
+
+                    {/* Trip & Workspace Verification Photos */}
+                    {(booking.start_kilometer_photo || booking.end_kilometer_photo || booking.work_evidence_photo || (booking.workPhotos && booking.workPhotos.length > 0)) && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <h2 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                <FiCamera className="text-primary-600" /> Trip & Workspace Photos
+                            </h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {booking.start_kilometer_photo && (
+                                    <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-200">
+                                        <p className="text-[11px] font-bold text-gray-700 mb-1.5">🚜 Handover / Start KM</p>
+                                        <img src={booking.start_kilometer_photo} alt="Start KM" className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90" onClick={() => window.open(booking.start_kilometer_photo, '_blank')} />
+                                    </div>
+                                )}
+                                {booking.end_kilometer_photo && (
+                                    <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-200">
+                                        <p className="text-[11px] font-bold text-gray-700 mb-1.5">🏁 Collection / End KM</p>
+                                        <img src={booking.end_kilometer_photo} alt="End KM" className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90" onClick={() => window.open(booking.end_kilometer_photo, '_blank')} />
+                                    </div>
+                                )}
+                                {(booking.work_evidence_photo || (booking.workPhotos && booking.workPhotos[0])) && (
+                                    <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-200">
+                                        <p className="text-[11px] font-bold text-gray-700 mb-1.5">🌾 Workspace / Evidence</p>
+                                        <img src={booking.work_evidence_photo || booking.workPhotos[0]} alt="Workspace Evidence" className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90" onClick={() => window.open(booking.work_evidence_photo || booking.workPhotos[0], '_blank')} />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Column: Party Info */}
@@ -221,6 +267,47 @@ const BookingDetailsPage = () => {
                                 <p className="text-xs font-bold text-gray-800 uppercase">{booking.paymentStatus || 'Paid'}</p>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Admin Actions */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-3">
+                        <h2 className="font-bold text-gray-800">Admin Actions</h2>
+                        <div className="flex gap-2">
+                            <select value={overrideStatus} onChange={(e) => setOverrideStatus(e.target.value)} className="flex-1 p-2 border border-gray-200 rounded-lg text-sm">
+                                <option value="">Change status to...</option>
+                                {['searching', 'confirmed', 'assigned', 'journey_started', 'visited', 'in_progress', 'work_done', 'completed', 'cancelled'].map(s => (
+                                    <option key={s} value={s} disabled={s === booking.status}>{s}</option>
+                                ))}
+                            </select>
+                            <button
+                                disabled={!overrideStatus || acting}
+                                onClick={() => {
+                                    const note = window.prompt(`Reason for changing status to "${overrideStatus}"?`);
+                                    if (note !== null) runAction(() => adminBookingService.overrideStatus(id, overrideStatus, note));
+                                }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+                            >Apply</button>
+                        </div>
+                        {!['cancelled', 'completed'].includes(booking.status) && (
+                            <button
+                                disabled={acting}
+                                onClick={() => {
+                                    const reason = window.prompt(`Cancel this booking?${isPaid ? ' The paid amount will be refunded to the customer wallet.' : ''} Reason:`);
+                                    if (reason !== null) runAction(() => adminBookingService.cancelBooking(id, reason));
+                                }}
+                                className="w-full py-2 bg-red-50 text-red-600 rounded-lg text-sm font-semibold"
+                            >Cancel Booking{isPaid ? ' & Refund' : ''}</button>
+                        )}
+                        {isPaid && (
+                            <button
+                                disabled={acting}
+                                onClick={() => {
+                                    const amount = window.prompt(`Refund amount to wallet (max ₹${booking.finalAmount}). Leave empty for full refund:`);
+                                    if (amount !== null) runAction(() => adminBookingService.refundBooking(id, amount ? Number(amount) : undefined, 'Refund by admin'));
+                                }}
+                                className="w-full py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold"
+                            >Refund to Wallet</button>
+                        )}
                     </div>
                 </div>
             </div>

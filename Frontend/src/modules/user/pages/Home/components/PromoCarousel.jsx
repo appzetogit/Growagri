@@ -2,12 +2,6 @@ import React, { useState, useEffect, useRef, memo } from 'react';
 import { gsap } from 'gsap';
 import PromoCard from '../../../components/common/PromoCard';
 import { themeColors } from '../../../../../theme';
-import promo1 from '../../../../../assets/images/pages/Home/promo-carousel/1764052270908-bae94c.jpg';
-import promo2 from '../../../../../assets/images/pages/Home/promo-carousel/1678450687690-81f922.jpg';
-import promo3 from '../../../../../assets/images/pages/Home/promo-carousel/1745822547742-760034.jpg';
-import promo4 from '../../../../../assets/images/pages/Home/promo-carousel/1711428209166-2d42c0.jpg';
-import promo5 from '../../../../../assets/images/pages/Home/promo-carousel/1762785595543-540198.jpg';
-import promo6 from '../../../../../assets/images/pages/Home/promo-carousel/1678454437383-aa4984.jpg';
 
 const PromoCarousel = memo(({ promos, onPromoClick }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -99,7 +93,7 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide snap-x snap-mandatory"
+        className="flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory"
         style={{ scrollBehavior: 'smooth' }}
       >
         {promotionalCards.map((promo) => (
@@ -116,7 +110,7 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
         ))}
       </div>
       {/* Carousel indicator dots */}
-      <div className="flex justify-center gap-1.5 mt-3 mb-4">
+      <div className="flex justify-center gap-1.5 mt-2 mb-1">
         {promotionalCards.map((_, index) => (
           <div
             key={index}

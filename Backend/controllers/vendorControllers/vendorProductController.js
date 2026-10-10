@@ -46,7 +46,12 @@ const addProduct = async (req, res) => {
 
 const updateMyProduct = async (req, res) => {
     try {
-        const updateData = { ...req.body };
+        // Vendors can't approve their own products or change ownership/type
+        const { approvalStatus: _a, vendorId: _v, type: _t, _id: _i, ...updateData } = req.body;
+        if (updateData.status) {
+            const existing = await Product.findOne({ _id: req.params.id, vendorId: req.user._id }).select('approvalStatus');
+            if (existing?.approvalStatus !== 'approved') delete updateData.status;
+        }
         
         // Sanitize categoryId to prevent Mongoose conversion errors if arriving as empty string or object
         if (updateData.categoryId === "") {
@@ -110,7 +115,8 @@ const getMyOrders = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Invalid status' });
             }
 
-            const order = await EcommerceOrder.findOne({ _id: req.params.id, vendorId: req.user._id });
+            const isAdminActor = ['ADMIN', 'admin', 'super_admin'].includes(req.userRole);
+            const order = await EcommerceOrder.findOne(isAdminActor ? { _id: req.params.id } : { _id: req.params.id, vendorId: req.user._id });
             if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
             if (status === 'cancelled') {
@@ -122,13 +128,26 @@ const getMyOrders = async (req, res) => {
                 }
             }
 
+            if (['delivered', 'cancelled'].includes(order.deliveryStatus)) {
+                return res.status(400).json({ success: false, message: `Order is already ${order.deliveryStatus}` });
+            }
+
             if (status === 'delivered') {
-                if (order.deliveryOtp && order.deliveryOtp !== deliveryOtp) {
+                if (!isAdminActor && order.deliveryOtp && order.deliveryOtp !== deliveryOtp) {
                     return res.status(400).json({ success: false, message: 'Invalid Verification OTP' });
                 }
                 if (order.paymentType === 'cod') {
                     order.paymentStatus = 'paid';
                 }
+            }
+
+            // Lock the transition so wallet credits/refunds below run only once
+            const locked = await EcommerceOrder.updateOne(
+                { _id: order._id, deliveryStatus: order.deliveryStatus },
+                { $set: { deliveryStatus: status } }
+            );
+            if (!locked.modifiedCount) {
+                return res.status(409).json({ success: false, message: 'Order status already updated' });
             }
 
             const updateData = { deliveryStatus: status };

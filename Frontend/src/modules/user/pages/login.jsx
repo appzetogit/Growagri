@@ -207,12 +207,15 @@ const Login = () => {
               </h2>
             )}
           </div>
-          <p className="text-sm font-medium text-gray-500">
-            {step === 'phone'
-              ? 'Login to your account'
-              : `Code sent to +91 ${phoneNumber}`
-            }
-          </p>
+          {step === 'phone' ? (
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">
+              Login to your account
+            </h2>
+          ) : (
+            <p className="text-sm font-medium text-gray-500">
+              Code sent to +91 {phoneNumber}
+            </p>
+          )}
         </div>
 
         {step === 'phone' ? (
@@ -232,7 +235,8 @@ const Login = () => {
                   inputMode="numeric"
                   autoComplete="tel"
                   id="phone"
-                  className="block w-full py-4 bg-transparent border-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                  className="block w-full py-4 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                  style={{ outline: 'none' }}
                   placeholder="Mobile Number"
                   value={phoneNumber}
                   onChange={(e) => {
@@ -288,8 +292,8 @@ const Login = () => {
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                  className="w-12 h-12 text-center text-xl font-bold rounded-xl focus:ring-0 border-transparent transition-all duration-300"
-                  style={{ backgroundColor: inputBgColor, color: brandColor }}
+                  className="w-12 h-12 text-center text-xl font-bold rounded-xl outline-none focus:outline-none focus:ring-0 border-transparent transition-all duration-300"
+                  style={{ backgroundColor: inputBgColor, color: brandColor, outline: 'none' }}
                 />
               ))}
             </div>

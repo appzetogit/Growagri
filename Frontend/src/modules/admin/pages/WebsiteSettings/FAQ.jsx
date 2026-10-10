@@ -29,7 +29,7 @@ const FAQ = () => {
   const fetchFaqs = async () => {
     try {
       setLoading(true);
-      const res = await API.get('/content/faq');
+      const res = await API.get('/content/faq/all');
       if (res.data.success) {
         setFaqs(res.data.data);
       }

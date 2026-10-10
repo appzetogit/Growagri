@@ -149,7 +149,7 @@ const MyRating = () => {
               You haven't reviewed any services yet. After completing a booking, you can rate your experience!
             </p>
             <button
-              onClick={() => navigate('/user/bookings')}
+              onClick={() => navigate('/user/my-bookings')}
               className="mt-6 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all"
             >
               Go to My Bookings

@@ -3,7 +3,7 @@ const EcommerceOrder = require('../../models/EcommerceOrder');
 const Transaction = require('../../models/Transaction');
 const User = require('../../models/User');
 const EcommerceCart = require('../../models/EcommerceCart');
-const { createOrder, verifyPayment } = require('../../services/razorpayService');
+const { createOrder, verifyAndClaimPayment, releasePayment } = require('../../services/razorpayService');
 const { createNotification } = require('../notificationControllers/notificationController');
 const PDFDocument = require('pdfkit');
 
@@ -313,7 +313,7 @@ const placeOrder = async (req, res) => {
  */
 const createPaymentOrder = async (req, res) => {
     try {
-        const order = await EcommerceOrder.findById(req.params.id);
+        const order = await EcommerceOrder.findOne({ _id: req.params.id, userId: req.user._id });
         if (!order || order.paymentStatus === 'paid') {
             return res.status(400).json({ success: false, message: 'Order already paid or not found' });
         }
@@ -356,7 +356,7 @@ const createPaymentOrder = async (req, res) => {
 const payPlatformFee = async (req, res) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-        const order = await EcommerceOrder.findById(req.params.id);
+        const order = await EcommerceOrder.findOne({ _id: req.params.id, userId: req.user._id });
         
         if (!order || order.paymentStatus === 'paid') {
             return res.status(400).json({ success: false, message: 'Order already paid or not found' });
@@ -365,10 +365,14 @@ const payPlatformFee = async (req, res) => {
         const amountToPay = order.paymentType === 'online_full' ? order.pricing.orderTotal : order.pricing.platformFee;
 
         if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
-             // Verify Razorpay signature
-             const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-             if (!isValid) {
-                 return res.status(400).json({ success: false, message: 'Payment verification failed' });
+             const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+             if (!verified.success) {
+                 return res.status(verified.status).json({ success: false, message: verified.error });
+             }
+             // The Razorpay order must be the one created for this ecommerce order, for the full amount
+             if (verified.notes.orderId !== order._id.toString() || verified.amountPaise < Math.round(amountToPay * 100)) {
+                 await releasePayment(razorpay_payment_id);
+                 return res.status(400).json({ success: false, message: 'Payment does not match this order' });
              }
 
              // Record Transaction
@@ -424,8 +428,19 @@ const payPlatformFee = async (req, res) => {
         } 
         
         // Fallback for wallet (Optional, but Razorpay requested)
-        const user = await User.findById(req.user._id);
-        if (user.wallet.balance < amountToPay) {
+        // Claim the order first so a double click can't debit twice
+        const prevPaymentStatus = order.paymentStatus;
+        const claimed = await EcommerceOrder.updateOne({ _id: order._id, paymentStatus: { $ne: 'paid' } }, { paymentStatus: 'paid' });
+        if (!claimed.modifiedCount) {
+            return res.status(400).json({ success: false, message: 'Order already paid' });
+        }
+        const user = await User.findOneAndUpdate(
+            { _id: req.user._id, 'wallet.balance': { $gte: amountToPay } },
+            { $inc: { 'wallet.balance': -amountToPay } },
+            { new: true }
+        );
+        if (!user) {
+            await EcommerceOrder.updateOne({ _id: order._id }, { paymentStatus: prevPaymentStatus });
             return res.status(400).json({ 
                 success: false, 
                 message: 'Insufficient balance in wallet',
@@ -433,8 +448,6 @@ const payPlatformFee = async (req, res) => {
             });
         }
 
-        user.wallet.balance -= amountToPay;
-        await user.save();
 
         const transaction = new Transaction({
             userId: user._id,
@@ -528,7 +541,14 @@ const cancelOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: `Cannot cancel order in ${order.deliveryStatus} status` });
         }
 
-        const oldStatus = order.deliveryStatus;
+        // Lock the transition so a double click can't refund twice
+        const locked = await EcommerceOrder.updateOne(
+            { _id: order._id, deliveryStatus: order.deliveryStatus },
+            { $set: { deliveryStatus: 'cancelled' } }
+        );
+        if (!locked.modifiedCount) {
+            return res.status(409).json({ success: false, message: 'Order status already changed' });
+        }
         order.deliveryStatus = 'cancelled';
         
         // If it was already paid, refund the correct amount to the user's wallet
@@ -552,8 +572,10 @@ const cancelOrder = async (req, res) => {
                 metadata: { orderId: order._id, reason: 'user_cancelled' }
             });
             await transaction.save();
+        }
 
-            // Return items to stock
+        // Stock was reduced at placement for COD, or after payment for online orders
+        if (order.paymentType === 'cod' || order.paymentStatus === 'paid') {
             for (const item of order.items) {
                 await Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
             }

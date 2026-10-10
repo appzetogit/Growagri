@@ -76,6 +76,7 @@ const AdminHeader = ({ onMenuClick }) => {
       { path: '/admin/settlements', title: 'Settlements', description: 'Manage financial settlements' },
       { path: '/admin/reviews', title: 'Reviews', description: 'Manage platform reviews and ratings' },
       { path: '/admin/disputes', title: 'Disputes', description: 'Review and resolve complaints from Farmers and Owners' },
+      { path: '/admin/schemes', title: 'Scheme Management', description: 'Configure dynamic government schemes, official portal links, and WhatsApp inquiry setup' },
       { path: '/admin/marketplace', title: 'Agri Marketplace', description: 'Manage agricultural products (Seeds, Fertilizers) and marketplace listings' },
       { path: '/admin/products/orders', title: 'Global Marketplace Orders', description: 'Monitor all marketplace sales and fulfillment' },
       { path: '/admin/products', title: 'Machinery Management', description: 'Approve and manage heavy equipment, tractors, and machinery' },

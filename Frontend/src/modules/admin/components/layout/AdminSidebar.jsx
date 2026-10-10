@@ -21,6 +21,7 @@ import {
   FiAlertTriangle,
   FiGlobe,
   FiTruck,
+  FiAward,
 } from "react-icons/fi";
 import adminMenu from "../../config/adminMenu.json";
 import dashboardService from "../../services/dashboardService";
@@ -30,6 +31,7 @@ const iconMap = {
   Dashboard: FiHome,
   Farmers: FiUsers,
   "Equipment Owners": FiBriefcase,
+  Workers: FiUser,
   Bookings: FiShoppingBag,
   "User Catalog": FiGrid,
   Payments: FiDollarSign,
@@ -42,6 +44,7 @@ const iconMap = {
   "Agri Marketplace": FiShoppingBag,
   "Soil Testing": FiActivity,
   Disputes: FiAlertTriangle,
+  "Scheme Management": FiAward,
   "Equipment Catalog": FiGrid,
   "Machinery Management": FiPackage,
   "Manage Website": FiGlobe,
@@ -55,17 +58,16 @@ const getChildRoute = (parentRoute, childName) => {
       "All Farmers": "/admin/users/all",
       "Farmer Bookings": "/admin/users/bookings",
       "Farmer Analytics": "/admin/users/analytics",
+      "Farmer Transactions": "/admin/users/transactions",
+      "KYC Verification": "/admin/users/kyc",
     },
     "/admin/vendors": {
       "All Owners": "/admin/vendors/all",
       "Owner Bookings": "/admin/vendors/bookings",
       "Owner Analytics": "/admin/vendors/analytics",
+      "Owner Payments": "/admin/vendors/payments",
     },
-    "/admin/bookings": {
-      "All Bookings": "/admin/bookings",
-      "Booking Tracking": "/admin/bookings/tracking",
-      "Booking Notifications": "/admin/bookings/notifications",
-    },
+
     "/admin/equipment-catalog": {
       "Home": "/admin/equipment-catalog/home",
       "Manage Categories": "/admin/equipment-catalog/categories",
@@ -211,8 +213,8 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     let activeItem = filteredMenu.find((item) => {
       return item.children?.some(child => {
         const childRoute = getChildRoute(item.route, child);
-        return location.pathname === childRoute || 
-               (childRoute !== item.route && location.pathname.startsWith(childRoute + '/'));
+        return location.pathname === childRoute ||
+          (childRoute !== item.route && location.pathname.startsWith(childRoute + '/'));
       });
     });
 
@@ -252,8 +254,8 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     if (item.children && item.children.length > 0) {
       return item.children.some(child => {
         const childRoute = getChildRoute(item.route, child);
-        return location.pathname === childRoute || 
-               (childRoute !== item.route && location.pathname.startsWith(childRoute + '/'));
+        return location.pathname === childRoute ||
+          (childRoute !== item.route && location.pathname.startsWith(childRoute + '/'));
       });
     }
 
@@ -429,7 +431,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
                 {adminUser.name}
               </h2>
               <p className="text-xs text-gray-400 truncate">
-                {adminUser.role === 'super_admin' ? '⭐ Super Admin' : 'Admin'}
+                {adminUser.role === 'super_admin' ? '' : 'Admin'}
               </p>
             </div>
           </div>

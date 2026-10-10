@@ -22,32 +22,6 @@ const vendorBillService = {
   },
 
   /**
-   * Get service catalog for billing
-   */
-  getServiceCatalog: async () => {
-    try {
-      const response = await api.get('/vendors/catalog/services');
-      return response.data;
-    } catch (error) {
-      console.warn('Service catalog not found, falling back to empty catalog');
-      return { success: true, services: [] };
-    }
-  },
-
-  /**
-   * Get parts catalog for billing
-   */
-  getPartsCatalog: async () => {
-    try {
-      const response = await api.get('/vendors/catalog/parts');
-      return response.data;
-    } catch (error) {
-      console.warn('Parts catalog not found, falling back to empty catalog');
-      return { success: true, parts: [] };
-    }
-  },
-
-  /**
    * Download Invoice PDF
    */
   downloadInvoice: async (bookingId) => {

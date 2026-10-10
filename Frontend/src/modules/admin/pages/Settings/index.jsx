@@ -93,22 +93,11 @@ const AdminSettings = () => {
       }
     };
 
-    const loadSettings = () => {
-      try {
-        const adminSettings = JSON.parse(localStorage.getItem('adminSettings') || '{}');
-        if (Object.keys(adminSettings).length > 0) {
-          setSettings(prev => ({ ...prev, ...adminSettings }));
-        }
-      } catch (error) {
-        console.error('Error loading admin settings:', error);
-      }
-    };
-
     const loadFinancialSettings = async () => {
       try {
         const res = await getSettings();
-        if (res.success && res.settings) {
-          setFinancialSettings({
+        if (res?.settings) {
+          const financialConfig = {
             visitedCharges: res.settings.visitedCharges || 0,
             serviceGstPercentage: res.settings.serviceGstPercentage ?? 18,
             partsGstPercentage: res.settings.partsGstPercentage ?? 18,
@@ -120,7 +109,9 @@ const AdminSettings = () => {
             cancellationPenalty: res.settings.cancellationPenalty ?? 49,
             bookingCommissionPercentage: res.settings.bookingCommissionPercentage ?? 10,
             rentalGstPercentage: res.settings.rentalGstPercentage ?? 5
-          });
+          };
+          setFinancialSettings(financialConfig);
+          setSettings(financialConfig);
 
           // Load billing settings
           setBillingSettings({
@@ -149,7 +140,6 @@ const AdminSettings = () => {
     };
 
     loadProfile();
-    loadSettings();
     loadFinancialSettings();
   }, []);
 
@@ -348,9 +338,9 @@ const AdminSettings = () => {
       }
 
       await updateAdminProfile(updateData);
-      const adminData = JSON.parse(localStorage.getItem('adminUser') || '{}');
+      const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
       adminData.email = profile.email;
-      localStorage.setItem('adminUser', JSON.stringify(adminData));
+      localStorage.setItem('adminData', JSON.stringify(adminData));
 
       toast.success('Profile updated');
       setProfile(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));

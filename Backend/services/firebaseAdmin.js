@@ -3,10 +3,10 @@
  * Handles push notification sending via Firebase Cloud Messaging (FCM)
  */
 
-const admin = require('firebase-admin');
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 const path = require('path');
 
-// Initialize Firebase Admin SDK
 // Initialize Firebase Admin SDK
 let serviceAccount;
 
@@ -27,11 +27,28 @@ try {
 }
 
 // Initialize only if not already initialized
-if (!admin.apps.length && serviceAccount) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-  console.log('✅ Firebase Admin SDK initialized');
+if (!getApps().length && serviceAccount) {
+  try {
+    initializeApp({
+      credential: cert(serviceAccount)
+    });
+    console.log('✅ Firebase Admin SDK initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
+  }
+}
+
+// Helper to get messaging instance safely
+function getMessagingService() {
+  if (getApps().length > 0) {
+    try {
+      return getMessaging();
+    } catch (err) {
+      console.error('❌ Error getting Firebase messaging instance:', err.message);
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -153,9 +170,13 @@ async function sendPushNotification(tokens, payload) {
     if (payload.icon) message.data.icon = payload.icon;
 
     // Log intent
-    console.log(`[FCM] Sending standard notification to ${uniqueTokens.length} tokens:`, payload.title);
+    const messaging = getMessagingService();
+    if (!messaging) {
+      console.warn('[FCM] Firebase messaging service not available. Skipping notification.');
+      return { successCount: 0, failureCount: uniqueTokens.length };
+    }
 
-    const response = await admin.messaging().sendEachForMulticast(message);
+    const response = await messaging.sendEachForMulticast(message);
 
     console.log(`✅ Push notification sent - Success: ${response.successCount}, Failed: ${response.failureCount}`);
 

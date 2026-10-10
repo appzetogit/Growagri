@@ -24,13 +24,16 @@ import {
   FiShield,
   FiZap,
   FiCheckCircle,
-  FiTrash2
+  FiTrash2,
+  FiGlobe
 } from 'react-icons/fi';
 import { MdAccountBalanceWallet } from 'react-icons/md';
 import NotificationBell from '../../components/common/NotificationBell';
+import { useLanguage } from '../../../../context/LanguageContext';
 
 const Account = () => {
   const navigate = useNavigate();
+  const { language, languages, t } = useLanguage();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [userProfile, setUserProfile] = useState({
@@ -375,7 +378,13 @@ const Account = () => {
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-2">Membership</h3>
             <MenuItem
               icon={FiShield}
-              label="Subscription Plans"
+              label="My Subscription"
+              badge={userProfile.plans?.isActive ? "Active" : null}
+              onClick={() => navigate('/user/my-subscription')}
+            />
+            <MenuItem
+              icon={FiStar}
+              label="Explore Plans"
               onClick={() => navigate('/user/my-plan')}
             />
           </motion.div>
@@ -406,8 +415,15 @@ const Account = () => {
 
             <MenuItem
               icon={FiSettings}
-              label="Settings"
+              label={t('Settings')}
               onClick={() => navigate('/user/settings')}
+            />
+
+            <MenuItem
+              icon={FiGlobe}
+              label={t('Language')}
+              badge={languages[language]?.nativeLabel || language}
+              onClick={() => navigate('/user/language')}
             />
           </motion.div>
 

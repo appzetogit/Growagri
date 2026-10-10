@@ -12,6 +12,9 @@ import LogoLoader from '../../../../components/common/LogoLoader';
 import BreadcrumbsSchema from '../../../../components/common/BreadcrumbsSchema';
 import ServiceSchema from '../../../../components/common/ServiceSchema';
 import { toast } from 'react-hot-toast';
+import { bookingService } from '../../../../services/bookingService';
+
+const SLOTS = ['Early Morning (6AM-10AM)', 'Forenoon (10AM-2PM)', 'Afternoon (2PM-6PM)'];
 
 const EquipmentDetail = () => {
   const { id } = useParams();
@@ -22,6 +25,24 @@ const EquipmentDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
+  const [blockedSlots, setBlockedSlots] = useState({}); // slot -> reason (booked / maintenance)
+
+  // Check each slot against existing bookings + maintenance for the chosen date
+  useEffect(() => {
+    if (!selectedDate || !equipment?._id) return;
+    let cancelled = false;
+    Promise.all(SLOTS.map(slot =>
+      bookingService.checkEquipmentAvailability(equipment._id, selectedDate, slot)
+        .then(r => [slot, r.available === false ? (r.message || 'Not available') : null])
+        .catch(() => [slot, null])
+    )).then(results => {
+      if (cancelled) return;
+      const blocked = Object.fromEntries(results.filter(([, reason]) => reason));
+      setBlockedSlots(blocked);
+      if (blocked[selectedSlot]) setSelectedSlot('');
+    });
+    return () => { cancelled = true; };
+  }, [selectedDate, equipment?._id]);
   const [selectedImplements, setSelectedImplements] = useState([]); // NEW: selected sub-categories
 
   useEffect(() => {
@@ -359,11 +380,13 @@ const EquipmentDetail = () => {
                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-2 block">Available Slots</label>
                     <div className="flex flex-wrap gap-2">
-                       {['Early Morning (6AM-10AM)', 'Forenoon (10AM-2PM)', 'Afternoon (2PM-6PM)'].map(slot => (
-                          <button 
+                       {SLOTS.map(slot => (
+                          <button
                             key={slot}
+                            disabled={!!blockedSlots[slot]}
+                            title={blockedSlots[slot] || ''}
                             onClick={() => setSelectedSlot(slot)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border disabled:opacity-40 disabled:line-through
                               ${selectedSlot === slot ? 'bg-purple-600 border-purple-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}
                           >
                             {slot}

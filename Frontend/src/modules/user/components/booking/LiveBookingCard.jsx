@@ -108,7 +108,7 @@ const LiveBookingCard = ({ hasBottomNav }) => {
           // Hide LiveBookingCard if status is WORK_DONE and review is already done
           if (s === 'WORK_DONE' && b.rating) return false;
 
-          return ['ASSIGNED', 'STARTED', 'JOURNEY_STARTED', 'VISITED', 'IN_PROGRESS', 'WORK_DONE', 'SEARCHING', 'REQUESTED'].includes(s);
+          return ['CONFIRMED', 'AWAITING_PAYMENT', 'ASSIGNED', 'STARTED', 'JOURNEY_STARTED', 'VISITED', 'IN_PROGRESS', 'WORK_DONE', 'SEARCHING', 'REQUESTED'].includes(s);
         });
         setActiveBooking(ongoing || null);
       }

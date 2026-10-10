@@ -1,51 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiBell, FiCheck, FiX, FiInfo, FiTrash2 } from 'react-icons/fi';
+import { FiBell, FiCheck, FiX, FiInfo } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import api from '../../../../services/api';
+
+// Group backend notification types into this page's filter buckets
+const kindOf = (type = '') => {
+  if (type.includes('cancel')) return 'cancelled';
+  if (type === 'payment_failed') return 'payment_failed';
+  if (type.startsWith('booking')) return 'new_booking';
+  return 'other';
+};
 
 const BookingNotifications = () => {
   const [filter, setFilter] = useState('All Types');
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'New Booking Received',
-      message: 'Booking #ORD-001 has been placed by John Doe',
-      time: 'Dec 31, 2025, 06:35 PM',
-      bookingId: 'ORD-001',
-      type: 'new_booking',
-      unread: true,
-    },
-    {
-      id: 2,
-      title: 'Booking Cancelled',
-      message: 'Booking #ORD-002 has been cancelled by customer',
-      time: 'Dec 31, 2025, 05:35 PM',
-      bookingId: 'ORD-002',
-      type: 'cancelled',
-      unread: true,
-    },
-    {
-      id: 3,
-      title: 'Payment Failed',
-      message: 'Payment for Booking #ORD-003 has failed',
-      time: 'Dec 31, 2025, 04:35 PM',
-      bookingId: 'ORD-003',
-      type: 'payment_failed',
-      unread: false,
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    api.get('/notifications/admin', { params: { limit: 100 } })
+      .then((res) => setNotifications((res.data.data || [])
+        .filter((n) => n.relatedType === 'booking' || n.type?.startsWith('booking') || n.type === 'payment_failed')
+        .map((n) => ({
+          id: n._id,
+          title: n.title,
+          message: n.message,
+          time: new Date(n.createdAt).toLocaleString('en-IN'),
+          bookingId: n.relatedId ? `#${String(n.relatedId).slice(-6)}` : '',
+          type: kindOf(n.type),
+          unread: !n.isRead
+        }))))
+      .catch(() => toast.error('Failed to load booking notifications'));
+  }, []);
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
   const markAllRead = () => {
     setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    api.put('/notifications/read-all').catch(() => {});
   };
 
   const deleteNotification = (id) => {
     setNotifications(notifications.filter(n => n.id !== id));
+    api.delete(`/notifications/${id}`).catch(() => {});
   };
 
   const markAsRead = (id) => {
     setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
+    api.put(`/notifications/${id}/read`).catch(() => {});
   };
 
   const getIcon = (type) => {
@@ -128,7 +129,7 @@ const BookingNotifications = () => {
 
                 <div className="flex items-center gap-3 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                   {notification.unread && (
-                    <button title="Mark as read" onClick={() => (notification.title)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors relative">
+                    <button title="Mark as read" onClick={() => markAsRead(notification.id)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors relative">
                       <div className="w-2 h-2 bg-blue-500 rounded-full absolute top-1 right-1" />
                       <FiCheck className="w-4 h-4" /> {/* Simple check icon logic implies read */}
                     </button>

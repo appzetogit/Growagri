@@ -14,6 +14,7 @@ import {
 import AllOwners from './AllOwners';
 import OwnerBookings from './OwnerBookings';
 import OwnerAnalytics from './OwnerAnalytics';
+import OwnerPayments from './OwnerPayments';
 
 const Vendors = () => {
   const location = useLocation();
@@ -22,6 +23,7 @@ const Vendors = () => {
     { name: 'All Owners', path: '/admin/vendors/all', icon: FiUsers },
     { name: 'Owner Bookings', path: '/admin/vendors/bookings', icon: FiBriefcase },
     { name: 'Owner Analytics', path: '/admin/vendors/analytics', icon: FiActivity },
+    { name: 'Owner Payments', path: '/admin/vendors/payments', icon: FiDollarSign },
   ];
 
   const getPageTitle = () => {
@@ -43,6 +45,7 @@ const Vendors = () => {
           <Route path="all" element={<AllOwners />} />
           <Route path="bookings" element={<OwnerBookings />} />
           <Route path="analytics" element={<OwnerAnalytics />} />
+          <Route path="payments" element={<OwnerPayments />} />
         </Routes>
       </motion.div>
     </div>

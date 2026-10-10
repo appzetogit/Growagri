@@ -20,21 +20,34 @@ exports.getAllCities = catchAsync(async (req, res) => {
   });
 });
 
+let citiesCache = null;
+let citiesCacheExpiry = 0;
+
 /**
  * @desc    Get active cities (Public)
  * @route   GET /api/public/cities
  * @access  Public
  */
 exports.getActiveCities = catchAsync(async (req, res) => {
+  if (citiesCache && Date.now() < citiesCacheExpiry) {
+    return res.status(200).json(citiesCache);
+  }
+
   const cities = await City.find({ isActive: true })
     .select('name slug state location serviceRadius isDefault currency timezone')
-    .sort({ displayOrder: 1, name: 1 });
+    .sort({ displayOrder: 1, name: 1 })
+    .lean();
 
-  res.status(200).json({
+  const responseData = {
     success: true,
     count: cities.length,
     cities
-  });
+  };
+
+  citiesCache = responseData;
+  citiesCacheExpiry = Date.now() + 120000; // 2 minutes
+
+  res.status(200).json(responseData);
 });
 
 /**
@@ -64,6 +77,7 @@ exports.getCity = catchAsync(async (req, res) => {
  * @access  Private (Super Admin)
  */
 exports.createCity = catchAsync(async (req, res) => {
+  citiesCache = null; // public list must reflect admin changes immediately
   req.body.createdBy = req.user.id;
 
   const city = await City.create(req.body);
@@ -81,6 +95,7 @@ exports.createCity = catchAsync(async (req, res) => {
  * @access  Private (Super Admin)
  */
 exports.updateCity = catchAsync(async (req, res) => {
+  citiesCache = null; // public list must reflect admin changes immediately
   let city = await City.findById(req.params.id);
 
   if (!city) {
@@ -108,6 +123,7 @@ exports.updateCity = catchAsync(async (req, res) => {
  * @access  Private (Super Admin)
  */
 exports.deleteCity = catchAsync(async (req, res) => {
+  citiesCache = null; // public list must reflect admin changes immediately
   const city = await City.findById(req.params.id);
 
   if (!city) {
@@ -139,6 +155,7 @@ exports.deleteCity = catchAsync(async (req, res) => {
  * @access  Private (Super Admin)
  */
 exports.toggleCityStatus = catchAsync(async (req, res) => {
+  citiesCache = null; // public list must reflect admin changes immediately
   const city = await City.findById(req.params.id);
 
   if (!city) {

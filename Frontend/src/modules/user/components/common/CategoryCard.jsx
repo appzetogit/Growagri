@@ -1,6 +1,7 @@
 import React, { useRef, memo, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { themeColors } from '../../../../theme';
+import { useLanguage } from '../../../../context/LanguageContext';
 
 // Pre-defined agriculture colors for the mockup
 const bgColors = [
@@ -16,6 +17,7 @@ const bgColors = [
 
 const CategoryCard = memo(({ icon, title, onClick, hasSaleBadge = false, index = 0 }) => {
   const cardRef = useRef(null);
+  const { t } = useLanguage();
 
   // Simple entrance animation
   useEffect(() => {
@@ -39,7 +41,7 @@ const CategoryCard = memo(({ icon, title, onClick, hasSaleBadge = false, index =
   return (
     <div
       ref={cardRef}
-      className="flex flex-col items-center cursor-pointer relative group transition-all duration-300 ease-out hover:-translate-y-1.5 active:scale-95 w-[85px] h-[105px] rounded-[20px] overflow-hidden shadow-sm hover:shadow-md"
+      className="flex flex-col items-center cursor-pointer relative group transition-all duration-300 ease-out hover:-translate-y-1.5 active:scale-95 w-[85px] h-[105px] rounded-[12px] overflow-hidden shadow-sm hover:shadow-md"
       onClick={onClick}
       style={{
         opacity: 0,
@@ -95,7 +97,7 @@ const CategoryCard = memo(({ icon, title, onClick, hasSaleBadge = false, index =
         <span
           className="text-[9.5px] leading-[1.1] text-center font-bold tracking-tight text-[#2c3e21] line-clamp-2"
         >
-          {title}
+          {t(title)}
         </span>
       </div>
     </div>

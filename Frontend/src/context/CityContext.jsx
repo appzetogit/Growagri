@@ -6,21 +6,41 @@ const CityContext = createContext();
 export const useCity = () => useContext(CityContext);
 
 export const CityProvider = ({ children }) => {
-  const [currentCity, setCurrentCity] = useState(null);
-  const [cities, setCities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [currentCity, setCurrentCity] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cached_current_city');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [cities, setCities] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cached_cities');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    const hasCity = !!localStorage.getItem('cached_current_city');
+    const hasCities = !!localStorage.getItem('cached_cities');
+    return !hasCity && !hasCities;
+  });
 
   // Load cities and restore selection on mount
   useEffect(() => {
     const initCity = async () => {
       try {
-        setLoading(true);
         // Fetch active cities from public API
         const response = await api.get('/public/cities');
 
         if (response.data.success && response.data.cities.length > 0) {
           const fetchedCities = response.data.cities;
           setCities(fetchedCities);
+          try {
+            localStorage.setItem('cached_cities', JSON.stringify(fetchedCities));
+          } catch {}
 
           // Check if user has a saved city
           const savedCityId = localStorage.getItem('selectedCityId');
@@ -38,6 +58,9 @@ export const CityProvider = ({ children }) => {
           setCurrentCity(selected);
           if (selected) {
             localStorage.setItem('selectedCityId', selected._id || selected.id);
+            try {
+              localStorage.setItem('cached_current_city', JSON.stringify(selected));
+            } catch {}
           }
         }
       } catch (error) {
@@ -58,8 +81,12 @@ export const CityProvider = ({ children }) => {
     }
     if (city) {
       localStorage.setItem('selectedCityId', city._id || city.id);
+      try {
+        localStorage.setItem('cached_current_city', JSON.stringify(city));
+      } catch {}
     } else {
       localStorage.removeItem('selectedCityId');
+      localStorage.removeItem('cached_current_city');
     }
   };
 

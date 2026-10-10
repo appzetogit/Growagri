@@ -139,12 +139,11 @@ exports.updateEquipment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Equipment not found in your inventory' });
     }
 
-    // Update fields (excluding vendorId and status reset)
-    const updateData = req.body;
-    delete updateData.vendorId;
-    
+    // Update fields — vendors can never set their own approval/status
+    const { vendorId: _v, status: _s, _id: _i, adminRemarks: _r, ...updateData } = req.body;
+
     // If category changed, reset to pending
-    if (updateData.categoryId && updateData.categoryId !== equipment.categoryId.toString()) {
+    if (updateData.categoryId && updateData.categoryId !== equipment.categoryId?.toString()) {
       updateData.status = 'pending';
     }
 
@@ -258,12 +257,15 @@ exports.startMachineryWork = async (req, res) => {
     const booking = await Booking.findOne({ _id: bookingId, vendorId }).select('+driver_start_otp');
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    if (booking.driver_start_otp !== otp) {
+    if (!otp || booking.driver_start_otp !== String(otp)) {
       return res.status(400).json({ success: false, message: 'Invalid Start OTP from Farmer' });
+    }
+    if ([BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED].includes(booking.status)) {
+      return res.status(400).json({ success: false, message: `Cannot start work on a ${booking.status} booking` });
     }
 
     // Adaptive tracking: check listingType from the SPECIFIC equipment linked to this booking
-    const equipment = await VendorEquipment.findById(booking.serviceId).select('listingType');
+    const equipment = await VendorEquipment.findById(booking.equipmentId || booking.serviceId).select('listingType');
     const isRentalType = equipment?.listingType === 'rental';
 
     if (isRentalType) {
@@ -309,6 +311,10 @@ exports.completeMachineryWork = async (req, res) => {
 
     const booking = await Booking.findOne({ _id: bookingId, vendorId }).populate('serviceId');
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    // Only once, from in-progress: this overwrites basePrice with the trip total
+    if (booking.status !== BOOKING_STATUS.IN_PROGRESS) {
+      return res.status(400).json({ success: false, message: 'Work has not started or is already completed' });
+    }
 
     // Calculate dynamic base price for the Trip
     const service = booking.serviceId || {};

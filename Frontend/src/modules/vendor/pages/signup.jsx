@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiUser, FiMail, FiPhone, FiFileText, FiUpload, FiX, FiArrowRight, FiChevronLeft, FiCheckCircle, FiCamera, FiBriefcase, FiChevronDown } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiFileText, FiUpload, FiX, FiArrowRight, FiChevronLeft, FiCheckCircle, FiCamera, FiBriefcase, FiChevronDown, FiCheck, FiSearch, FiLayers } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../theme';
 import { register, sendOTP as sendVendorOTP } from '../services/authService';
@@ -32,7 +32,11 @@ const VendorSignup = () => {
     const saved = localStorage.getItem('vendor_signup_form_data');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && !Array.isArray(parsed.service)) {
+          parsed.service = parsed.service ? [parsed.service] : [];
+        }
+        return parsed;
       } catch (e) {
         console.error('Error parsing saved signup form data:', e);
       }
@@ -53,6 +57,9 @@ const VendorSignup = () => {
     };
   });
   const [categories, setCategories] = useState([]);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const categoryDropdownRef = useRef(null);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpToken, setOtpToken] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
@@ -77,7 +84,7 @@ const VendorSignup = () => {
       } else {
         setPolicyContent('No content available.');
       }
-    } catch (e) {
+    } catch {
       setPolicyContent('Failed to load policy content.');
     }
   };
@@ -124,6 +131,21 @@ const VendorSignup = () => {
       }
     };
     loadCategories();
+  }, []);
+
+  // Close category dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Refs for auto-focus
@@ -190,6 +212,29 @@ const VendorSignup = () => {
       }
     });
   };
+
+  const handleSelectAllCategories = (catsToSelect) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.service) ? [...prev.service] : [];
+      const newItems = catsToSelect.map(c => c.title).filter(t => t && !current.includes(t));
+      return { ...prev, service: [...current, ...newItems] };
+    });
+  };
+
+  const handleClearAllCategories = () => {
+    setFormData(prev => ({ ...prev, service: [] }));
+  };
+
+  const handleRemoveCategory = (title) => {
+    setFormData(prev => {
+      const current = Array.isArray(prev.service) ? prev.service : [];
+      return { ...prev, service: current.filter(s => s !== title) };
+    });
+  };
+
+  const filteredCategories = categories.filter(cat =>
+    (cat?.title || '').toLowerCase().includes((categorySearchQuery || '').toLowerCase().trim())
+  );
 
   const handleDocumentUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -534,7 +579,7 @@ const VendorSignup = () => {
             <form onSubmit={handleDetailsSubmit} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Basic Details */}
-                <div className="space-y-4 animate-stagger-1 animate-fade-in">
+                <div className="space-y-4 animate-stagger-1 animate-fade-in relative" style={{ zIndex: isCategoryDropdownOpen ? 40 : 1 }}>
                   <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Business Profile</h3>
 
                   <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
@@ -576,34 +621,208 @@ const VendorSignup = () => {
                     </div>
                   </div>
 
-                  <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Equipment Category (Select All That Apply)</label>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map((cat, index) => {
-                        const isSelected = formData.service.includes(cat.title);
-                        return (
-                          <button
-                            key={cat._id || cat.id || index}
-                            type="button"
-                            onClick={() => toggleServiceSelection(cat.title)}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all duration-300 ${
-                              isSelected
-                                ? 'bg-[#347989] text-white border-[#347989] shadow-sm'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-[#347989]'
-                            }`}
-                          >
-                            {cat.title}
-                          </button>
-                        );
-                      })}
-                      {categories.length === 0 && (
-                        <p className="text-xs text-gray-400 italic">No categories available</p>
+                  <div className="animate-fade-in relative" style={{ animationDelay: '0.2s', zIndex: isCategoryDropdownOpen ? 50 : 1 }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Equipment Category <span className="text-xs font-normal text-gray-500">(Multiple Select)</span>
+                      </label>
+                      {Array.isArray(formData.service) && formData.service.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearAllCategories}
+                          className="text-xs font-semibold text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                        >
+                          Clear all
+                        </button>
                       )}
                     </div>
+
+                    {/* Multi-Select Dropdown Container */}
+                    <div ref={categoryDropdownRef} className="relative z-50">
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryDropdownOpen(prev => !prev)}
+                        className={`w-full min-h-[44px] px-3.5 py-2.5 text-left border rounded-xl flex items-center justify-between bg-white transition-all duration-200 outline-none cursor-pointer hover:border-gray-400 ${
+                          isCategoryDropdownOpen
+                            ? 'border-[#347989] ring-2 ring-[#347989]/20 shadow-sm'
+                            : 'border-gray-300'
+                        }`}
+                        aria-haspopup="listbox"
+                        aria-expanded={isCategoryDropdownOpen}
+                      >
+                        <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                          <FiLayers
+                            className={`text-base flex-shrink-0 ${
+                              Array.isArray(formData.service) && formData.service.length > 0
+                                ? 'text-[#347989]'
+                                : 'text-gray-400'
+                            }`}
+                          />
+                          {(!formData.service || formData.service.length === 0) ? (
+                            <span className="text-sm text-gray-400 truncate">Select Equipment Categories...</span>
+                          ) : (
+                            <span className="text-sm font-medium text-gray-800 truncate">
+                              {formData.service.length === 1
+                                ? formData.service[0]
+                                : `${formData.service.length} Categories Selected`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          {Array.isArray(formData.service) && formData.service.length > 0 && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#347989]/10 text-[#347989]">
+                              {formData.service.length}
+                            </span>
+                          )}
+                          <FiChevronDown
+                            className={`text-gray-400 transition-transform duration-200 text-lg ${
+                              isCategoryDropdownOpen ? 'transform rotate-180 text-[#347989]' : ''
+                            }`}
+                          />
+                        </div>
+                      </button>
+
+                      {/* Dropdown Menu Popup */}
+                      {isCategoryDropdownOpen && (
+                        <div
+                          className="absolute left-0 right-0 top-full mt-1.5 border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
+                          style={{ backgroundColor: '#ffffff', zIndex: 50 }}
+                        >
+                          {/* Search Bar inside Dropdown */}
+                          <div className="p-2.5 border-b border-gray-100" style={{ backgroundColor: '#f9fafb' }}>
+                            <div className="relative">
+                              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                              <input
+                                type="text"
+                                value={categorySearchQuery}
+                                onChange={(e) => setCategorySearchQuery(e.target.value)}
+                                placeholder="Search category..."
+                                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-gray-200 rounded-lg outline-none focus:border-[#347989] focus:ring-1 focus:ring-[#347989] transition-all"
+                                autoFocus
+                              />
+                              {categorySearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCategorySearchQuery('')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
+                                >
+                                  <FiX size={12} />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Header Actions */}
+                            <div className="flex items-center justify-between mt-2 pt-1.5 px-0.5 text-[11px] text-gray-500">
+                              <span>
+                                {filteredCategories.length} {filteredCategories.length === 1 ? 'category' : 'categories'}
+                              </span>
+                              <div className="flex items-center space-x-2">
+                                {filteredCategories.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectAllCategories(filteredCategories)}
+                                    className="text-[#347989] hover:underline font-semibold cursor-pointer"
+                                  >
+                                    Select All
+                                  </button>
+                                )}
+                                {Array.isArray(formData.service) && formData.service.length > 0 && (
+                                  <>
+                                    <span className="text-gray-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={handleClearAllCategories}
+                                      className="text-red-500 hover:underline font-semibold cursor-pointer"
+                                    >
+                                      Clear All
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Options List */}
+                          <div className="max-h-52 overflow-y-auto divide-y divide-gray-50 p-1.5" style={{ backgroundColor: '#ffffff' }}>
+                            {filteredCategories.length > 0 ? (
+                              filteredCategories.map((cat, index) => {
+                                const isSelected = Array.isArray(formData.service) && formData.service.includes(cat.title);
+                                return (
+                                  <div
+                                    key={cat._id || cat.id || index}
+                                    onClick={() => toggleServiceSelection(cat.title)}
+                                    className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors text-xs ${
+                                      isSelected
+                                        ? 'bg-[#347989]/10 text-[#347989] font-medium'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                    style={{ backgroundColor: isSelected ? undefined : '#ffffff' }}
+                                  >
+                                    <span className="truncate pr-2">{cat.title}</span>
+                                    <div
+                                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${
+                                        isSelected
+                                          ? 'bg-[#347989] border-[#347989] text-white'
+                                          : 'border-gray-300 bg-white'
+                                      }`}
+                                    >
+                                      {isSelected && <FiCheck className="stroke-[3] w-2.5 h-2.5" />}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="py-6 text-center text-xs text-gray-400" style={{ backgroundColor: '#ffffff' }}>
+                                {categories.length === 0 ? 'No categories available' : `No matches for "${categorySearchQuery}"`}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer / Done Button */}
+                          <div className="p-2 border-t border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#f9fafb' }}>
+                            <span className="text-[11px] text-gray-500 pl-1">
+                              {Array.isArray(formData.service) ? formData.service.length : 0} selected
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsCategoryDropdownOpen(false)}
+                              className="px-3 py-1 bg-[#347989] text-white text-xs font-semibold rounded-lg hover:bg-[#2b6471] transition-colors cursor-pointer"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected Categories Badge Cloud */}
+                    {Array.isArray(formData.service) && formData.service.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                        {formData.service.map((serviceName) => (
+                          <span
+                            key={serviceName}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#347989]/10 text-[#347989] border border-[#347989]/20"
+                          >
+                            <span className="truncate max-w-[180px]">{serviceName}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveCategory(serviceName);
+                              }}
+                              className="text-[#347989] hover:text-red-500 hover:bg-[#347989]/20 rounded-full p-0.5 transition-colors cursor-pointer"
+                              title="Remove"
+                            >
+                              <FiX size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Lab & Shop Checkboxes */}
-                  <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+                  <div className="animate-fade-in relative" style={{ animationDelay: '0.25s', zIndex: 0 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Additional Services</label>
                     <div className="flex flex-col gap-4">
                       <div className="border border-gray-200 rounded-xl p-3 bg-white">
@@ -764,7 +983,7 @@ const VendorSignup = () => {
                     </div>
                   </div>
 
-                  <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  <div className="animate-fade-in relative" style={{ animationDelay: '0.2s', zIndex: 0 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
@@ -795,7 +1014,7 @@ const VendorSignup = () => {
                   </div>
 
                   {!verificationToken && (
-                    <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                    <div className="animate-fade-in relative" style={{ animationDelay: '0.3s', zIndex: 0 }}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                       <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-3 border-r pr-2 flex items-center pointer-events-none">
@@ -814,7 +1033,7 @@ const VendorSignup = () => {
                     </div>
                   )}
 
-                  <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+                  <div className="animate-fade-in relative" style={{ animationDelay: '0.4s', zIndex: 0 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number (Owner)</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
@@ -832,7 +1051,7 @@ const VendorSignup = () => {
                     </div>
                   </div>
 
-                  <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                  <div className="animate-fade-in relative" style={{ animationDelay: '0.5s', zIndex: 0 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">PAN Number (Business/Individual)</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none group-focus-within:text-[#347989] transition-colors">
@@ -851,7 +1070,7 @@ const VendorSignup = () => {
                 </div>
 
                 {/* Documents Section */}
-                <div className="space-y-4 animate-stagger-2 animate-fade-in">
+                <div className="space-y-4 animate-stagger-2 animate-fade-in relative" style={{ zIndex: 0 }}>
                   <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Identity Documents</h3>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1038,7 +1257,7 @@ const VendorSignup = () => {
                           setResendTimer(120);
                           toast.success('OTP sent again');
                         }
-                      } catch (e) { toast.error('Resend failed'); }
+                      } catch { toast.error('Resend failed'); }
                     }}
                     disabled={resendTimer > 0}
                     className="text-sm font-semibold transition-colors duration-300 opacity-70 hover:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -7,9 +7,11 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import NotificationBell from '../../components/common/NotificationBell';
 import { motion } from 'framer-motion';
 import { bookingService } from '../../../../services/bookingService';
+import { useLanguage } from '../../../../context/LanguageContext';
 
 const MyBookings = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, confirmed, in-progress, completed, cancelled
@@ -19,7 +21,7 @@ const MyBookings = () => {
     const loadBookings = async () => {
       try {
         setLoading(true);
-        const params = {};
+        const params = { limit: 200 };
         if (filter !== 'all') {
           if (filter === 'in_progress') {
              // For Machinery/Farm orders, "In Progress" means anything from journey started to operation
@@ -119,7 +121,7 @@ const MyBookings = () => {
         return 'In Progress';
       case 'journey_started': return 'On The Way';
       case 'visited': return 'Arrived';
-      case 'awaiting_payment': return 'Request Accepted';
+      case 'awaiting_payment': return 'Payment Pending';
       case 'work_done': return 'Work Completed';
       default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
@@ -192,7 +194,7 @@ const MyBookings = () => {
             >
               <FiArrowLeft className="w-5 h-5 text-gray-800" />
             </button>
-            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">My Farm Orders</h1>
+            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">{t('My Farm Orders')}</h1>
           </div>
           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/[0.02] relative">
             <NotificationBell />
@@ -218,7 +220,7 @@ const MyBookings = () => {
                   }`}
                 style={filter === tab.id ? { backgroundColor: themeColors.button } : {}}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             ))}
           </div>

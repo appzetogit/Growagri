@@ -475,6 +475,14 @@ const deleteWorker = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const activeJobs = await Booking.countDocuments({
+      workerId: id,
+      status: { $in: [BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.JOURNEY_STARTED, BOOKING_STATUS.VISITED, BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE] }
+    });
+    if (activeJobs > 0) {
+      return res.status(400).json({ success: false, message: `Worker has ${activeJobs} active job(s). Reassign them first.` });
+    }
+
     const worker = await Worker.findByIdAndDelete(id);
 
     if (!worker) {

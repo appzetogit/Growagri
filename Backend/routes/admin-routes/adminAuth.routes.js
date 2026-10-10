@@ -5,7 +5,8 @@ const {
   login,
   logout,
   updateProfile,
-  getProfile
+  getProfile,
+  refreshToken
 } = require('../../controllers/adminControllers/adminAuthController');
 const { authenticate } = require('../../middleware/authMiddleware');
 const { isAdmin } = require('../../middleware/roleMiddleware');
@@ -18,6 +19,7 @@ const loginValidation = [
 
 // Routes
 router.post('/login', loginValidation, login);
+router.post('/refresh-token', refreshToken);
 router.post('/logout', authenticate, isAdmin, logout);
 router.put('/profile', authenticate, isAdmin, updateProfile);
 router.get('/profile', authenticate, isAdmin, getProfile);

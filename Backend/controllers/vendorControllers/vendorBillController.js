@@ -29,16 +29,20 @@ const createOrUpdateBill = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    if (booking.vendorId.toString() !== vendorId) {
+    if (booking.vendorId?.toString() !== vendorId) {
       return res.status(403).json({ success: false, message: 'Not authorized for this booking' });
+    }
+
+    // A paid bill is final: wallet earnings were already credited from it
+    const existingBill = await VendorBill.findOne({ bookingId }).select('status');
+    if (existingBill?.status === BILL_STATUS.PAID) {
+      return res.status(400).json({ success: false, message: 'Bill is already paid and can no longer be changed' });
     }
 
     // ── Fetch Settings (frozen snapshot) ──
     const settings = await Settings.findOne({ type: 'global' });
     
-    // Use the new bookingCommissionPercentage (default 10%), or fallback to 100 - servicePayoutPercentage
-    const commissionPct = settings?.bookingCommissionPercentage ?? (100 - (settings?.servicePayoutPercentage ?? 90));
-    const serviceSplitPct = 100 - commissionPct;
+    const serviceSplitPct = require('../../utils/constants').serviceSplitPct(settings);
     const partsSplitPct = settings?.partsPayoutPercentage ?? 10;
     const serviceGstPct = settings?.serviceGstPercentage ?? 18;
     const partsGstPct = settings?.partsGstPercentage ?? 18;
@@ -262,7 +266,7 @@ const createOrUpdateBill = async (req, res) => {
 const getBillByBookingId = async (req, res) => {
   try {
     const { bookingId } = req.params;
-    const bill = await VendorBill.findOne({ bookingId });
+    const bill = await VendorBill.findOne({ bookingId, vendorId: req.user.id });
 
     if (!bill) {
       // Return 200 instead of 404 to gracefully tell the frontend that a bill is not yet created
@@ -283,10 +287,10 @@ const getBillByBookingId = async (req, res) => {
 const downloadInvoice = async (req, res) => {
   try {
     const { bookingId } = req.params;
-    const bill = await VendorBill.findOne({ bookingId });
+    const bill = await VendorBill.findOne({ bookingId, vendorId: req.user.id });
     const booking = await Booking.findById(bookingId).populate('userId');
 
-    if (!bill) {
+    if (!bill || !booking) {
       return res.status(404).json({ success: false, message: 'Invoice not generated yet' });
     }
 

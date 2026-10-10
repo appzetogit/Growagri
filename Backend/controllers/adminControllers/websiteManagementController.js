@@ -5,7 +5,7 @@ const WebsiteReview = require('../../models/WebsiteReview');
 // Blog Controllers
 exports.getBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find().sort({ createdAt: -1 });
+    const blogs = await Blog.find(req.publicOnly ? { isActive: true } : {}).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: blogs.length, data: blogs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -47,7 +47,7 @@ exports.deleteBlog = async (req, res) => {
 // Article Controllers
 exports.getArticles = async (req, res) => {
   try {
-    const articles = await Article.find().sort({ createdAt: -1 });
+    const articles = await Article.find(req.publicOnly ? { isActive: true } : {}).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: articles.length, data: articles });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -89,7 +89,7 @@ exports.deleteArticle = async (req, res) => {
 // WebsiteReview Controllers
 exports.getReviews = async (req, res) => {
   try {
-    const reviews = await WebsiteReview.find().sort({ createdAt: -1 });
+    const reviews = await WebsiteReview.find(req.publicOnly ? { isActive: true } : {}).sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: reviews.length, data: reviews });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

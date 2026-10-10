@@ -98,7 +98,7 @@ const FarmerAnalytics = () => {
             </div>
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Growth</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.growth || '8.2%'}</h3>
+              <h3 className="text-lg font-bold text-gray-900">{data.growth ?? '0%'}</h3>
             </div>
           </div>
         </div>
@@ -109,7 +109,7 @@ const FarmerAnalytics = () => {
             </div>
             <div>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Retention</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.retentionRate || '65%'}</h3>
+              <h3 className="text-lg font-bold text-gray-900">{data.retentionRate ?? '0%'}</h3>
             </div>
           </div>
         </div>

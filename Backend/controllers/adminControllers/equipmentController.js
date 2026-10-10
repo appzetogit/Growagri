@@ -58,6 +58,20 @@ exports.updateEquipmentStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Equipment not found' });
     }
 
+    if (status !== 'pending') {
+      const { createNotification } = require('../notificationControllers/notificationController');
+      await createNotification({
+        vendorId: equipment.vendorId,
+        type: status === 'approved' ? 'vendor_approved' : 'vendor_rejected',
+        title: status === 'approved' ? 'Machinery Approved' : 'Machinery Rejected',
+        message: status === 'approved'
+          ? `Your machinery "${equipment.name}" is approved and now visible to farmers.`
+          : `Your machinery "${equipment.name}" was rejected.${remarks ? ` Reason: ${remarks}` : ''}`,
+        relatedId: equipment._id,
+        relatedType: 'service'
+      }).catch(() => {});
+    }
+
     res.status(200).json({
       success: true,
       message: `Equipment ${status} successfully`,

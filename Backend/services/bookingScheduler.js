@@ -191,7 +191,7 @@ class BookingScheduler {
           pushData: {
             type: 'new_booking',
             dataOnly: false,
-            link: `/vendor/bookings/${booking._id}`
+            link: `/vendor/booking/${booking._id}`
           }
         });
 

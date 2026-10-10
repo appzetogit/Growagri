@@ -53,13 +53,6 @@ const vendorWalletService = {
   },
 
   /**
-   * Record cash collection (Legacy - redirects to confirm)
-   */
-  recordCashCollection: async (bookingId, amount, notes = '') => {
-    return vendorWalletService.confirmCashCollection(bookingId, amount);
-  },
-
-  /**
    * Request settlement (vendor pays admin)
    */
   requestSettlement: async (data) => {
@@ -103,14 +96,6 @@ const vendorWalletService = {
       screenshot,
       paymentMethod
     });
-    return response.data;
-  },
-
-  /**
-   * Request Withdrawal
-   */
-  requestWithdrawal: async (data) => {
-    const response = await api.post('/vendors/wallet/withdrawal', data);
     return response.data;
   }
 };

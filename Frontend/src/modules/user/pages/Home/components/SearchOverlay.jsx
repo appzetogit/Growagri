@@ -50,16 +50,8 @@ const SearchOverlay = ({ isOpen, onClose, categories = [], onCategoryClick }) =>
       try {
         const res = await publicCatalogService.getHomeContent();
         if (res.success && res.homeContent?.booked && res.homeContent.booked.length > 0) {
-          const filtered = res.homeContent.booked.filter(s =>
-            !s.title.toLowerCase().includes('fan install') &&
-            !s.title.toLowerCase().includes('fan repair') &&
-            !s.title.toLowerCase().includes('top load') &&
-            !s.title.toLowerCase().includes('automatic')
-          );
-          if (filtered.length > 0) {
-            setTrendingServices(filtered.slice(0, 5));
-            return;
-          }
+          setTrendingServices(res.homeContent.booked.slice(0, 5));
+          return;
         }
         setTrendingServices(defaultTrending);
       } catch (error) {

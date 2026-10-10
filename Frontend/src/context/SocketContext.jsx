@@ -79,8 +79,7 @@ export const SocketProvider = ({ children }) => {
     if (path.startsWith('/vendor')) return 'vendor';
     if (path.startsWith('/worker')) return 'worker';
     if (path.startsWith('/admin')) return 'admin';
-    if (path.startsWith('/user')) return 'user';
-    return null;
+    return 'user';
   };
 
   const userType = getUserType(location.pathname);
@@ -116,8 +115,8 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    // If no token, we don't connect
-    if (!token) {
+    // For vendor/worker/admin, token is strictly required. For user, allow guest connection for public events.
+    if (!token && userType !== 'user') {
       if (socket) {
         socket.disconnect();
         setSocket(null);
@@ -125,14 +124,8 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    // Reuse existing socket if userType hasn't changed (effectively) is handled by React deps
-    // But basic useEffect will re-run if dependencies change.
-    // userType changes -> re-run.
-
     // Disconnect previous if any
     if (socket) {
-      // Optimization: if we are already connected with same token/auth, maybe don't reconnect?
-      // But determining that is hard. Simpler to reconnect.
       socket.disconnect();
     }
 
@@ -141,7 +134,7 @@ export const SocketProvider = ({ children }) => {
 
     const newSocket = io(socketBaseUrl, {
       auth: {
-        token: token
+        token: token || ''
       },
       transports: ['websocket', 'polling'], // WebSocket first for instant real-time alerts
       path: '/socket.io/',
@@ -179,6 +172,24 @@ export const SocketProvider = ({ children }) => {
         if (vendorId) {
           newSocket.emit('join_vendor_room', vendorId);
         }
+      }
+
+      const selectedCityId = localStorage.getItem('selectedCityId');
+      if (selectedCityId) {
+        newSocket.emit('join_city', selectedCityId);
+      }
+    });
+
+    // Real-time Catalog & Home Content synchronization
+    newSocket.on('home_content_updated', (data) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('home_content_updated', { detail: data }));
+      }
+    });
+
+    newSocket.on('categories_updated', (data) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('categories_updated', { detail: data }));
       }
     });
 

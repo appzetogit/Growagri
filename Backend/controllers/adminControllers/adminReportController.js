@@ -5,6 +5,13 @@ const User = require('../../models/User');
 const Service = require('../../models/Service');
 const { BOOKING_STATUS, PAYMENT_STATUS, VENDOR_STATUS } = require('../../utils/constants');
 
+// Platform commission rate from settings (same formula as vendor bills)
+// ponytail: applies the current rate to past bookings; sum VendorBill.companyRevenue instead if historic rate changes must be exact
+const getCommissionRate = async () => {
+  const settings = await require('../../models/Settings').findOne({ type: 'global' });
+  return (100 - require('../../utils/constants').serviceSplitPct(settings)) / 100;
+};
+
 /**
  * Get Booking Report Data
  */
@@ -272,17 +279,29 @@ exports.getCustomerReport = async (req, res) => {
       }
     ]);
 
-    // Monthly registration trend
-    const monthlyTrend = await User.aggregate([
+    // Monthly registration trend (latest 6 months, oldest first)
+    const monthlyTrend = (await User.aggregate([
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
           count: { $sum: 1 }
         }
       },
-      { $sort: { _id: 1 } },
+      { $sort: { _id: -1 } },
       { $limit: 6 }
+    ])).reverse();
+
+    // Growth = this month's sign-ups vs last month's
+    const cur = monthlyTrend.at(-1)?.count || 0;
+    const prev = monthlyTrend.at(-2)?.count || 0;
+    const growth = prev ? `${(((cur - prev) / prev) * 100).toFixed(1)}%` : (cur ? '100%' : '0%');
+
+    // Retention = share of booking farmers who booked more than once
+    const [repeat] = await Booking.aggregate([
+      { $group: { _id: '$userId', n: { $sum: 1 } } },
+      { $group: { _id: null, users: { $sum: 1 }, repeat: { $sum: { $cond: [{ $gt: ['$n', 1] }, 1, 0] } } } }
     ]);
+    const retentionRate = repeat?.users ? `${Math.round((repeat.repeat / repeat.users) * 100)}%` : '0%';
 
     res.status(200).json({
       success: true,
@@ -291,6 +310,8 @@ exports.getCustomerReport = async (req, res) => {
         totalBookings,
         verificationStatus,
         topUsers,
+        growth,
+        retentionRate,
         monthlyTrend
       }
     });
@@ -315,7 +336,7 @@ exports.getRevenueReport = async (req, res) => {
         $group: {
           _id: { $dateToString: { format: groupFormat, date: '$completedAt' } },
           revenue: { $sum: '$finalAmount' },
-          commission: { $sum: { $multiply: ['$finalAmount', 0.2] } } // 20% commission
+          commission: { $sum: { $multiply: ['$finalAmount', await getCommissionRate()] } }
         }
       },
       { $sort: { _id: 1 } }
@@ -372,7 +393,7 @@ exports.getAgricultureInsights = async (req, res) => {
       { $unwind: '$category' },
       {
         $group: {
-          _id: '$category.name',
+          _id: '$category.title',
           revenue: { $sum: '$finalAmount' },
           count: { $sum: 1 }
         }

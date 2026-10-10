@@ -4,7 +4,7 @@ import { FiSearch, FiShoppingCart, FiArrowLeft, FiPlus, FiFilter, FiTag } from '
 import { motion, AnimatePresence } from 'framer-motion';
 import productService from '../../services/productService';
 import { publicCatalogService } from '../../../../services/catalogService';
-import { useCart } from '../../../../context/CartContext';
+import { useEcommerceCart } from '../../../../context/EcommerceCartContext';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
 
@@ -18,7 +18,7 @@ const toAssetUrl = (url) => {
 
 const MarketplacePage = () => {
     const navigate = useNavigate();
-    const { addToCart } = useCart();
+    const { addToCart } = useEcommerceCart();
 
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -124,23 +124,8 @@ const MarketplacePage = () => {
 
     const handleAddToCart = async (product) => {
         try {
-            const cartItemData = {
-                serviceId: product._id,
-                categoryId: product.categoryId?._id || product.categoryId,
-                title: product.title,
-                description: product.description || '',
-                icon: toAssetUrl(product.imageUrl),
-                category: 'Marketplace',
-                categoryTitle: 'Agri Inputs',
-                price: product.discountPrice || product.price,
-                originalPrice: product.discountPrice ? product.price : null,
-                unitPrice: product.discountPrice || product.price,
-                serviceCount: 1,
-                vendorId: product.vendorId || null,
-                type: 'product'
-            };
-
-            const res = await addToCart(cartItemData);
+            // Seeds/fertilizers are store products -> agri (ecommerce) cart, not the service booking cart
+            const res = await addToCart(product._id, 1);
             if (res.success) {
                 toast.success(`${product.title} added!`);
             }

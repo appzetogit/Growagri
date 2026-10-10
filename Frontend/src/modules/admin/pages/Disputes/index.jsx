@@ -15,6 +15,8 @@ const AdminDisputes = () => {
     const [selectedDispute, setSelectedDispute] = useState(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [resolutionNotes, setResolutionNotes] = useState('');
+    const [refundAmount, setRefundAmount] = useState('');
+    const [vendorDeduction, setVendorDeduction] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -47,6 +49,8 @@ const AdminDisputes = () => {
             if (response.success) {
                 setSelectedDispute(response.data);
                 setResolutionNotes(response.data.resolutionNotes || '');
+                setRefundAmount('');
+                setVendorDeduction('');
                 setIsDetailsModalOpen(true);
             }
         } catch (error) {
@@ -63,7 +67,8 @@ const AdminDisputes = () => {
             setSubmitting(true);
             const response = await adminDisputeService.resolveDispute(selectedDispute._id, {
                 status,
-                resolutionNotes
+                resolutionNotes,
+                ...(status === 'resolved' ? { refundAmount: Number(refundAmount) || 0, vendorDeduction: Number(vendorDeduction) || 0 } : {})
             });
             if (response.success) {
                 toast.success(`Dispute ${status} successfully`);
@@ -71,7 +76,7 @@ const AdminDisputes = () => {
                 fetchDisputes();
             }
         } catch (error) {
-            toast.error('Failed to update dispute');
+            toast.error(error.response?.data?.message || 'Failed to update dispute');
         } finally {
             setSubmitting(false);
         }
@@ -260,6 +265,20 @@ const AdminDisputes = () => {
                                 className="w-full h-24 p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 disabled={selectedDispute.status === 'resolved' || selectedDispute.status === 'dismissed'}
                             />
+
+                            {/* Optional money outcome (applies on "Mark Resolved") */}
+                            {selectedDispute.status !== 'resolved' && selectedDispute.status !== 'dismissed' && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className="text-xs font-bold text-gray-600">
+                                        Refund to customer wallet (₹)
+                                        <input type="number" min="0" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} placeholder="0" className="mt-1 w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" />
+                                    </label>
+                                    <label className="text-xs font-bold text-gray-600">
+                                        Deduct from vendor earnings (₹)
+                                        <input type="number" min="0" value={vendorDeduction} onChange={(e) => setVendorDeduction(e.target.value)} placeholder="0" className="mt-1 w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" />
+                                    </label>
+                                </div>
+                            )}
 
                             {/* Buttons */}
                             {selectedDispute.status !== 'resolved' && selectedDispute.status !== 'dismissed' ? (

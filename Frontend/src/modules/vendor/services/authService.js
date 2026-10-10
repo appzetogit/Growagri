@@ -136,17 +136,8 @@ export const register = async (vendorData) => {
  */
 export const getCurrentVendor = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/auth/me`, {
-    //   headers: {
-    //     'Authorization': `Bearer ${localStorage.getItem('vendorToken')}`,
-    //   },
-    // });
-    // return await response.json();
-
-    // Mock implementation
-    const profile = JSON.parse(localStorage.getItem('vendorProfile') || '{}');
-    return profile;
+    const response = await api.get('/vendors/profile');
+    return response.data?.data || response.data?.vendor || response.data;
   } catch (error) {
     console.error('Error fetching current vendor:', error);
     throw error;
@@ -160,76 +151,14 @@ export const getCurrentVendor = async () => {
  */
 export const updateProfile = async (profileData) => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-    //   method: 'PUT',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${localStorage.getItem('vendorToken')}`,
-    //   },
-    //   body: JSON.stringify(profileData),
-    // });
-    // return await response.json();
-
-    // Mock implementation
-    const existing = JSON.parse(localStorage.getItem('vendorProfile') || '{}');
-    const updated = { ...existing, ...profileData, updatedAt: new Date().toISOString() };
-    localStorage.setItem('vendorProfile', JSON.stringify(updated));
-    return updated;
+    const response = await api.put('/vendors/profile', profileData);
+    return response.data?.data || response.data?.vendor || response.data;
   } catch (error) {
     console.error('Error updating profile:', error);
     throw error;
   }
 };
 
-/**
- * Change password
- * @param {Object} passwordData - Current and new password
- * @returns {Promise<boolean>} Success status
- */
-export const changePassword = async (passwordData) => {
-  try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${localStorage.getItem('vendorToken')}`,
-    //   },
-    //   body: JSON.stringify(passwordData),
-    // });
-    // return await response.json();
-
-    // Mock implementation
-    return { success: true };
-  } catch (error) {
-    console.error('Error changing password:', error);
-    throw error;
-  }
-};
-
-/**
- * Request password reset
- * @param {string} email - Vendor email
- * @returns {Promise<boolean>} Success status
- */
-export const requestPasswordReset = async (email) => {
-  try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ email }),
-    // });
-    // return await response.json();
-
-    // Mock implementation
-    return { success: true, message: 'Password reset email sent' };
-  } catch (error) {
-    console.error('Error requesting password reset:', error);
-    throw error;
-  }
-};
 
 /**
  * Verify token validity
@@ -237,19 +166,10 @@ export const requestPasswordReset = async (email) => {
  */
 export const verifyToken = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const token = localStorage.getItem('vendorToken');
-    // if (!token) return false;
-    // 
-    // const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-    //   headers: {
-    //     'Authorization': `Bearer ${token}`,
-    //   },
-    // });
-    // return response.ok;
-
-    // Mock implementation
-    return !!localStorage.getItem('vendorToken');
+    const token = localStorage.getItem('vendorAccessToken') || sessionStorage.getItem('vendorAccessToken');
+    if (!token) return false;
+    const response = await api.get('/vendors/profile');
+    return !!response.data?.success;
   } catch (error) {
     console.error('Error verifying token:', error);
     return false;

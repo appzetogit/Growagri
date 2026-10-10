@@ -86,5 +86,9 @@ module.exports = {
   BOOKING_STATUS,
   PAYMENT_STATUS,
   SERVICE_STATUS,
-  BILL_STATUS
+  BILL_STATUS,
+  // Vendor's % share of the service base. One formula for bills, self-jobs and dashboards.
+  serviceSplitPct: (settings) => 100 - (settings?.bookingCommissionPercentage ?? (100 - (settings?.servicePayoutPercentage ?? 90))),
+  isPaymentSettled: (booking) => booking.cashCollected === true ||
+    ['success', 'collected_by_vendor', 'plan_covered'].includes(booking.paymentStatus)
 };

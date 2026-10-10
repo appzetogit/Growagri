@@ -8,6 +8,7 @@ import vendorSoilTestService from '../../../../services/vendorSoilTestService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import api from '../../../../services/api';
 
 // ─── Status Config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -190,13 +191,7 @@ const VendorSoilTests = () => {
     const uploadFile = async (file) => {
         const formData = new FormData();
         formData.append('file', file);
-        let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-        baseUrl = baseUrl.replace(/\/api$/, '');
-        if (!baseUrl && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-            baseUrl = 'http://localhost:5000';
-        }
-        const response = await fetch(`${baseUrl}/api/image/upload`, { method: 'POST', body: formData });
-        const data = await response.json();
+        const { data } = await api.post('/image/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         if (!data.success) throw new Error(data.message || 'Upload failed');
         return data.imageUrl;
     };

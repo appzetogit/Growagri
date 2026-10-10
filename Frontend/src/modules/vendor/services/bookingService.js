@@ -175,7 +175,7 @@ export const endTrip = async (bookingId, kmPhotoUrl, otp, workUnits, workEvidenc
  * @param {string} startKmPhoto - Cloudinary URL of starting meter photo
  */
 export const machineryStartWork = async (bookingId, otp, startKmPhoto) => {
-  const response = await api.post(`/vendor/equipment/bookings/${bookingId}/start`, {
+  const response = await api.post(`/vendors/equipment/bookings/${bookingId}/start`, {
     otp,
     startKmPhoto
   });
@@ -191,7 +191,7 @@ export const machineryStartWork = async (bookingId, otp, startKmPhoto) => {
  * @param {string} evidencePhoto - Cloudinary URL of evidence of work
  */
 export const machineryCompleteWork = async (bookingId, endKmPhoto, workUnits, evidencePhoto) => {
-  const response = await api.post(`/vendor/equipment/bookings/${bookingId}/complete`, {
+  const response = await api.post(`/vendors/equipment/bookings/${bookingId}/complete`, {
     endKmPhoto, workUnits, evidencePhoto
   });
   return response.data;
@@ -219,13 +219,8 @@ export const payWorker = async (bookingId) => {
  */
 export const getPendingAlerts = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/bookings/pending`);
-    // return await response.json();
-
-    // Mock implementation
-    const pending = JSON.parse(localStorage.getItem('vendorPendingJobs') || '[]');
-    return pending;
+    const response = await api.get('/vendors/bookings', { params: { status: 'requested' } });
+    return response.data?.data || response.data || [];
   } catch (error) {
     console.error('Error fetching pending alerts:', error);
     throw error;

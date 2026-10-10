@@ -30,17 +30,17 @@ const payWorkerValidation = [
 ];
 
 // Routes
-router.get('/workers', authenticate, isAdmin, getAllWorkers);
-router.get('/workers/jobs', authenticate, isAdmin, getAllWorkerJobs);
-router.get('/workers/payments', authenticate, isAdmin, getWorkerPaymentsSummary);
-router.get('/workers/:id', authenticate, isAdmin, getWorkerDetails);
-router.post('/workers/:id/approve', authenticate, isAdmin, approveWorker);
-router.post('/workers/:id/reject', authenticate, isAdmin, rejectWorkerValidation, rejectWorker);
-router.post('/workers/:id/suspend', authenticate, isAdmin, suspendWorker);
-router.post('/workers/:id/pay', authenticate, isAdmin, payWorkerValidation, payWorker);
-router.patch('/workers/:id/status', authenticate, isAdmin, toggleWorkerStatus); // New
-router.delete('/workers/:id', authenticate, isAdmin, deleteWorker); // New
-router.get('/workers/:id/jobs', authenticate, isAdmin, getWorkerJobs);
-router.get('/workers/:id/earnings', authenticate, isAdmin, getWorkerEarnings);
+router.get('/', authenticate, isAdmin, getAllWorkers);
+router.get('/jobs', authenticate, isAdmin, getAllWorkerJobs);
+router.get('/payments', authenticate, isAdmin, getWorkerPaymentsSummary);
+router.get('/:id', authenticate, isAdmin, getWorkerDetails);
+router.post('/:id/approve', authenticate, isAdmin, approveWorker);
+router.post('/:id/reject', authenticate, isAdmin, rejectWorkerValidation, rejectWorker);
+router.post('/:id/suspend', authenticate, isAdmin, suspendWorker);
+router.post('/:id/pay', authenticate, isAdmin, payWorkerValidation, payWorker);
+router.patch('/:id/status', authenticate, isAdmin, toggleWorkerStatus); // New
+router.delete('/:id', authenticate, isAdmin, deleteWorker); // New
+router.get('/:id/jobs', authenticate, isAdmin, getWorkerJobs);
+router.get('/:id/earnings', authenticate, isAdmin, getWorkerEarnings);
 
 module.exports = router;

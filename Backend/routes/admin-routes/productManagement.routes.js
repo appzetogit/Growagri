@@ -29,6 +29,7 @@ router.post('/vendor-submissions/:id/reject', rejectProduct);
 
 // Global Ecommerce Order View
 router.get('/orders', getAllEcommerceOrders);
+router.patch('/orders/:id/status', require('../../controllers/vendorControllers/vendorProductController').updateOrderStatus);
 
 module.exports = router;
 

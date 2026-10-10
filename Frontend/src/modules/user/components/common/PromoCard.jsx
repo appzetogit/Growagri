@@ -11,7 +11,7 @@ const PromoCard = memo(({ title, subtitle, buttonText, image, onClick, className
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden min-w-[320px] md:min-w-[400px] h-48 md:h-56 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-95"
+      className="relative rounded-2xl overflow-hidden w-[86vw] sm:w-auto min-w-[340px] sm:min-w-[390px] md:min-w-[460px] max-w-[520px] h-40 sm:h-44 md:h-52 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-95"
       style={{
         boxShadow: themeColors.cardShadow,
         border: themeColors.cardBorder,

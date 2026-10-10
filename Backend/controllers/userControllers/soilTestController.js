@@ -4,7 +4,7 @@ const User = require('../../models/User');
 const Vendor = require('../../models/Vendor');
 const Transaction = require('../../models/Transaction');
 const { createNotification } = require('../notificationControllers/notificationController');
-const { createOrder, verifyPayment } = require('../../services/razorpayService');
+const { createOrder, verifyAndClaimPayment, releasePayment } = require('../../services/razorpayService');
 
 /**
  * User: Create Soil Test Request
@@ -217,11 +217,16 @@ const verifySoilTestPayment = async (req, res) => {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         const userId = req.user.id;
 
-        const request = await SoilTestRequest.findById(id);
+        const request = await SoilTestRequest.findOne({ _id: id, userId });
         if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+        if (request.paymentStatus === 'paid') return res.status(400).json({ success: false, message: 'Already paid' });
 
-        const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-        if (!isValid) return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+        const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+        if (!verified.success) return res.status(verified.status).json({ success: false, message: verified.error });
+        if (verified.notes.requestId !== request._id.toString() || verified.amountPaise < Math.round((request.totalAmount || 0) * 100)) {
+            await releasePayment(razorpay_payment_id);
+            return res.status(400).json({ success: false, message: 'Payment does not match this soil test' });
+        }
 
         request.paymentStatus = 'paid';
         request.paymentMethod = 'online';

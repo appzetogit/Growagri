@@ -1,7 +1,8 @@
 import React from 'react';
-import winterBanner from '../../../../../assets/images/pages/Home/Banner/Winter-banner.png';
+import { useLanguage } from '../../../../../context/LanguageContext';
 
 const BannerWithRefer = ({ imageUrl, onBannerClick, onReferClick }) => {
+  const { t } = useLanguage();
   return (
     <div className="mb-6">
       {/* Main Banner */}
@@ -10,7 +11,7 @@ const BannerWithRefer = ({ imageUrl, onBannerClick, onReferClick }) => {
           className="relative overflow-hidden shadow-xl"
           style={{
             borderRadius: '0',
-            backgroundImage: imageUrl ? `url(${imageUrl})` : `url(${winterBanner})`,
+            backgroundImage: imageUrl ? `url(${imageUrl})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -33,10 +34,10 @@ const BannerWithRefer = ({ imageUrl, onBannerClick, onReferClick }) => {
             <h3
               className="text-lg font-bold mb-1 text-black"
             >
-              Refer and get free services
+              {t('Refer and get free services')}
             </h3>
             <p className="text-sm font-medium text-black">
-              Invite and get ₹100*
+              {t('Invite and get ₹100*')}
             </p>
           </div>
 
@@ -89,7 +90,7 @@ const BannerWithRefer = ({ imageUrl, onBannerClick, onReferClick }) => {
             e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 166, 166, 0.3), 0 2px 4px -1px rgba(0, 166, 166, 0.2)';
           }}
         >
-          Refer Now
+          {t('Refer Now')}
         </button>
       </div>
     </div>

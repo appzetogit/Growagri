@@ -1,39 +1,447 @@
-GrooAgri - Complete Knowledge Base
-==================================================
+======================================================================
+GROOAGRI (ग्रूएग्री) - MASTER AGRICULTURAL & PLATFORM KNOWLEDGE BASE
+Comprehensive Agronomy, AgriTech, Livestock, Schemes & App Ecosystem
+======================================================================
 
-[1. COMPANY OVERVIEW]
-- Name: GrooAgri
-- Purpose: A complete platform for farmers, vendors, and agricultural workers. We provide soil testing, farming equipment rental, e-commerce for agri-products, and a platform for booking agricultural workers.
-- Platform Users: Farmers (Users), Vendors (Shop owners, equipment providers, lab owners), Workers (Laborers), and Admins.
-- Customer Support: support@grooagri.com
+[SECTION 1: GROOAGRI PLATFORM OVERVIEW & ECOSYSTEM]
+----------------------------------------------------------------------
+GrooAgri is India's premier unified AgriTech Super-App designed to empower farmers, agricultural equipment owners/vendors, agrochemical retailers, service providers, and rural field workers.
+- Core Mission: Modernize Indian agriculture, maximize farmer income, eliminate unnecessary middlemen, reduce input costs, provide timely mechanized services, and deliver scientific agronomy advisories in native Indian languages.
+- Helplines & Customer Support:
+  * Customer Care Phone & WhatsApp: +91 91177 04450
+  * Support Email: support@grooagri.com / grooagri@gmail.com
+  * Working Hours: 7:00 AM to 9:00 PM IST (All 7 days of the week)
+  * App Platforms: Android (Google Play Store), iOS App Store, and Web Browser.
+- Platform Stakeholders & Ecosystem Roles:
+  1. Farmers (Kisan / End Users): Book verified soil testing with GPS sample collection, rent agricultural machinery and drone sprayers, order certified seeds and fertilizers, hire skilled farm labor, check 7-day hyper-local weather advisories, manage payments via digital wallet.
+  2. Vendors & Equipment Owners: Machinery fleet owners, tractor operators, certified agrochemical retailers, seed suppliers, and testing laboratories. They list equipment, fulfill orders, accept bookings, and withdraw earnings.
+  3. Field Workers & Operators: Local agricultural laborers, tractor drivers, harvester operators, and soil sample collectors who receive fair daily wages and direct job alerts.
+  4. Administrators: Oversee quality standards, KYC verification, dispute resolution, transparent escrow payments, and timely payouts.
 
-[2. FOR FARMERS (USERS)]
-- E-commerce (Shop): Farmers can buy high-quality seeds, fertilizers, and pesticides directly from our app. Cash on Delivery (COD) and Online Payments (via Razorpay) are supported.
-- Soil Testing (मिट्टी की जांच): Farmers can book a soil test. A worker will visit the farm, collect the soil sample, and send it to the lab. The lab report will be uploaded to the farmer's app within 3 to 5 days.
-- Equipment Rental (मशीनें किराये पर लेना): Farmers can rent tractors, harvesters, and other farming equipment from local vendors on an hourly or daily basis.
-- Worker Booking (मज़दूर): Farmers can hire verified agricultural workers for their fields on a daily wage basis.
-- Wallet: Farmers have a built-in wallet to add money and make quick payments.
 
-[3. FOR VENDORS (SHOP OWNERS / EQUIPMENT OWNERS)]
-- Registration: Any business owner can register as a Vendor to sell products, rent out equipment, or offer soil testing services.
-- Commissions & Settlements: GrooAgri charges a small platform fee/commission on every successful booking or sale. Remaining funds are transferred to the vendor's bank account via the "Settlements" system within 2-3 working days.
-- Dashboard: Vendors get a dedicated dashboard to track their sales, manage inventory, accept/reject bookings, and withdraw wallet funds.
-- Compliance & Maintenance: Equipment vendors must regularly update the maintenance status of their machines to ensure they are safe for farmers to use.
+[SECTION 2: GROOAGRI FEATURES & IN-APP DEEP-LINK DIRECTORY]
+----------------------------------------------------------------------
+Whenever guiding a user inside the GrooAgri platform, ALWAYS provide clear, actionable steps and embed the relevant markdown link [Link Label](/route) so the user can navigate with one tap:
 
-[4. FOR WORKERS (मज़दूर)]
-- Joining: Agricultural workers can join the platform to get regular daily wage jobs from nearby farmers.
-- Job Alerts: Workers receive push notifications on their phone when a nearby farmer books them.
-- Payments: Workers get their daily wages transferred directly to their app wallet, which they can withdraw to their bank account.
+1. Soil Testing Services (मिट्टी परीक्षण):
+   - App Link: [Book Soil Test](/user/soil-testing)
+   - How it works:
+     Step 1: Farmer taps [Book Soil Test](/user/soil-testing), enters field size and pinpoints farm location via GPS.
+     Step 2: A trained GrooAgri field technician visits the farm within 24 to 48 hours to collect core soil samples across zig-zag points of the field.
+     Step 3: Samples are analyzed at an accredited laboratory testing 14+ essential parameters: pH (acidity/alkalinity), Electrical Conductivity (EC - salinity), Organic Carbon (OC), Available Nitrogen (N), Phosphorus (P2O5), Potassium (K2O), Sulphur (S), Zinc (Zn), Boron (B), Iron (Fe), Manganese (Mn), Copper (Cu).
+     Step 4: A comprehensive digital Soil Health Card and customized crop-wise fertilizer dosage schedule is delivered directly to the app in 3 to 5 business days.
 
-[5. REFUND & CANCELLATION POLICY (नियम और शर्तें)]
-- Order Cancellation: Farmers can cancel their product order before it is dispatched for a full refund.
-- Booking Cancellation: If an equipment booking is canceled 24 hours before the scheduled time, no cancellation fee applies. Late cancellations may incur a 10% fee.
-- Defective Products: If a farmer receives expired seeds or fake pesticides, they can raise a "Dispute" from the app within 48 hours for a replacement or refund.
-- Wallet Withdrawals: Minimum withdrawal limit for vendors and workers is ₹500.
+2. Farm Machinery & Equipment Rental (कृषि मशीनरी किराया):
+   - App Link: [Rent Farm Machinery](/user/machinery-explorer)
+   - Available Fleet:
+     * Tractors: 35 HP to 75 HP (2WD and 4WD, suitable for ploughing, puddling, rotavating, and haulage).
+     * Rotavators & Cultivators: 5 to 9 feet implements for fine seedbed preparation.
+     * Combine Harvesters: High-capacity multi-crop harvesters for paddy, wheat, soybean, maize.
+     * Laser Land Levelers: Precision hydraulic grading that saves 20-25% irrigation water.
+     * Agricultural Drones: High-tech 10L-16L spraying drones for fast nano-fertilizer and pesticide application (1 acre in 7-10 minutes).
+     * Modern Implements: Happy Seeders, Super Seeders, Zero-Till Drills, Power Weeders, Disc Harrows, Straw Reapers, Hay Balers, Boom Sprayers.
+   - Pricing & Booking: Transparent hourly, per-acre, or daily rental models. Instant booking with digital OTP verification on equipment arrival.
 
-[6. GENERAL AI RULES (तुम्हारे लिए निर्देश)]
-- Always greet politely (e.g., "नमस्ते!").
-- If asked about prices not listed here, say: "कीमतों की सटीक जानकारी के लिए कृपया अपने ऐप में उस प्रोडक्ट या सर्विस को चेक करें।" (Please check the app for exact pricing).
-- If asked about "Disputes", guide them to the "My Orders" or "Bookings" section where they can click on "Raise Dispute".
-- If asked about App Download, say the app is available on Google Play Store and the web platform.
-- Strictly refuse to answer questions about politics, coding, entertainment, or anything outside of agriculture and GrooAgri platform.
+3. Agri Marketplace & E-Commerce Store (कृषि बाज़ार):
+   - App Link: [Visit Agri Marketplace](/user/agri-marketplace)
+   - Cart & Orders: [View Cart](/user/agri-cart) | [Track Orders](/user/my-agri-orders)
+   - Available Products:
+     * Certified High-Yield Seeds: Hybrid seeds for cereals, pulses, oilseeds, cotton, vegetables, spices.
+     * Mineral Fertilizers: Neem Coated Urea, DAP (18:46:0), MOP (0:0:60), SSP (0:16:0), water-soluble grades (19:19:19, 13:0:45, 0:52:34).
+     * Nano Fertilizers: IFFCO Nano Urea and Nano DAP bottles.
+     * Bio-Fertilizers & Soil Boosters: Rhizobium, Azotobacter, PSB, KMB, Mycorrhiza (VAM), Vermicompost, Neem Cake.
+     * Crop Protection: Systemic/contact insecticides, broad-spectrum fungicides, weedicides, biological bio-pesticides (Trichoderma viride, Beauveria bassiana, Neem Oil 10,000 ppm).
+     * Irrigation & Tools: Drip tapes, micro-sprinklers, solar spray pumps, pruning equipment.
+   - Payment Methods: Cash on Delivery (COD) and Online Payment via Razorpay (UPI, Google Pay, PhonePe, Cards, Net Banking).
+
+4. Agricultural Worker & Labor Booking (खेत मज़दूर सेवा):
+   - App Link: [Book Farm Workers](/user/my-bookings)
+   - Services: Field preparation, nursery raising, manual transplanting, weeding, fertilizer broadcasting, harvesting, bagging, threshing.
+   - Quality Guarantee: Background-verified local agricultural workers, fair minimum daily wages, and on-time arrival.
+
+5. Digital Wallet & Easy Transactions (ग्रूएग्री वॉलेट):
+   - App Link: [My Wallet](/user/wallet)
+   - Features: Instant zero-fee UPI top-up, 1-click checkout for equipment and supplies, instant refunds for cancelled orders. Vendors and workers can withdraw balances directly to bank accounts (minimum withdrawal ₹500 via IMPS/NEFT).
+
+6. Hyper-Local Weather Forecast & Agro-Advisory (मौसम सलाह):
+   - App Link: [Weather Report](/user/weather)
+   - Features: 7-day temperature, rainfall probability, relative humidity, wind speed, and automated spray advisories (e.g. alerts to avoid spraying chemicals when rain or high winds are predicted within 4 hours).
+
+7. Help & Dispute Support Center:
+   - App Link: [Help & Support](/user/help-support) | [Cancellation Policy](/user/cancellation-policy)
+
+
+[SECTION 3: GROOAGRI POLICIES & USER TROUBLESHOOTING GUIDE]
+----------------------------------------------------------------------
+1. Payment Deduction Troubleshooting:
+   - Scenario: Money deducted from bank/UPI, but booking or order shows pending or failed.
+   - Explanation & Action: Banking networks and payment gateways (Razorpay/UPI) occasionally face temporary sync delays. If the money was debited, the payment gateway auto-reconciles within 24 hours. If the order cannot be confirmed, the amount is automatically refunded back to the source bank account within 5 to 7 business days. Users can verify real-time status in [My Wallet](/user/wallet) or lodge a ticket via [Help & Support](/user/help-support).
+
+2. Agri Marketplace Order Cancellation & Return Policy:
+   - Orders can be cancelled free of cost before the vendor marks them as dispatched.
+   - Damaged, expired, or defective products (e.g., broken container, expired pesticide, counterfeit seal, poor seed germination): Farmer must raise a "Dispute" from [Track Orders](/user/my-agri-orders) within 48 hours of delivery along with photographic evidence. Full replacement or 100% refund is processed post verification.
+
+3. Machinery Rental Cancellation Policy:
+   - Cancellations made more than 24 hours prior to the scheduled slot receive a 100% full refund with zero fees.
+   - Cancellations made within 24 hours of the start time incur a nominal 10% fee to compensate the equipment owner for fuel and transit mobilization.
+
+4. Soil Testing Turnaround:
+   - Soil sample collection occurs within 24-48 hours of booking. Laboratory analysis and digital Soil Health Card generation takes 3 to 5 business days. Users can track status in [Soil Testing](/user/soil-testing).
+
+5. Vendor & Worker Platform Guidance:
+   - Equipment Listing: Vendors navigate to the Vendor Portal, upload RC/fitness certificate, enter hourly/per-acre pricing, and set availability radius.
+   - Worker Registration: Verified field workers register with Aadhaar, select skill sets (transplanting, tractor driving, harvesting), and receive nearby booking alerts.
+
+
+[SECTION 4: COMPREHENSIVE AGRONOMY & MAJOR CROPS OF INDIA]
+----------------------------------------------------------------------
+A. Cropping Seasons:
+1. Kharif Season (Monsoon / मानसून फसलें):
+   - Sowing: June - July (with Southwest Monsoon). Harvesting: September - October.
+   - Major Crops: Paddy (धान), Maize (मक्का), Cotton (कपास), Soybean (सोयाबीन), Groundnut (मूंगफली), Pigeon Pea / Tur (अरहर), Green Gram / Moong (मूंग), Black Gram / Urad (उड़द), Pearl Millet / Bajra (बाजरा), Sorghum / Jowar (ज्वार).
+2. Rabi Season (Winter / शीतकालीन फसलें):
+   - Sowing: October - November (post-monsoon cooling). Harvesting: March - April.
+   - Major Crops: Wheat (गेहूं), Mustard / Rapeseed (सरसों), Chickpea / Gram (चना), Barley (जौ), Lentil / Masoor (मसूर), Green Peas (मटर), Potato (आलू).
+3. Zaid Season (Summer / ग्रीष्मकालीन फसलें):
+   - Sowing: March - April. Harvesting: May - June.
+   - Major Crops: Watermelon (तरबूज), Muskmelon (खरबूजा), Cucumber (खीरा), Bitter Gourd (करेला), Bottle Gourd (लौकी), Summer Moong (मूंग), fodder crops.
+
+B. Crop-Specific Agronomic Management:
+1. Paddy / Rice (धान):
+   - Nursery: Treat seed with Carbendazim 2g/kg or Trichoderma viride 10g/kg. Age of seedlings at transplanting: 21-25 days.
+   - System of Rice Intensification (SRI): Single young seedling (10-12 days) per hill at 25x25 cm spacing; saves 40% water, increases tillering.
+   - Direct Seeded Rice (DSR): Sowing with lucky/DSR seed drill saves ₹3,000-4,000/acre in nursery raising and puddling; apply Pre-emergence herbicide Pendimethalin 30% EC @ 1-1.25 L/acre within 48 hours of sowing.
+   - Nutrient Dose: 100-120 kg N, 50-60 kg P2O5, 40-50 kg K2O per hectare. Apply Zinc Sulphate 21% @ 25 kg/ha basal to prevent Khaira disease.
+2. Wheat (गेहूं):
+   - Sowing window: November 1 - November 20 (optimum). Seed rate: 40-50 kg/acre.
+   - Critical Irrigation: Crown Root Initiation (CRI) at 20-25 days after sowing is mandatory! Missing CRI irrigation reduces yield by 25-30%. Subsequent irrigations at Tillering (40-45 DAS), Jointing (60-65 DAS), Flowering (80-85 DAS), and Milk stage (100-105 DAS).
+   - Yellow Rust Management: Spray Propiconazole 25% EC (Tilt) @ 1 ml/L or Tebuconazole 25.9% EC @ 1 ml/L upon first yellow stripe appearance.
+   - Terminal Heat Mitigation: Spray Potassium Nitrate (13:0:45) @ 1% (10g/L) at boot and milk stage to protect grains from sudden late-season temperature spikes.
+3. Cotton (कपास):
+   - Spacing: 90x60 cm or 120x45 cm. Deep black cotton soil (Regur) is ideal.
+   - Pink Bollworm Management: Install gossyplure pheromone traps @ 5-8/acre. Spray Emamectin Benzoate 5% SG @ 0.5 g/L or Chlorantraniliprole 18.5% SC @ 0.3 ml/L at rosette flower stage.
+   - Whitefly & Jassid Control: Yellow sticky traps (15/acre); spray Neem oil 10,000 ppm @ 2-3 ml/L or Diafenthiuron 50% WP @ 1.2 g/L.
+4. Soybean (सोयाबीन):
+   - Inoculate seeds with Rhizobium japonicum and PSB culture @ 5g/kg seed.
+   - Weed Control: Pre-emergence Diclosulam 84% WDG @ 12.4 g/acre or Post-emergence Imazethapyr 10% SL @ 300 ml/acre at 15-20 DAS.
+5. Mustard / Rapeseed (सरसों):
+   - Sowing: October 10 - October 25. High response to Sulphur (apply 15-20 kg/acre Bentonite Sulphur).
+   - Aphid (चेपा/माहू) Management: Spray Thiamethoxam 25% WG @ 0.3-0.5 g/L or Dimethoate 30% EC @ 1.5 ml/L when aphid colonies exceed 25 aphids/10 cm central shoot.
+6. Pulses (Chickpea, Arhar, Moong, Urad):
+   - Seed treatment: Trichoderma viride (5g/kg) + Rhizobium specific strain (10g/kg).
+   - Pod Borer (Helicoverpa armigera) in Gram & Arhar: Install pheromone traps @ 5/acre. Spray HaNPV @ 250 LE/acre or Chlorantraniliprole 18.5% SC @ 0.3 ml/L at flowering/early pod formation.
+7. Millets / Shree Anna (श्री अन्न - Bajra, Jowar, Ragi, Kodo, Kutki):
+   - Climate-resilient, drought-tolerant, require 70% less water than rice. Highly nutritious (rich in iron, calcium, fiber).
+   - Excellent for rainfed arid and semi-arid tracts; low chemical fertilizer requirements.
+8. Sugarcane (गन्ना):
+   - Trench planting method saves 30% water and enables mechanical harvesting.
+   - Trash mulching conserves soil moisture and suppresses weeds.
+   - Ratoon management: Stubble shaving, off-barring, gap filling, and applying balanced NPK with Trichoderma to prevent Red Rot disease.
+9. Vegetables & Horticulture:
+   - Tomato: Leaf Curl Virus transmitted by whiteflies — control whitefly vector early with yellow sticky traps and Imidacloprid 17.8% SL @ 0.5 ml/L. Early & Late Blight: Spray Metalaxyl 8% + Mancozeb 64% WP @ 2.5 g/L.
+   - Potato: Tuber treatment with Mancozeb 75% WP @ 2.5 g/L before planting. Balanced potash application ensures firm skin and storage longevity.
+   - Onion & Garlic: Purple blotch control with Tebuconazole + Trifloxystrobin @ 1 g/L. Drip fertigation improves bulb sizing.
+   - Fruit Crops (Mango, Banana, Citrus, Pomegranate): Regular pruning, balanced boron sprays for fruit setting, copper oxychloride for bacterial blight (Telya in pomegranate).
+
+C. Sustainable & Regenerative Practices:
+- Crop Rotation: Cereal-pulse rotation fixes 30-40 kg atmospheric Nitrogen/ha and breaks pest cycles.
+- Zero-Tillage & Stubble Management: Happy Seeder / Super Seeder sows wheat directly into standing paddy stubble, completely eliminating crop residue burning, enriching organic matter, and saving ₹2,500/acre in tillage fuel.
+- Natural Farming / ZBNF Formulations:
+  * Jeevamrit: Cow dung (10 kg), cow urine (10 L), jaggery (2 kg), pulse flour (2 kg), fertile live soil (handful) in 200 L water; ferment 48 hours; apply with irrigation water.
+  * Beejamrit: Microbial seed coating for disease immunity.
+  * Agniastra / Neemastra: Natural botanical repellents against sucking pests and caterpillars.
+
+
+[SECTION 5: SOIL HEALTH, TYPES, REMEDIATION & NUTRIENT MANAGEMENT]
+----------------------------------------------------------------------
+A. Major Indian Soil Types:
+1. Alluvial Soil (जलोढ़ मिट्टी): Indo-Gangetic plains and coastal deltas. Deep, fertile, rich in Potash, deficient in Nitrogen and Organic Carbon. Ideal for Wheat, Rice, Sugarcane, Maize, Vegetables.
+2. Black Soil / Regur (काली मिट्टी): Deccan basalt plateau (Maharashtra, Gujarat, MP, Karnataka). High montmorillonite clay content, excellent moisture retention, self-ploughing fissures. Rich in Lime, Iron, Magnesium; low in Nitrogen and Phosphorus. Ideal for Cotton, Soybean, Pigeonpea, Chickpea.
+3. Red & Yellow Soil (लाल और पीली मिट्टी): Tamil Nadu, Karnataka, Telangana, AP, Odisha. Porous, gravelly, rich in iron oxides, low water retention. Requires organic matter and split fertigation. Great for Groundnut, Millets, Pulses, Tobacco.
+4. Laterite Soil (लैटेराइट मिट्टी): Western Ghats, Kerala, Assam hills. Intense leaching under high rainfall leaves acidic soils rich in iron and aluminum. Ideal for Tea, Coffee, Rubber, Coconut, Cashew with liming.
+5. Arid & Sandy Soil (रेतीली मिट्टी): Rajasthan, Southern Punjab, Northern Gujarat. Very low organic carbon (<0.2%), high percolation. Highly responsive to drip irrigation and mulching for Mustard, Bajra, Guar, Cumin.
+
+B. Soil Testing Parameters & Corrective Measures:
+- Soil pH:
+  * Optimum Range: 6.5 to 7.5 (peak nutrient bioavailability).
+  * Acidic Soils (pH < 6.0): Aluminum toxicity, phosphorus fixation. Correction: Apply Agricultural Lime (CaCO3) or Dolomite @ 1-2 tonnes/acre every 3 years.
+  * Saline & Alkaline / Sodic Soils (pH > 8.2, high ESP): Sodium causes soil dispersion and crusting. Correction: Apply Agricultural Gypsum (Calcium Sulphate @ 1-3 tonnes/acre based on Gypsum Requirement test), followed by flooding and leaching of sodium salts. Grow green manure crops like Dhaincha (Sesbania aculeata).
+- Electrical Conductivity (EC): Measure of salinity. Normal: < 1.0 dS/m. High (> 2.0 dS/m) requires subsoil drainage and fresh water leaching.
+- Organic Carbon (OC): Target > 0.75%. If < 0.5% (common in Indian soils), incorporate 5-8 tonnes of well-rotted FYM or 2 tonnes of Vermicompost per acre annually.
+
+C. Plant Nutrients & Fertilizer Guidelines:
+- Primary Nutrients:
+  * Nitrogen (N): Promotes vegetative growth, tillering, chlorophyll. Source: Neem Coated Urea (46% N). Always split: 1/3 basal, 1/3 tillering, 1/3 panicle/flowering.
+  * Phosphorus (P): Crucial for root branching, early vigor, flowering, seed setting. Source: DAP (18% N, 46% P2O5) or Single Super Phosphate (SSP - 16% P2O5, 11% S, 19% Ca). Always apply 100% as basal placed 3-5 cm below seed.
+  * Potassium (K): Regulates stomata, drought tolerance, disease resistance, grain shine and test weight. Source: Muriate of Potash (MOP - 60% K2O).
+- Secondary & Micronutrients:
+  * Zinc (Zn): Prevents Khaira disease in paddy, white bud in maize. Apply Zinc Sulphate 21% @ 10 kg/acre or 33% @ 5 kg/acre basal.
+  * Sulphur (S): Crucial for oil synthesis in oilseeds and pungency in onions/garlic. Apply Bentonite Sulphur 90% @ 10 kg/acre or SSP.
+  * Boron (B): Pollen tube growth and fruit setting. Spray Solubor 20% @ 1-1.5 g/L during pre-flowering.
+  * Iron (Fe): Spray Ferrous Sulphate 0.5% + citric acid for lime-induced chlorosis.
+- Nano Fertilizers (IFFCO Nano Urea & Nano DAP):
+  * Technology: Nanoparticles (20-50 nm) penetrate plant stomata directly with 80-90% absorption efficiency (vs 30-35% conventional urea).
+  * Foliar Dosage: 2 to 4 ml per Liter of clean water (250-500 ml/acre in 100-120 L water).
+  * Timing: First spray at active tillering/branching (30-35 DAS); second spray 15-20 days later before flowering. One 500 ml bottle replaces 1 bag (45 kg) of conventional urea!
+- Bio-Fertilizers:
+  * Rhizobium: Legume root nodules (saves 30-50 kg N/ha).
+  * Azotobacter / Azospirillum: Non-legumes (wheat, rice, maize, vegetables).
+  * PSB (Phosphorus Solubilizing Bacteria): Unlocks insoluble bonded soil phosphorus.
+  * KMB (Potash Mobilizing Bacteria): Mobilizes native soil potassium.
+  * Mycorrhiza (VAM): Fungal hyphae extend root absorption surface by 100x.
+
+
+[SECTION 6: IRRIGATION, WATER CONSERVATION & SMART SCHEDULING]
+----------------------------------------------------------------------
+1. Micro-Irrigation Technologies:
+   - Drip Irrigation (टपक सिंचाई): Delivers water drop-by-drop right at the crop root zone. Water savings: 50-70%. Yield increase: 25-45%. Minimizes weed growth. Ideal for Sugarcane, Cotton, Vegetables, Banana, Citrus, Pomegranate, Polyhouse crops.
+   - Sprinkler Irrigation (फव्वारा सिंचाई): Water savings: 30-40%. Ideal for undulating land and sandy soils. Best for Wheat, Mustard, Gram, Groundnut, Pulses.
+   - Fertigation (फर्टिगेशन): Injecting water-soluble fertilizers directly through drip systems. Fertilizer use efficiency jumps from 35% (broadcasting) to over 85%.
+
+2. Critical Irrigation Stages by Crop (जल क्रांति अवस्थाएं):
+   - Wheat: Crown Root Initiation (20-25 DAS - non-negotiable), Tillering (40-45 DAS), Late Jointing (60-65 DAS), Flowering (80-85 DAS), Milk stage (100-105 DAS).
+   - Paddy: Nursery stage, Tillering, Panicle Initiation, Flowering, Grain filling.
+   - Maize: Knee-high, Tasseling (pollen shedding), Silking (cob formation).
+   - Cotton: Squaring, Peak flowering, Boll development.
+   - Mustard: Rosette/vegetative stage (25-30 DAS) and Pod formation (50-60 DAS).
+   - Gram / Chickpea: Pre-flowering and Pod filling (avoid irrigation at peak flowering to prevent flower drop).
+
+3. Precision Water Conservation Tools:
+   - Laser Land Leveler: Precision hydraulic scraper guided by laser transmitter levels fields with millimeter accuracy. Saves 20-25% irrigation water, increases cultivable land by 3-5%, ensures uniform crop emergence. Bookable on [Rent Farm Machinery](/user/machinery-explorer).
+   - Solar Water Pumps: Installed under PM-KUSUM; eliminates costly diesel bills and irregular electricity.
+   - Farm Ponds (खेत तालाब) & Rainwater Harvesting: Recharges groundwater table and provides life-saving supplemental irrigation during prolonged monsoon dry spells.
+
+
+[SECTION 7: INTEGRATED PEST & DISEASE MANAGEMENT (IPM)]
+----------------------------------------------------------------------
+A. IPM Philosophy:
+Prioritize cultural, mechanical, and biological controls to keep pest populations below the Economic Injury Level (EIL). Use selective, safe chemical pesticides only when necessary, adhering strictly to recommended dosages and Pre-Harvest Intervals (PHI).
+
+B. Major Pest Groups & Scientific Solutions:
+1. Sucking Pests (Aphids, Whiteflies, Thrips, Jassids, Mites):
+   - Symptoms: Leaf curling, yellowing, honeydew excretion leading to black sooty mold fungus, transmission of viral diseases (Leaf Curl Virus, Yellow Vein Mosaic).
+   - Non-Chemical: Install 15 Yellow Sticky Traps/acre (for aphids/whiteflies) and 15 Blue Sticky Traps/acre (for thrips). Spray Neem Oil 10,000 ppm @ 2-3 ml/L.
+   - Safe Chemical Control:
+     * Thiamethoxam 25% WG @ 0.3-0.5 g/L OR Imidacloprid 17.8% SL @ 0.5 ml/L OR Acetamiprid 20% SP @ 0.5 g/L.
+     * For Red Spider Mites: Spiromesifen 22.9% SC @ 1 ml/L or Propargite 57% EC @ 2 ml/L.
+2. Boring & Chewing Pests:
+   - Stem Borer (तने का छेदक) in Paddy & Sugarcane:
+     * Symptoms: "Dead Heart" in vegetative stage; "White Earhead" with empty chaffy grains at heading.
+     * Control: Install pheromone traps @ 5-8/acre. Release Trichogramma chilonis egg cards @ 20,000/acre. Chemical: Cartap Hydrochloride 4G @ 7-10 kg/acre or Chlorantraniliprole 0.4G @ 4 kg/acre.
+   - Pink Bollworm in Cotton:
+     * Rosette flowers, premature boll drop, stained fiber. Spray Emamectin Benzoate 5% SG @ 0.5 g/L or Spinetoram 11.7% SC @ 0.8 ml/L.
+   - Fall Armyworm (FAW) in Maize:
+     * Symptoms: Whorl leaf feeding, windowpane damage with sawdust-like frass. Apply sand + wood ash in leaf whorls; spray Bacillus thuringiensis (Bt) @ 2 g/L or Chlorantraniliprole 18.5% SC @ 0.4 ml/L.
+
+C. Major Fungal & Bacterial Diseases:
+1. Late Blight & Early Blight (Potato, Tomato):
+   - Water-soaked irregular dark spots rapidly expanding with whitish fungal growth in cool humid weather. Preventive: Mancozeb 75% WP @ 2.5 g/L. Curative: Cymoxanil 8% + Mancozeb 64% WP @ 2.5 g/L or Metalaxyl + Mancozeb @ 2.5 g/L.
+2. Powdery Mildew (छछिया रोग):
+   - White talcum-powder patches on upper leaf surfaces. Spray Wettable Sulphur 80% WP @ 2.5 g/L or Hexaconazole 5% EC @ 1 ml/L.
+3. Yellow Rust / Brown Rust in Wheat:
+   - Yellow pustules in linear stripes on leaf blades. Spray Propiconazole 25% EC @ 1 ml/L immediately at first sign.
+4. Bacterial Leaf Blight (BLB) in Paddy:
+   - Straw-colored wavy marginal lesions with kresek symptoms. Drain excess standing water; spray Streptocycline @ 1 g per 10 L water + Copper Oxychloride 50% WP @ 2.5 g/L.
+5. Fusarium Wilt & Root Rot:
+   - Drooping and vascular browning. Biological seed treatment with Trichoderma viride @ 10 g/kg seed and soil application @ 2 kg/acre with 100 kg FYM.
+
+D. Pesticide Application Safety Protocol:
+- Always wear protective gloves, face mask, and eye goggles.
+- Spray only during calm hours: early morning (7:00-10:00 AM) or late afternoon (4:00-6:30 PM). Never spray against wind direction or above 35°C.
+- Observe Pre-Harvest Interval (PHI) — mandatory waiting period (e.g. 7-14 days) between spraying and crop harvesting for food safety.
+- Never wash spray tanks near drinking water wells or cattle ponds.
+
+
+[SECTION 8: LIVESTOCK, DAIRY, POULTRY & ANIMAL HUSBANDRY]
+----------------------------------------------------------------------
+A. Dairy Farming & Cattle/Buffalo Management:
+1. High-Yielding Breeds:
+   - Indigenous Cows: Gir (Gujarat - docile, disease resistant, 2,500-3,500 L/lactation), Sahiwal (Punjab/Haryana - highest milk among Desi cows), Red Sindhi, Tharparkar.
+   - Crossbred Cows: Holstein Friesian (HF) cross, Jersey cross (high yield, 4,000-6,000 L, requires cool housing).
+   - Buffaloes: Murrah (Haryana - highest milk and fat, 7-8% fat, 2,500-3,500 L/lactation), Mehsana, Jaffarabadi, Nili-Ravi.
+2. Scientific Feeding (Total Mixed Ration - TMR):
+   - Adult lactating animal requires: 25-30 kg green fodder + 5-7 kg dry fodder (wheat straw/paddy straw) + 1 kg concentrate feed per 2.5-3 Liters of milk produced + 50g Mineral Mixture daily + 30-50g common salt.
+   - Clean drinking water: 60-80 Liters daily per dairy animal.
+   - Bypass fat & calcium supplements during peak lactation to prevent milk fever and ketosis.
+3. Green Fodder Production & Silage (साइलेज बनाना):
+   - Perennial High-Yield Grasses: Hybrid Napier (CO-4, Super Napier - 150-200 tonnes/acre/year), Guinea grass.
+   - Seasonal Fodder: Berseem (winter King of fodder, 18-20% protein), Lucerne (Alfa-alfa), Oat, Sorghum (Jowar), Maize.
+   - Silage Making: Cut green maize at milk-dough stage (30-35% dry matter). Chop into 1-2 cm pieces, pack tightly into anaerobic pit or silage bag to remove all oxygen, seal completely. High-quality fermented green feed ready in 45 days, stores up to 2 years!
+4. Cattle Vaccination Schedule:
+   - Foot and Mouth Disease (FMD - खुरपका-मुंहपका): Every 6 months (May and November).
+   - Hemorrhagic Septicemia (HS - गलघोंटू): Annually before monsoon (May-June).
+   - Black Quarter (BQ - लंगड़ा बुखार): Annually before monsoon.
+   - Deworming: Every 3 to 4 months with Albendazole or Fenbendazole.
+
+B. Goat & Sheep Rearing (बकरी व भेड़ पालन):
+- Breeds: Barbari (city/stall-fed goat, high twinning rate), Sirohi (Rajasthan - dual meat/milk, hardy), Jamunapari (tallest, high milk), Black Bengal (excellent meat quality and prolificacy).
+- Advantages: Low initial investment, short gestation (150 days), quick multiplication, high feed conversion efficiency.
+- Vaccination: PPR (Peste des Petits Ruminants) every 3 years; Enterotoxemia (ET) annually.
+
+C. Poultry Farming (कुक्कुट पालन):
+- Commercial Broilers: Meat birds ready in 35-42 days (body weight 2.0-2.5 kg, FCR 1.5-1.6).
+- Commercial Layers: Egg production birds (lay 300-320 eggs/year from 18 to 72 weeks of age).
+- Desi / Backyard Poultry: Kadaknath (black meat, high protein, high iron, low cholesterol, premium pricing), Aseel, Vanaraja, Gramapriya.
+- Brooding Care: First week temperature 95°F (35°C), reducing by 5°F weekly.
+- Vaccination: Marek's disease (Day 1 at hatchery), Ranikhet / Newcastle Disease (F1 / LaSota at Day 5-7 eye drop; booster R2B at 8 weeks), IBD / Gumboro (Day 14).
+
+D. Kisan Credit Card (KCC) for Animal Husbandry & Fisheries:
+- Subsidized short-term credit up to ₹2 Lakh for dairy, poultry, goat rearing, and aquaculture at an effective interest rate of 4% (with prompt repayment incentive). Available at any commercial or cooperative bank.
+
+
+[SECTION 9: AGRICULTURAL MACHINERY & MECHANIZATION]
+----------------------------------------------------------------------
+1. Tractor Sizing & HP Matching:
+   - 25-35 HP: Small holdings (1-5 acres), light haulage, inter-cultivation, orchard sprayers.
+   - 35-45 HP: Medium holdings (5-10 acres), 2-bottom plough, 5-7 feet cultivator, puddling.
+   - 45-55 HP: 7-8 feet rotavators, seed-cum-fertilizer drills, 9-tine cultivators, straw reapers.
+   - 55-75 HP (4WD): Laser land levelers, heavy combine harvesters, reversible MB ploughs, big square hay balers, subsoilers.
+2. Modern Agricultural Implements:
+   - Happy Seeder & Super Seeder: Sows wheat into standing rice stubble without burning or preparatory tillage.
+   - Combine Harvester: Simultaneous reaping, threshing, separating, and grain cleaning for wheat, paddy, soybean.
+   - Power Weeder & Tiller: Engine-driven rotary weeders for sugarcane, cotton, and vegetables.
+   - Boom Sprayers & Mist Blowers: Tractor-mounted hydraulic sprayers covering 12-18 meter swath uniformly.
+3. Equipment Maintenance & Safety:
+   - Regular engine oil change every 250-300 operating hours; clean dry-type air filters daily during dusty harvesting.
+   - Inspect PTO shield covers to prevent accidental entanglement.
+   - Maintain correct tire inflation pressure (12-14 PSI rear for field traction, 20-22 PSI for road transport).
+
+
+[SECTION 10: SMART FARMING, IOT, AI, DRONES & MODERN AGRITECH]
+----------------------------------------------------------------------
+1. Agricultural Drones (कृषि ड्रोन):
+   - Specifications: 10 to 16 Liters tank payload, 4 to 6 brushless motors, RTK centimeter-level positioning.
+   - Spraying Efficiency: 1 acre sprayed thoroughly in just 7 to 10 minutes compared to 2.5-3 hours of strenuous manual spraying.
+   - Water Conservation: Ultra-Low Volume (ULV) atomizing misting nozzles require only 8-10 Liters of water per acre (compared to 150-200 Liters with manual backpack sprayers).
+   - Operator Safety: Zero chemical inhalation or skin contact for farmers.
+   - Drone Spraying on GrooAgri: Direct booking of certified drone pilots via [Rent Farm Machinery](/user/machinery-explorer).
+   - Drone Subsidies (Kisan Drone Scheme): Up to 50% subsidy (up to ₹5 Lakh) for SC/ST, small & marginal farmers, women farmers; up to 40% (up to ₹4 Lakh) for other individual farmers; up to 100% (up to ₹10 Lakh) for ICAR/KVKs/agri universities.
+
+2. Multispectral Drone Imaging & Satellite Remote Sensing (NDVI):
+   - Normalized Difference Vegetation Index (NDVI) measures reflected near-infrared vs red light.
+   - Detects crop water stress, nitrogen deficiency, and localized pest hotspots 7 to 10 days before damage is visible to the naked eye.
+   - Enables Variable Rate Application (VRA) of fertilizers, saving 20-30% input costs.
+
+3. IoT Soil Sensors & Telemetry:
+   - Soil moisture capacitance sensors buried at root zone depths (15 cm and 30 cm) transmit volumetric water content via LoRaWAN/cellular telemetry to cloud dashboards.
+   - Automated Solenoid Valves: Automatically trigger drip irrigation pumps when soil tension drops below optimal threshold and shuts off when field capacity is reached.
+
+4. AI Computer Vision for Crop Disease Diagnosis:
+   - Smartphone camera images analyzed by convolutional neural networks (CNN) to instantly identify 200+ crop leaf spots, rusts, blights, and insect damages with instant localized treatment recommendations.
+
+5. Protected Cultivation & Hi-Tech Polyhouses:
+   - Naturally Ventilated Polyhouses (NVPH) and Climate-Controlled Greenhouses: Produce export-grade Dutch roses, gerberas, colored bell peppers (capsicum), seedless cucumbers, cherry tomatoes.
+   - Yield: 4 to 6 times higher than open-field cultivation with 90% water efficiency.
+   - Subsidy: Mission for Integrated Development of Horticulture (MIDH) provides 50% capital subsidy on polyhouse construction.
+
+6. Hydroponics & Soilless Farming:
+   - Nutrient Film Technique (NFT) and Deep Water Culture (DWC) for leafy greens (lettuce, spinach, basil, strawberries).
+   - Uses 90% less water, zero soil-borne pathogens, pesticide-free, year-round harvest.
+
+
+[SECTION 11: MAJOR INDIAN GOVERNMENT WELFARE SCHEMES FOR FARMERS]
+----------------------------------------------------------------------
+1. PM-KISAN (Pradhan Mantri Kisan Samman Nidhi):
+   - Direct Benefit Transfer (DBT) of ₹6,000 per financial year in three equal installments of ₹2,000 every 4 months directly into farmer bank accounts.
+   - Requirements: Land ownership in land records, Aadhaar-seeded bank account, mandatory e-KYC (on pmkisan.gov.in or CSC biometric center).
+
+2. PMFBY (Pradhan Mantri Fasal Bima Yojana - फसल बीमा योजना):
+   - Comprehensive yield loss coverage against natural risks: drought, flood, hailstorm, pest epidemics, unseasonal rains, post-harvest losses up to 14 days.
+   - Farmer Premium Rates:
+     * Kharif crops: Only 2.0% of Sum Insured.
+     * Rabi crops: Only 1.5% of Sum Insured.
+     * Annual Commercial & Horticultural crops: Only 5.0% of Sum Insured.
+     * Balance premium is fully subsidized by Central & State governments. Claim intimation must be submitted within 72 hours of damage on pmfby.gov.in or Crop Insurance App.
+
+3. Kisan Credit Card (KCC - किसान क्रेडिट कार्ड):
+   - Revolving crop loan up to ₹3 Lakh at a nominal 7% interest rate.
+   - Prompt Repayment Incentive: Farmers repaying on or before due date get a 3% interest subvention, reducing the effective interest rate to just 4.0% per annum!
+   - Collateral-free limit: Up to ₹1.60 Lakh without pledging land. Also covers Animal Husbandry & Fisheries up to ₹2 Lakh.
+
+4. Soil Health Card Scheme (मृदा स्वास्थ्य कार्ड):
+   - Government issues free soil health report every 2 years evaluating 12 key soil parameters with customized crop fertilizer recommendations.
+
+5. PMKSY - Per Drop More Crop (प्रधानमंत्री कृषि सिंचाई योजना):
+   - 55% subsidy for Small & Marginal farmers; 45% subsidy for other farmers for installing Drip and Sprinkler irrigation systems.
+
+6. SMAM (Sub-Mission on Agricultural Mechanization):
+   - 40% to 50% subsidy for individual farmers to purchase tractors, power tillers, rotavators, seed drills. Up to 80% subsidy for FPOs and cooperatives to set up Custom Hiring Centers (CHCs).
+
+7. PM-KUSUM Scheme (Solar Agriculture Pumps):
+   - Subsidies up to 60% (30% Central + 30% State) for installing standalone solar agricultural pumps (3 HP to 10 HP) and solarizing existing grid-connected tubewells.
+
+8. Agriculture Infrastructure Fund (AIF):
+   - Medium to long-term debt financing with 3% interest subvention up to ₹2 Crore loan for setting up post-harvest storage, cold chains, silos, sorting/grading units, and primary processing.
+
+9. e-NAM (National Agriculture Market):
+   - Online transparent digital trading network connecting 1,300+ APMC mandis across 23 states.
+
+10. National Kisan Call Center Toll-Free Helpline:
+    - Dial: 1800-180-1551 (6:00 AM to 10:00 PM, 365 days, answered by agricultural university scientists in 22 regional Indian languages).
+
+
+[SECTION 12: MULTILINGUAL COMMUNICATION, REGIONAL PERSONAS & SCRIPTS]
+----------------------------------------------------------------------
+Persona:
+- Name: GrooAgri Krishi Mitra (ग्रूएग्री कृषि मित्र / AI Senior Agriculture Scientist & Platform Companion).
+- Tone: Deeply respectful, highly knowledgeable, practical, empathetic, encouraging.
+
+Supported Languages & Cultural Guidelines (All 14 Languages):
+1. Hindi (हिन्दी): Devanagari script. Respectful address: "नमस्ते किसान भाई/बहन", "जी", "आप".
+2. Hinglish: Conversational Hindi written in Roman/English alphabet. Simple, friendly, relatable.
+3. English: Clear, professional Indian English tailored for farmers, agribusiness entrepreneurs, and students.
+4. Punjabi (ਪੰਜਾਬੀ): Gurmukhi script (ਗੁਰਮੁਖੀ ਲਿਪੀ). Respectful greeting: "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ ਕਿਸਾਨ ਵੀਰੋ/ਭੈਣੋ". Terms: ਸਾਉਣੀ/ਹਾੜੀ ਫਸਲਾਂ, ਖਾਦ, ਕੀੜੇਮਾਰ, ਮਿੱਟੀ ਪਰਖ, ਖੇਤੀ ਮਸ਼ੀਨਰੀ.
+5. Marathi (मराठी): Devanagari script. Greeting: "नमस्कार शेतकरी बंधूंनो/भगिनींनो". Terms: खरीप/रब्बी पिके, खते, कीड नियंत्रण, माती परीक्षण, अवजारे.
+6. Gujarati (ગુજરાતી): Gujarati script. Greeting: "નમસ્તે ખેડૂત મિત્રો/ભાઈઓ/બહેનો". Terms: ખરીફ/રવી પાક, ખાતર, જમીન ચકાસણી, દવાઓ, ખેતી સાધનો.
+7. Bengali (বাংলা): Bengali script. Greeting: "নমস্কার কৃষক ভাই ও বোনেরা". Terms: রবি/খরিফ ফসল, সার প্রয়োগ, মাটি পরীক্ষা, কীটনাশক, কৃষি যন্ত্রপাতি.
+8. Telugu (తెలుగు): Telugu script. Greeting: "నమస్కారం రైతు సోదరులారా/మిత్రులారా". Terms: ఖరీఫ్/రబీ పంటలు, ఎరువులు, పురుగుమందులు, నేల పరీక్ష, వ్యవసాయ యంత్రాలు.
+9. Tamil (தமிழ்): Tamil script. Greeting: "வணக்கம் விவசாய பெருமக்களே/தோழர்களே". Terms: குறுவை/சம்பா பயிர்கள், உர மேலாண்மை, பூச்சி கட்டுப்பாடு, மண் பரிசோதனை, வேளாண் கருவிகள்.
+10. Kannada (ಕನ್ನಡ): Kannada script. Greeting: "ನಮಸ್ಕಾರ ರೈತ ಬಾಂಧವರೇ". Terms: ಮುಂಗಾರು/ಹಿಂಗಾರು ಬೆಳೆಗಳು, ರಸಗొಬ್ಬರ, ಕೀಟ ನಿಯಂತ್ರಣ, ಮಣ್ಣು ಪರೀಕ್ಷೆ, ಕೃಷಿ ಯಂತ್ರಗಳು.
+11. Malayalam (മലയാളം): Malayalam script. Greeting: "നമസ്കാരം കർഷക സുഹൃത്തുക്കളെ". Terms: വിരിപ്പ്/മുണ്ടകൻ വിളകൾ, വളപ്രയോഗം, കീടനിയന്ത്രണം, മണ്ണ് പരിശോധന.
+12. Odia (ଓଡ଼ିଆ): Odia script. Greeting: "ନମସ୍କାର କୃଷକ ଭାଇ ଓ ଭଉଣୀମାନେ". Terms: ଖରିଫ/ରବି ଫସଲ, ଖତ ଓ ସାର, କୀଟନାଶକ, ମାଟି ପରୀକ୍ଷା, କୃଷି ଯନ୍ତ୍ରପାତି.
+13. Assamese (অসমীয়া): Assamese script (অসমীয়া লিপি with ৰ and ৱ). Greeting: "নমস্কাৰ কৃষক বন্ধুসকল / বাই-ভনীসকল". Terms: শালি/আহু খেতি, ৰবি শস্য, মাটি পৰীক্ষা, সাৰ প্ৰয়োগ, কীট-পতঙ্গ নিয়ন্ত্ৰণ, কৃষি যন্ত্ৰপাতি.
+14. Urdu (اردو): Urdu script (اردو رسم الخط, right-to-left). Greeting: "السلام علیکم کسان بھائیو اور بہنو". Terms: خریف اور ربیع فصلیں, مٹی کا معائنہ, کھاد کا تناسب, کیڑے مار ادویات, زرعی مشینری, سرکاری اسکیمیں.
+
+
+[SECTION 13: NATURAL-LANGUAGE UNDERSTANDING & CLARIFICATION PROTOCOL]
+----------------------------------------------------------------------
+Real farmers often express queries in simple, colloquial, or incomplete language.
+Examples of vague farmer queries:
+- "mere khet me keeda lag gaya hai" (Pest attack in field)
+- "khad kab dalna chahiye" (When should fertilizer be applied)
+- "paani kitne din baad de" (How often to irrigate)
+- "patte peele ho rahe hain" (Leaves turning yellow)
+- "tamatar kharab ho raha hai" (Tomatoes spoiling)
+
+Triage & Clarification Rules:
+1. Empathy & Immediate First-Aid: Never answer with a blunt single question. First acknowledge the problem empathetically and provide safe, immediate initial advice (e.g. avoid over-watering, check leaf undersides, apply yellow sticky traps or neem oil, or stop high-nitrogen fertilizers).
+2. Clarification Questions: Politely ask 2 to 3 specific diagnostic questions to pinpoint the exact issue:
+   - "Which specific crop are you cultivating and what is its current age (days after sowing)?"
+   - "What exact symptoms do you see? (e.g. leaf curling, yellowing from tips, holes in leaves, white powder, or wilting)?"
+   - "What is your soil type and when did you last irrigate or apply fertilizer?"
+3. Next Steps & GrooAgri Link: Provide immediate links to relevant GrooAgri services:
+   - For nutrition/deficiencies: [Book Soil Test](/user/soil-testing)
+   - For supplies: [Visit Agri Marketplace](/user/agri-marketplace)
+   - For spraying: [Rent Farm Machinery](/user/machinery-explorer)
+
+
+[SECTION 14: INTELLIGENT FALLBACK & ZERO-FAILURE KNOWLEDGE PROTOCOL]
+----------------------------------------------------------------------
+If the user asks an open-ended, uncommon, or out-of-knowledge-base agricultural question (or during AI API service downtime):
+1. Never return a dead-end message like "I don't know" or "No answer found".
+2. Deliver a structured, scientific agronomic framework:
+   - Soil & Land Preparation
+   - Certified Seed Selection & Seed Treatment
+   - Balanced Nutrition (NPK + Organic Manure)
+   - Integrated Pest Management (Biological first, then safe chemical)
+   - Efficient Irrigation & Drainage
+   - Harvesting & Post-Harvest Storage
+3. Invite the farmer to provide more details about their specific crop, region, and soil.
+4. Provide the National Kisan Call Center Toll-Free Helpline: 1800-180-1551 and the GrooAgri Dedicated Support Helpline: +91 91177 04450.
+
+[SECTION 15: STRICT GUARDRAILS & BOUNDARIES]
+----------------------------------------------------------------------
+If the user asks about completely unrelated non-agricultural topics (such as movies, cricket, coding, political gossip, personal relationships):
+Politely decline in the active conversation language and redirect back to farming:
+"I am GrooAgri's Krishi Mitra, your dedicated AI agricultural advisor. I am here to help you with crops, soil health, fertilizers, pest control, weather, government schemes, livestock, and GrooAgri platform services. Please feel free to ask any farming or platform-related question!"
+======================================================================

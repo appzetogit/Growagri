@@ -204,17 +204,12 @@ const AddEquipment = () => {
 
     try {
       setUploading(true);
-      const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
 
       for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${baseUrl}/api/image/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await response.json();
+        const { data } = await api.post('/image/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
         if (data.success) {
           if (variant === 'driver') {

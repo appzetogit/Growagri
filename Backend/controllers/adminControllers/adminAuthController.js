@@ -1,5 +1,5 @@
 const Admin = require('../../models/Admin');
-const { generateTokenPair } = require('../../utils/tokenService');
+const { generateTokenPair, verifyRefreshToken } = require('../../utils/tokenService');
 const { USER_ROLES } = require('../../utils/constants');
 const { validationResult } = require('express-validator');
 
@@ -162,7 +162,35 @@ const getProfile = async (req, res) => {
   }
 };
 
+/**
+ * Exchange a valid admin refresh token for a new token pair
+ */
+const refreshToken = async (req, res) => {
+  try {
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(req.body.refreshToken);
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+    }
+
+    const admin = decoded.role === USER_ROLES.ADMIN ? await Admin.findById(decoded.userId) : null;
+    if (!admin || admin.isActive === false) {
+      return res.status(401).json({ success: false, message: 'Account is not active' });
+    }
+
+    res.status(200).json({
+      success: true,
+      ...generateTokenPair({ userId: admin._id, role: USER_ROLES.ADMIN })
+    });
+  } catch (error) {
+    console.error('Admin refresh token error:', error);
+    res.status(500).json({ success: false, message: 'Failed to refresh token' });
+  }
+};
+
 module.exports = {
+  refreshToken,
   login,
   logout,
   updateProfile,

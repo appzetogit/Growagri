@@ -65,7 +65,7 @@ const getFinanceOverview = async (req, res) => {
     const pendingSettlements = await Settlement.aggregate([
       {
         $match: {
-          status: 'PENDING'
+          status: 'pending'
         }
       },
       {

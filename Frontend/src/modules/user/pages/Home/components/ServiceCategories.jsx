@@ -9,7 +9,7 @@ const toAssetUrl = (url) => {
   return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
-const ServiceCategories = React.memo(({ categories, onCategoryClick, onSeeAllClick, title = "Agriculture Seva Shreniyan", subtitle = "PREMIUM AGRICULTURE SERVICES" }) => {
+const ServiceCategories = React.memo(({ categories, onCategoryClick, onSeeAllClick, title = "Agriculture Seva Shreniyan", subtitle = "PREMIUM AGRICULTURE SERVICES", showHeader = true }) => {
 
 
   if (!Array.isArray(categories) || categories.length === 0) {
@@ -24,18 +24,19 @@ const ServiceCategories = React.memo(({ categories, onCategoryClick, onSeeAllCli
   return (
     <div className="px-5">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex flex-col">
-          <h2 className="text-[18px] sm:text-[20px] font-black text-gray-900 tracking-tight flex items-center gap-2">
-            <TranslatedText>{title}</TranslatedText>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-          </h2>
-          <p className="text-[10px] sm:text-[11px] text-gray-500 font-bold uppercase tracking-[0.14em] mt-0.5">
-            <TranslatedText>{subtitle}</TranslatedText>
-          </p>
+      {showHeader && (
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col">
+            <h2 className="text-[18px] sm:text-[20px] font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <TranslatedText>{title}</TranslatedText>
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+            </h2>
+            <p className="text-[10px] sm:text-[11px] text-gray-500 font-bold uppercase tracking-[0.14em] mt-0.5">
+              <TranslatedText>{subtitle}</TranslatedText>
+            </p>
+          </div>
         </div>
-
-      </div>
+      )}
 
       {/* Professional Grid Layout */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-y-7 gap-x-3">

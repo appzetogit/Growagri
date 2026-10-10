@@ -225,7 +225,7 @@ const BookingConfirmation = () => {
   const handleCancelBooking = async () => {
     try {
       setLoading(true);
-      await bookingService.cancel(booking._id || booking.id, { reason: 'Cancelled during uncertain vendor search' });
+      await bookingService.cancel(booking._id || booking.id, 'Cancelled during uncertain vendor search');
       toast.success('Booking cancelled successfully');
       navigate('/user');
     } catch (error) {
@@ -284,7 +284,7 @@ const BookingConfirmation = () => {
           )}
 
           {/* Success Icon - Show when confirmed */}
-          {!isSearching && ['confirmed', 'assigned', 'journey_started', 'work_in_progress', 'visited', 'work_done', 'completed'].includes(booking?.status?.toLowerCase()) && (
+          {!isSearching && ['confirmed', 'assigned', 'journey_started', 'in_progress', 'visited', 'work_done', 'completed'].includes(booking?.status?.toLowerCase()) && (
             <div className="flex flex-col items-center justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4">
                 <FiCheckCircle className="w-12 h-12 text-green-600" />

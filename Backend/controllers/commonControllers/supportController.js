@@ -5,7 +5,7 @@ const { createNotification } = require('../notificationControllers/notificationC
 const submitQuery = async (req, res) => {
     try {
         const { name, email, subject, message } = req.body;
-        const userId = req.user.id;
+        const userId = req.user?.id || null;
 
         const query = await SupportQuery.create({
             userId,

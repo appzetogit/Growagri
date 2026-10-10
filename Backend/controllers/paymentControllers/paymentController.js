@@ -4,9 +4,10 @@ const Settings = require('../../models/Settings');
 const Plan = require('../../models/Plan');
 const { validationResult } = require('express-validator');
 const { PAYMENT_STATUS, BOOKING_STATUS } = require('../../utils/constants');
-const { createOrder, verifyPayment, refundPayment } = require('../../services/razorpayService');
+const { createOrder, verifyAndClaimPayment, releasePayment, refundPayment } = require('../../services/razorpayService');
 const { createNotification } = require('../notificationControllers/notificationController');
 const { recordBookingEarning } = require('../../services/earningTrackerService');
+const { dispatchWave1 } = require('../../services/bookingDispatchService');
 
 /**
  * Create Razorpay order for booking payment
@@ -103,25 +104,28 @@ const verifyPaymentWebhook = async (req, res) => {
       razorpay_signature
     } = req.body;
 
-    // Verify signature
-    const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!verified.success) {
+      return res.status(verified.status).json({ success: false, message: verified.error });
+    }
 
-    if (!isValid) {
-      return res.status(400).json({
+    // Find booking by Razorpay order ID (must belong to caller and be unpaid)
+    const booking = await Booking.findOne({
+      razorpayOrderId: razorpay_order_id,
+      userId: req.user.id,
+      paymentStatus: { $ne: PAYMENT_STATUS.SUCCESS }
+    });
+
+    if (!booking || verified.amountPaise < Math.round(booking.finalAmount * 100)) {
+      await releasePayment(razorpay_payment_id);
+      return res.status(booking ? 400 : 404).json({
         success: false,
-        message: 'Invalid payment signature'
+        message: booking ? 'Paid amount does not match booking amount' : 'Booking not found or already paid'
       });
     }
 
-    // Find booking by Razorpay order ID
-    const booking = await Booking.findOne({ razorpayOrderId: razorpay_order_id });
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
+    // Booking was held for payment -> start the vendor search once it's paid
+    const startVendorSearch = booking.status === BOOKING_STATUS.AWAITING_PAYMENT && !booking.vendorId;
 
     // Update booking payment status
     booking.paymentStatus = PAYMENT_STATUS.SUCCESS;
@@ -131,13 +135,65 @@ const verifyPaymentWebhook = async (req, res) => {
 
     // Update booking status based on current state
     if ([BOOKING_STATUS.PENDING, BOOKING_STATUS.SEARCHING, BOOKING_STATUS.AWAITING_PAYMENT].includes(booking.status)) {
-      booking.status = BOOKING_STATUS.CONFIRMED;
+      booking.status = booking.vendorId ? BOOKING_STATUS.CONFIRMED : BOOKING_STATUS.SEARCHING;
     } else if (booking.status === BOOKING_STATUS.WORK_DONE) {
       booking.status = BOOKING_STATUS.COMPLETED;
       booking.completedAt = new Date();
     }
 
     await booking.save();
+
+    if (startVendorSearch) {
+      const alerted = await dispatchWave1(booking._id, req.app.get('io'));
+      if (!alerted) {
+        req.app.get('io')?.to(`user_${booking.userId}`).emit('booking_updated', {
+          bookingId: booking._id, status: booking.status, noVendorsFound: true,
+          message: 'No vendors nearby right now. We will keep searching.'
+        });
+      }
+
+      // Booking created notification for user
+      await createNotification({
+        userId: booking.userId,
+        type: 'booking_requested',
+        title: 'Booking Created',
+        message: `Your booking ${booking.bookingNumber} has been created successfully.`,
+        relatedId: booking._id,
+        relatedType: 'booking',
+        pushData: {
+          type: 'booking_requested',
+          bookingId: booking._id.toString(),
+          link: `/user/booking/${booking._id}`
+        }
+      }).catch(err => console.error('[Payment] Notification error:', err));
+
+      // Booking confirmation email
+      const populatedBooking = await Booking.findById(booking._id)
+        .populate('userId', 'name phone email')
+        .populate('serviceId', 'title iconUrl')
+        .populate('categoryId', 'title slug requiresDriver');
+      const { sendBookingEmails } = require('../../services/emailService');
+      sendBookingEmails(populatedBooking, populatedBooking?.userId, null, populatedBooking?.serviceId).catch(err => console.error(err));
+
+      // Clear user cart for this booking's items
+      try {
+        const Cart = require('../../models/Cart');
+        const userCart = await Cart.findOne({ userId: booking.userId });
+        if (userCart && userCart.items?.length > 0) {
+          const bookedTitles = new Set((booking.bookedItems || []).map(item => item.card?.title || item.title).filter(Boolean));
+          if (bookedTitles.size > 0) {
+            userCart.items = userCart.items.filter(item => {
+              const itemTitle = item.title;
+              const itemCardTitle = item.card?.title;
+              return !(bookedTitles.has(itemTitle) || (itemCardTitle && bookedTitles.has(itemCardTitle)));
+            });
+            await userCart.save();
+          }
+        }
+      } catch (cartErr) {
+        console.error('[Payment] Cart clear error:', cartErr);
+      }
+    }
 
     // ── Credit Vendor Wallet from VendorBill (single source of truth) ──
     const Transaction = require('../../models/Transaction');
@@ -325,17 +381,19 @@ const processWalletPayment = async (req, res) => {
       });
     }
 
-    // Check wallet balance
-    if (user.wallet.balance < booking.finalAmount) {
+    // Atomic deduct: only succeeds if balance is still sufficient
+    const debitedUser = await User.findOneAndUpdate(
+      { _id: userId, 'wallet.balance': { $gte: booking.finalAmount } },
+      { $inc: { 'wallet.balance': -booking.finalAmount } },
+      { new: true }
+    );
+    if (!debitedUser) {
       return res.status(400).json({
         success: false,
         message: 'Insufficient wallet balance'
       });
     }
-
-    // Deduct from user wallet
-    user.wallet.balance -= booking.finalAmount;
-    await user.save();
+    user.wallet.balance = debitedUser.wallet.balance;
 
     const Transaction = require('../../models/Transaction');
     await Transaction.create({
@@ -349,20 +407,44 @@ const processWalletPayment = async (req, res) => {
       balanceAfter: user.wallet.balance
     });
 
+    const startVendorSearch = booking.status === BOOKING_STATUS.AWAITING_PAYMENT && !booking.vendorId;
+
     // Update booking payment status
     booking.paymentStatus = PAYMENT_STATUS.SUCCESS;
     booking.paymentMethod = 'wallet';
     booking.paymentId = `WALLET_${Date.now()}`;
 
-    // Update booking status
+    // Update booking status (no vendor yet -> keep searching so vendors still see it)
     if ([BOOKING_STATUS.PENDING, BOOKING_STATUS.SEARCHING, BOOKING_STATUS.AWAITING_PAYMENT].includes(booking.status)) {
-      booking.status = BOOKING_STATUS.CONFIRMED;
+      booking.status = booking.vendorId ? BOOKING_STATUS.CONFIRMED : BOOKING_STATUS.SEARCHING;
     } else if (booking.status === BOOKING_STATUS.WORK_DONE) {
       booking.status = BOOKING_STATUS.COMPLETED;
       booking.completedAt = new Date();
     }
 
-    await booking.save();
+    if (startVendorSearch) {
+      const alerted = await dispatchWave1(booking._id, req.app.get('io'));
+      if (!alerted) {
+        req.app.get('io')?.to(`user_${booking.userId}`).emit('booking_updated', {
+          bookingId: booking._id, status: booking.status, noVendorsFound: true,
+          message: 'No vendors nearby right now. We will keep searching.'
+        });
+      }
+
+      await createNotification({
+        userId: booking.userId,
+        type: 'booking_requested',
+        title: 'Booking Created',
+        message: `Your booking ${booking.bookingNumber} has been created successfully.`,
+        relatedId: booking._id,
+        relatedType: 'booking',
+        pushData: {
+          type: 'booking_requested',
+          bookingId: booking._id.toString(),
+          link: `/user/booking/${booking._id}`
+        }
+      }).catch(err => console.error('[WalletPayment] Notification error:', err));
+    }
 
     // ── Credit Vendor Wallet from VendorBill (single source of truth) ──
     const Vendor = require('../../models/Vendor');
@@ -492,10 +574,10 @@ const processRefund = async (req, res) => {
     }
 
     const { bookingId } = req.body;
-    const { amount } = req.body; // Optional: partial refund
+    // Users can only refund their own cancelled bookings, always for the paid amount
+    const amount = null;
 
-    // Get booking
-    const booking = await Booking.findById(bookingId);
+    const booking = await Booking.findOne({ _id: bookingId, userId: req.user.id, status: BOOKING_STATUS.CANCELLED });
 
     if (!booking) {
       return res.status(404).json({
@@ -535,10 +617,18 @@ const processRefund = async (req, res) => {
       booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
     } else if (booking.paymentMethod === 'wallet') {
       // Wallet refund - add back to user wallet
-      const user = await User.findById(booking.userId);
+      const user = await User.findByIdAndUpdate(booking.userId, { $inc: { 'wallet.balance': booking.finalAmount } }, { new: true });
       if (user) {
-        user.wallet.balance += (amount || booking.finalAmount);
-        await user.save();
+        await require('../../models/Transaction').create({
+          userId: user._id,
+          bookingId: booking._id,
+          type: 'refund',
+          amount: booking.finalAmount,
+          status: 'completed',
+          paymentMethod: 'wallet',
+          description: `Refund for booking ${booking.bookingNumber}`,
+          balanceAfter: user.wallet.balance
+        });
       }
 
       // Update booking payment status
@@ -766,14 +856,19 @@ const createPlanOrder = async (req, res) => {
 
 const verifyPlanPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    // Import verifyPayment if needed, but it's destructured at top
-    const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-    if (!isValid) return res.status(400).json({ success: false, message: 'Invalid signature' });
+    const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!verified.success) return res.status(verified.status).json({ success: false, message: verified.error });
 
-    const plan = await Plan.findById(planId);
+    // Plan comes from the order we created, not from the request body
+    const { type, planId, userId } = verified.notes;
+    const plan = type === 'plan' && userId === req.user.id.toString() ? await Plan.findById(planId) : null;
     const user = await User.findById(req.user.id);
+    if (!plan || !user) {
+      await releasePayment(razorpay_payment_id);
+      return res.status(400).json({ success: false, message: 'Payment does not match a valid plan order' });
+    }
 
     const validityDays = plan.validityDays || 30;
     user.plans = {

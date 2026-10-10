@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { FiX, FiLayers, FiArrowLeft, FiPlus, FiCheck } from 'react-icons/fi';
+// eslint-disable-next-line no-unused-vars
 import { AnimatePresence, motion } from 'framer-motion';
 import { themeColors } from '../../../../../theme';
 import { publicCatalogService } from '../../../../../services/catalogService';
@@ -17,14 +18,13 @@ const toAssetUrl = (url) => {
   return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
 };
 
-const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCount, currentCity }) => {
+const CategoryModal = React.memo(({ isOpen, onClose, category, currentCity }) => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const [isClosing, setIsClosing] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const [view, setView] = useState('services'); // 'services' | 'attachments'
-  const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [services, setServices] = useState([]); // Sub-services
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,6 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
       setTimeout(() => {
         setView('services');
         setSelectedBrand(null);
-        setBrands([]);
         setServices([]);
         setIsRedirecting(false);
       }, 300);
@@ -67,7 +66,8 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
       setLoading(true);
       const response = await publicCatalogService.getServices({
         categoryId: category?.id || category?._id,
-        cityId: cityId
+        cityId: cityId,
+        forceRefresh: true
         // Don't filter by pricing_context — show all services for this category
       });
       if (response.success) {
@@ -80,11 +80,6 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
     }
   };
 
-  const handleBackToBrands = () => {
-    setView('services');
-    setSelectedBrand(null);
-    setServices([]);
-  };
 
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState(null);
   const [availableImplements, setAvailableImplements] = useState([]);
@@ -166,6 +161,9 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
         // Add parent machine first
         await addToCart({
           serviceId: service?._id || service?.id,
+          equipmentId: service?.equipmentId || (service?.isVendorEquipment ? (service?._id || service?.id) : null),
+          isVendorEquipment: !!service?.isVendorEquipment,
+          vendorId: service?.vendorId || selectedBrand?._id || selectedBrand?.id || null,
           title: service.title,
           description: service.description || '',
           icon: toAssetUrl(service.icon || ''),
@@ -221,7 +219,7 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
           }
         }, 1200);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to add to cart. Try again.');
     }
   };
@@ -233,264 +231,248 @@ const CategoryModal = React.memo(({ isOpen, onClose, category, location, cartCou
   const modalContent = (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998]"
-            onClick={onClose}
-            style={{
-              position: 'fixed',
-              willChange: 'opacity',
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden',
-              WebkitBackfaceVisibility: 'hidden',
-            }}
-          />
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 28, stiffness: 240 }}
+          className="fixed inset-0 z-[9999] bg-[#F8FBFF] flex flex-col h-full w-full overflow-hidden"
+        >
+          {/* Top Sticky Navigation Bar */}
+          <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3.5 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  if (view === 'attachments' || view === 'slots') setView('services');
+                  else onClose();
+                }}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all"
+                aria-label="Back"
+              >
+                <FiArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="font-black text-slate-900 text-base sm:text-lg leading-tight line-clamp-1">
+                  {view === 'attachments'
+                    ? `Attachments for ${selectedServiceForBooking?.title}`
+                    : (category?.title || 'Services')}
+                </h1>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">
+                  {view === 'attachments' ? 'Step 2: Choose tools required' : 'Select a machine to continue'}
+                </p>
+              </div>
+            </div>
 
-          {/* Modal Container */}
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[9999]"
-            style={{
-              position: 'fixed',
-              willChange: 'transform',
-              backfaceVisibility: 'hidden',
-              WebkitBackfaceVisibility: 'hidden',
-            }}
-          >
-            {/* Close Button */}
-            <div className="absolute -top-12 right-4 z-[60]">
+            <div className="flex items-center gap-2">
+              {loading && (
+                <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              )}
               <button
                 onClick={onClose}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50 transition-colors"
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-600 transition-all"
+                aria-label="Close"
               >
-                <FiX className="w-6 h-6 text-gray-800" />
+                <FiX className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            <div className="bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto min-h-[50vh]">
-              {isRedirecting ? (
-                <div className="flex flex-col items-center justify-center min-h-[40vh] py-12">
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6"
-                  >
-                    <FiCheck className="w-10 h-10 text-green-500" />
-                  </motion.div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Service Added!</h3>
-                  <p className="text-gray-500 text-sm">Proceeding to checkout...</p>
-                </div>
-              ) : (
-                <div className="px-4 py-6">
-                  {/* Header */}
-                  <div className="flex items-center gap-3 mb-6">
-                    {(view === 'attachments' || view === 'slots') && (
-                       <button
-                         onClick={() => {
-                           if (view === 'slots') setView('services');
-                           else setView('services');
-                         }}
-                         className="p-1 rounded-full hover:bg-gray-100"
-                       >
-                         <FiArrowLeft className="w-6 h-6 text-gray-800" />
-                       </button>
-                     )}
-                     <div>
-                       <h1 className="text-xl font-bold text-gray-900 line-clamp-1">
-                         {view === 'attachments'
-                           ? `Attachments for ${selectedServiceForBooking?.title}`
-                           : (category?.title || 'Services')}
-                       </h1>
-                       {view === 'services' && <p className="text-xs text-gray-500">Select a machine to continue</p>}
-                       {view === 'attachments' && <p className="text-xs text-gray-500">Step 2: Choose tools required for your task</p>}
-                     </div>
-                     {loading && <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin ml-auto"></div>}
-                   </div>
-
-                  {/* Content */}
-                  {loading && services.length === 0 ? (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 animate-pulse">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <div key={i} className="flex flex-col items-center">
-                          <div className="w-20 h-20 bg-gray-200 rounded-2xl mb-2"></div>
-                          <div className="h-3 w-16 bg-gray-200 rounded"></div>
+          {/* Full-Page Scrollable Body */}
+          <div className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+            {isRedirecting ? (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6"
+                >
+                  <FiCheck className="w-10 h-10 text-green-500" />
+                </motion.div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Service Added!</h3>
+                <p className="text-gray-500 text-sm">Proceeding to checkout...</p>
+              </div>
+            ) : (
+              <div className="max-w-2xl mx-auto">
+                {loading && services.length === 0 ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-28 bg-white rounded-2xl border border-slate-100 p-4" />
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {view === 'attachments' ? (
+                      // Attachments View
+                      <div className="space-y-6 pb-32">
+                        {/* Machine Summary Snippet */}
+                        <div className="bg-slate-50 p-4 rounded-[14px] border border-slate-100 flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm overflow-hidden">
+                            {toAssetUrl(selectedServiceForBooking?.icon) ? (
+                              <img src={toAssetUrl(selectedServiceForBooking?.icon)} className="w-full h-full object-cover" />
+                            ) : <FiLayers className="w-6 h-6 text-slate-300" />}
+                          </div>
+                          <div>
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Selected Machine</h4>
+                            <h3 className="font-black text-slate-800 text-sm">{selectedServiceForBooking?.title}</h3>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {view === 'attachments' ? (
-                        // Attachments View
-                        <div className="space-y-6 pb-32">
-                          {/* Machine Summary Snippet */}
-                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm overflow-hidden">
-                              {toAssetUrl(selectedServiceForBooking?.icon) ? (
-                                <img src={toAssetUrl(selectedServiceForBooking?.icon)} className="w-full h-full object-cover" />
-                              ) : <FiLayers className="w-6 h-6 text-slate-300" />}
-                            </div>
-                            <div>
-                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Selected Machine</h4>
-                                <h3 className="font-black text-slate-800 text-sm">{selectedServiceForBooking?.title}</h3>
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-1 gap-3 max-h-[40vh] overflow-y-auto pr-1">
-                            {availableImplements.map((impl) => {
-                              const isSelected = selectedImplements.some(i => (i._id || i.id) === (impl._id || impl.id));
-                              return (
-                                <div
-                                  key={impl.id || impl._id}
-                                  onClick={() => toggleImplement(impl)}
-                                  className={`p-4 border-2 rounded-2xl flex flex-col gap-3 transition-all cursor-pointer ${
-                                    isSelected 
-                                      ? 'border-emerald-600 bg-emerald-50/50 shadow-md' 
-                                      : 'border-gray-100 bg-white hover:border-gray-200'
-                                  }`}
-                                >
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <h3 className="font-extrabold text-gray-900 text-sm italic uppercase">{impl.title}</h3>
-                                      <p className="text-[10px] text-gray-400 font-medium line-clamp-1">{impl.description || 'Rental implement attachment'}</p>
-                                    </div>
-                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                      isSelected ? 'bg-emerald-600 border-emerald-600' : 'border-gray-200'
-                                    }`}>
-                                      {isSelected && <FiCheck className="w-4 h-4 text-white" />}
-                                    </div>
+                        <div className="grid grid-cols-1 gap-3 max-h-[40vh] overflow-y-auto pr-1">
+                          {availableImplements.map((impl) => {
+                            const isSelected = selectedImplements.some(i => (i._id || i.id) === (impl._id || impl.id));
+                            return (
+                              <div
+                                key={impl.id || impl._id}
+                                onClick={() => toggleImplement(impl)}
+                                className={`p-4 border-2 rounded-[14px] flex flex-col gap-3 transition-all cursor-pointer ${
+                                  isSelected 
+                                    ? 'border-emerald-600 bg-emerald-50/50 shadow-md' 
+                                    : 'border-gray-100 bg-white hover:border-gray-200'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <h3 className="font-extrabold text-gray-900 text-sm italic uppercase">{impl.title}</h3>
+                                    <p className="text-[10px] text-gray-400 font-medium line-clamp-1">{impl.description || 'Rental implement attachment'}</p>
                                   </div>
-                                  
-                                  {/* Pricing Row */}
-                                  <div className="flex flex-wrap gap-2 mt-1">
-                                    {impl.hourly_price > 0 && (
-                                      <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
-                                        <span className="text-[7px] font-black text-gray-400 uppercase">Hourly</span>
-                                        <span className="text-[11px] font-black text-emerald-700">+₹{impl.hourly_price}</span>
-                                      </div>
-                                    )}
-                                    {impl.land_price > 0 && (
-                                      <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
-                                        <span className="text-[7px] font-black text-gray-400 uppercase">Land (/{impl.land_unit || 'Ac'})</span>
-                                        <span className="text-[11px] font-black text-teal-700">+₹{impl.land_price}</span>
-                                      </div>
-                                    )}
-                                    {impl.daily_price > 0 && (
-                                      <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
-                                        <span className="text-[7px] font-black text-gray-400 uppercase">Daily</span>
-                                        <span className="text-[11px] font-black text-blue-700">+₹{impl.daily_price}</span>
-                                      </div>
-                                    )}
+                                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                    isSelected ? 'bg-emerald-600 border-emerald-600' : 'border-gray-200'
+                                  }`}>
+                                    {isSelected && <FiCheck className="w-4 h-4 text-white" />}
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* Sticky Summary / Total Bar */}
-                          <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.05)] z-50 rounded-t-3xl">
-                            <div className="flex flex-col gap-4">
-                                {/* Aggregated Prices Preview */}
-                                <div className="flex items-center justify-between px-2">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Hourly</span>
-                                        <span className="text-xl font-black text-slate-900">₹{calculateTotals().hourly}</span>
+                                
+                                {/* Pricing Row */}
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {impl.hourly_price > 0 && (
+                                    <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
+                                      <span className="text-[7px] font-black text-gray-400 uppercase">Hourly</span>
+                                      <span className="text-[11px] font-black text-emerald-700">+₹{impl.hourly_price}</span>
                                     </div>
-                                    <div className="h-10 w-px bg-slate-100"></div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Land</span>
-                                        <span className="text-xl font-black text-slate-900">₹{calculateTotals().land}</span>
+                                  )}
+                                  {impl.land_price > 0 && (
+                                    <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
+                                      <span className="text-[7px] font-black text-gray-400 uppercase">Land (/{impl.land_unit || 'Ac'})</span>
+                                      <span className="text-[11px] font-black text-teal-700">+₹{impl.land_price}</span>
                                     </div>
-                                    <div className="h-10 w-px bg-slate-100"></div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Daily</span>
-                                        <span className="text-xl font-black text-slate-900">₹{calculateTotals().daily}</span>
+                                  )}
+                                  {impl.daily_price > 0 && (
+                                    <div className="flex-1 min-w-[70px] flex flex-col bg-white p-2 rounded-xl border border-gray-100 items-center">
+                                      <span className="text-[7px] font-black text-gray-400 uppercase">Daily</span>
+                                      <span className="text-[11px] font-black text-blue-700">+₹{impl.daily_price}</span>
                                     </div>
+                                  )}
                                 </div>
+                              </div>
+                            );
+                          })}
+                        </div>
 
+                        {/* Sticky Summary / Total Bar */}
+                        <div className="fixed bottom-0 left-0 right-0 p-5 bg-white border-t border-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] z-50">
+                          <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                            {/* Aggregated Prices Preview */}
+                            <div className="flex items-center justify-between px-2">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Hourly</span>
+                                <span className="text-xl font-black text-slate-900">₹{calculateTotals().hourly}</span>
+                              </div>
+                              <div className="h-10 w-px bg-slate-100"></div>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Land</span>
+                                <span className="text-xl font-black text-slate-900">₹{calculateTotals().land}</span>
+                              </div>
+                              <div className="h-10 w-px bg-slate-100"></div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Daily</span>
+                                <span className="text-xl font-black text-slate-900">₹{calculateTotals().daily}</span>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={handleProcessWithAttachments}
+                              className="w-full py-4 rounded-2xl text-white font-extrabold text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                              style={{ 
+                                backgroundColor: themeColors.button,
+                                boxShadow: `0 8px 16px ${themeColors.brand.teal}3D`
+                              }}
+                            >
+                              Proceed to Booking ({selectedImplements.length + 1} Items)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // Services List
+                      services.length > 0 ? (
+                        <div className="space-y-3">
+                          {services.map((svc) => (
+                            <div key={svc.id || svc._id} className="p-4 border border-gray-100 rounded-[14px] bg-white shadow-sm flex flex-col gap-3 hover:border-gray-200 transition-all">
+                              <div className="flex items-start gap-3">
+                                {toAssetUrl(svc.icon) ? (
+                                  <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-50 flex-shrink-0 border border-slate-100">
+                                    <img src={toAssetUrl(svc.icon)} alt={svc.title} className="w-full h-full object-cover" />
+                                  </div>
+                                ) : null}
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <h3 className="font-bold text-gray-900 text-base leading-snug">{svc.title}</h3>
+                                    {svc.isVendorEquipment && (
+                                      <span className="px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 rounded text-[9px] font-black uppercase tracking-wider">
+                                        {svc.vendorName ? `By ${svc.vendorName}` : 'Verified Fleet'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 font-medium line-clamp-1">{svc.description || 'Professional rental equipment service'}</p>
+                                </div>
                                 <button
-                                    onClick={handleProcessWithAttachments}
-                                    className="w-full py-4 rounded-2xl text-white font-extrabold text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
-                                    style={{ 
-                                        backgroundColor: themeColors.button,
-                                        boxShadow: `0 8px 16px ${themeColors.brand.teal}3D`
-                                    }}
+                                  onClick={() => handleServiceClick(svc)}
+                                  className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-black flex items-center gap-1.5 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm flex-shrink-0"
                                 >
-                                    Proceed to Booking ({selectedImplements.length + 1} Items)
+                                  <FiPlus className="w-4 h-4" /> Add
                                 </button>
+                              </div>
+
+                              <div className="flex gap-2 py-3 px-2 bg-gray-50/50 rounded-lg border border-gray-50 overflow-x-auto">
+                                {(svc.hourly_price > 0 || svc.basePrice > 0) && (
+                                  <div className="flex-1 min-w-[70px] flex flex-col items-center">
+                                    <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Hourly</span>
+                                    <span className="text-[13px] font-extrabold text-gray-900">₹{svc.hourly_price || svc.basePrice}</span>
+                                  </div>
+                                )}
+                                {svc.land_price > 0 && (
+                                  <div className={`flex-1 min-w-[70px] flex flex-col items-center ${
+                                    (svc.hourly_price > 0 || svc.basePrice > 0) ? 'border-l border-gray-100 pl-2' : ''
+                                  }`}>
+                                    <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Land ({svc.land_unit || 'Acre'})</span>
+                                    <span className="text-[13px] font-extrabold text-gray-900">₹{svc.land_price}</span>
+                                  </div>
+                                )}
+                                {svc.daily_price > 0 && (
+                                  <div className={`flex-1 min-w-[70px] flex flex-col items-center ${
+                                    (svc.hourly_price > 0 || svc.basePrice > 0 || svc.land_price > 0) ? 'border-l border-gray-100 pl-2' : ''
+                                  }`}>
+                                    <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Daily</span>
+                                    <span className="text-[13px] font-extrabold text-gray-900">₹{svc.daily_price}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       ) : (
-                        // Services List
-                        services.length > 0 ? (
-                          <div className="space-y-3">
-                            {services.map((svc) => {
-                              const isAgri = isRentalCategory(category?.title);
-                              return (
-                                <div key={svc.id || svc._id} className="p-4 border border-gray-100 rounded-2xl bg-white shadow-sm flex flex-col gap-3">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1 pr-4">
-                                      <h3 className="font-bold text-gray-900 text-base">{svc.title}</h3>
-                                      <p className="text-[10px] text-gray-400 font-medium line-clamp-1">{svc.description || 'Professional rental equipment service'}</p>
-                                    </div>
-                                    <button
-                                      onClick={() => handleServiceClick(svc)}
-                                      className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-sm font-black flex items-center gap-1.5 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm"
-                                    >
-                                      <FiPlus className="w-4 h-4" /> Add
-                                    </button>
-                                  </div>
-
-                                  <div className="flex gap-2 py-3 px-2 bg-gray-50/50 rounded-xl border border-gray-50 overflow-x-auto">
-                                    {(svc.hourly_price > 0 || svc.basePrice > 0) && (
-                                      <div className="flex-1 min-w-[70px] flex flex-col items-center">
-                                        <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Hourly</span>
-                                        <span className="text-[13px] font-extrabold text-gray-900">₹{svc.hourly_price || svc.basePrice}</span>
-                                      </div>
-                                    )}
-                                    {svc.land_price > 0 && (
-                                      <div className={`flex-1 min-w-[70px] flex flex-col items-center ${
-                                        (svc.hourly_price > 0 || svc.basePrice > 0) ? 'border-l border-gray-100 pl-2' : ''
-                                      }`}>
-                                        <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Land ({svc.land_unit || 'Acre'})</span>
-                                        <span className="text-[13px] font-extrabold text-gray-900">₹{svc.land_price}</span>
-                                      </div>
-                                    )}
-                                    {svc.daily_price > 0 && (
-                                      <div className={`flex-1 min-w-[70px] flex flex-col items-center ${
-                                        (svc.hourly_price > 0 || svc.basePrice > 0 || svc.land_price > 0) ? 'border-l border-gray-100 pl-2' : ''
-                                      }`}>
-                                        <span className="text-[8.5px] font-black text-gray-400 uppercase tracking-wider">Daily</span>
-                                        <span className="text-[13px] font-extrabold text-gray-900">₹{svc.daily_price}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12 text-gray-500">
-                            <p>No equipment available in this category yet.</p>
-                          </div>
-                        )
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </>
+                        <div className="text-center py-20 text-gray-500">
+                          <p>No equipment available in this category yet.</p>
+                        </div>
+                      )
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

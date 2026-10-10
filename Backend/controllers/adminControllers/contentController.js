@@ -6,8 +6,17 @@ const About = require('../../models/About');
 // @desc    Get all FAQs (Public & Admin)
 exports.getFAQs = async (req, res) => {
     try {
-        const query = req.user && req.user.role === 'admin' ? {} : { isActive: true };
-        const faqs = await FAQ.find(query).sort({ createdAt: -1 });
+        const faqs = await FAQ.find({ isActive: true }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, count: faqs.length, data: faqs });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+// @desc    Get all FAQs incl. hidden (Admin)
+exports.getAllFAQs = async (req, res) => {
+    try {
+        const faqs = await FAQ.find({}).sort({ createdAt: -1 });
         res.status(200).json({ success: true, count: faqs.length, data: faqs });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server Error' });

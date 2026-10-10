@@ -569,21 +569,27 @@ module.exports = {
       // Fetch global settings for rates
       const Settings = require('../../models/Settings');
       const settings = await Settings.findOne({ type: 'global' });
-      const tdsRate = settings?.tdsPercentage || 1;
-      const platformFeeRate = settings?.platformFeePercentage || 1;
+      // ?? (not ||) so an admin can set 0%
+      const tdsRate = settings?.tdsPercentage ?? 1;
+      const platformFeeRate = settings?.platformFeePercentage ?? 1;
 
-      const withdrawal = await Withdrawal.findById(withdrawalId);
-      if (!withdrawal) return res.status(404).json({ success: false, message: 'Withdrawal not found' });
-      if (withdrawal.status !== 'pending') return res.status(400).json({ success: false, message: 'Not pending' });
+      // Claim the withdrawal atomically: a double click / two admins can't both approve it
+      const withdrawal = await Withdrawal.findOneAndUpdate(
+        { _id: withdrawalId, status: 'pending' },
+        { $set: { status: 'approved' } },
+        { new: true }
+      );
+      if (!withdrawal) return res.status(400).json({ success: false, message: 'Withdrawal not found or not pending' });
 
-      const vendor = await Vendor.findById(withdrawal.vendorId);
-      if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
-
-      if (vendor.wallet.earnings < withdrawal.amount) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient earnings. Available: ₹${vendor.wallet.earnings}`
-        });
+      // Debit only if earnings still cover it (atomic)
+      const vendor = await Vendor.findOneAndUpdate(
+        { _id: withdrawal.vendorId, 'wallet.earnings': { $gte: withdrawal.amount } },
+        { $inc: { 'wallet.earnings': -withdrawal.amount, 'wallet.totalWithdrawn': withdrawal.amount } },
+        { new: true }
+      );
+      if (!vendor) {
+        await Withdrawal.updateOne({ _id: withdrawal._id }, { $set: { status: 'pending' } });
+        return res.status(400).json({ success: false, message: 'Insufficient vendor earnings for this withdrawal' });
       }
 
       // Calculate Deductions
@@ -592,13 +598,7 @@ module.exports = {
       const platformFeeAmount = Math.round((grossAmount * platformFeeRate) / 100);
       const netAmount = grossAmount - tdsAmount - platformFeeAmount;
 
-      // Deduct full amount from vendor earnings (gross)
-      vendor.wallet.earnings -= grossAmount;
-      vendor.wallet.totalWithdrawn = (vendor.wallet.totalWithdrawn || 0) + grossAmount;
-      await vendor.save();
-
-      // Update withdrawal with details
-      withdrawal.status = 'approved';
+      // Update withdrawal with details (vendor wallet already debited above)
       withdrawal.processedBy = adminId;
       withdrawal.processedDate = new Date();
       withdrawal.transactionReference = transactionReference;
@@ -694,17 +694,26 @@ module.exports = {
   rejectWithdrawal: async (req, res) => {
     try {
       const { withdrawalId } = req.params;
-      const { reason } = req.body;
+      const reason = req.body.rejectionReason || req.body.reason;
       const adminId = req.user.id;
 
-      const withdrawal = await Withdrawal.findById(withdrawalId);
-      if (!withdrawal) return res.status(404).json({ success: false, message: 'Withdrawal not found' });
+      // Only a pending withdrawal can be rejected (an approved one was already paid out)
+      const withdrawal = await Withdrawal.findOneAndUpdate(
+        { _id: withdrawalId, status: 'pending' },
+        { $set: { status: 'rejected', processedBy: adminId, processedDate: new Date(), rejectionReason: reason } },
+        { new: true }
+      );
+      if (!withdrawal) return res.status(400).json({ success: false, message: 'Withdrawal not found or not pending' });
 
-      withdrawal.status = 'rejected';
-      withdrawal.processedBy = adminId;
-      withdrawal.processedAt = new Date();
-      withdrawal.rejectionReason = reason;
-      await withdrawal.save();
+      const { createNotification } = require('../notificationControllers/notificationController');
+      await createNotification({
+        vendorId: withdrawal.vendorId,
+        type: 'withdrawal_rejected',
+        title: 'Withdrawal Rejected',
+        message: `Your withdrawal of ₹${withdrawal.amount} was rejected${reason ? `: ${reason}` : '.'}`,
+        relatedId: withdrawal._id,
+        relatedType: 'withdrawal'
+      }).catch(() => {});
 
 
 

@@ -83,6 +83,19 @@ const notificationSchema = new mongoose.Schema({
       'ecommerce_order',
       'ecommerce_order_update',
       'ecommerce_out_of_stock',
+      // types already used by controllers (were silently rejected by validation)
+      'worker_approved',
+      'work_started',
+      'worker_accepted',
+      'support_update',
+      'vendor_approval_request',
+      'vendor_cash_limit_exceeded',
+      'vendor_settlement_request',
+      'dispute_update',
+      'shop_approved',
+      'shop_rejected',
+      'withdrawal_rejected',
+      'admin_broadcast',
       'general'
     ],
     index: true
@@ -105,7 +118,7 @@ const notificationSchema = new mongoose.Schema({
   },
   relatedType: {
     type: String,
-    enum: ['booking', 'payment', 'user', 'vendor', 'worker', 'service', 'scrap', 'withdrawal'],
+    enum: ['booking', 'payment', 'user', 'vendor', 'worker', 'service', 'scrap', 'withdrawal', 'dispute', 'settlement', 'support_query', 'order'],
     default: null
   },
   // Notification Status

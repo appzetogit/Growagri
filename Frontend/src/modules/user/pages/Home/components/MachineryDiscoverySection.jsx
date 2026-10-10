@@ -7,9 +7,11 @@ import {
 import { motion } from 'framer-motion';
 import { publicEquipmentService } from '../../../../../services/publicEquipmentService';
 import { useCity } from '../../../../../context/CityContext';
+import { useLanguage } from '../../../../../context/LanguageContext';
 
 const MachineryDiscoverySection = () => {
     const navigate = useNavigate();
+    const { t } = useLanguage();
     const [equipment, setEquipment] = useState([]);
     const [loading, setLoading] = useState(true);
     const { currentCity } = useCity();
@@ -40,7 +42,7 @@ const MachineryDiscoverySection = () => {
         <section className="px-5 mb-8">
             <div className="flex items-center justify-between mb-5">
                 <div>
-                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Rent Machinery</h2>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('Machinery Rental')}</h2>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <FiCheckCircle className="text-emerald-500" /> Verified Owners & Drivers
                     </p>
@@ -49,7 +51,7 @@ const MachineryDiscoverySection = () => {
                     onClick={() => navigate('/user/machinery-explorer')}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-black transition-all active:scale-95"
                 >
-                    Explore All <FiArrowRight />
+                    {t('View All')} <FiArrowRight />
                 </button>
             </div>
 

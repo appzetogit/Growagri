@@ -81,6 +81,15 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    // Blocked/suspended accounts lose access immediately, not when their token expires.
+    // (Pending workers are allowed: worker approval is optional in the current flow.)
+    if (user.isActive === false || ['rejected', 'suspended'].includes(decoded.role === USER_ROLES.WORKER && user.approvalStatus)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been blocked. Please contact support.'
+      });
+    }
+
     // Attach user to request
     req.user = user;
     req.userId = decoded.userId;

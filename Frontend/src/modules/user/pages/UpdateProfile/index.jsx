@@ -6,6 +6,7 @@ import { themeColors } from '../../../../theme';
 import { userAuthService } from '../../../../services/authService';
 
 import { z } from "zod";
+import api from '../../../../services/api';
 
 // Zod schema
 const profileSchema = z.object({
@@ -90,21 +91,7 @@ const UpdateProfile = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    if (!baseUrl) {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        baseUrl = 'http://localhost:5000';
-      } else {
-        baseUrl = window.location.origin;
-      }
-    }
-    baseUrl = baseUrl.replace(/\/api$/, '');
-    const response = await fetch(`${baseUrl}/api/image/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
+    const { data } = await api.post('/image/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     if (!data.success) throw new Error(data.message || 'Upload failed');
     return data.imageUrl;
   };

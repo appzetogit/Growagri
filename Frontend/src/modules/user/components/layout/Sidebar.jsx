@@ -12,15 +12,18 @@ import {
   HiOutlineQuestionMarkCircle,
   HiOutlineInformationCircle,
   HiOutlineShieldCheck,
-  HiOutlineLogout
+  HiOutlineLogout,
+  HiOutlineGlobeAlt
 } from 'react-icons/hi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { themeColors } from '../../../../theme';
 import { userAuthService } from '../../../../services/authService';
+import { useLanguage } from '../../../../context/LanguageContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const { language, languages, t } = useLanguage();
 
   useEffect(() => {
     if (isOpen) {
@@ -62,7 +65,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   const menuItems = [
-    { name: 'Home', path: '/user/dashboard', icon: HiOutlineHome },
+    { name: 'Home', path: '/user', icon: HiOutlineHome },
     { name: 'About Us', path: '/user/about-groo', icon: HiOutlineInformationCircle },
     { 
       name: 'How to use our app', 
@@ -77,6 +80,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'FAQ', path: '/user/faq', icon: HiOutlineQuestionMarkCircle },
     { name: 'Help & Support', path: '/user/help-support', icon: HiOutlineQuestionMarkCircle },
     { name: 'Settings', path: '/user/settings', icon: HiOutlineCog },
+    { 
+      name: 'Language', 
+      path: '/user/language', 
+      icon: HiOutlineGlobeAlt,
+      badge: languages[language]?.nativeLabel || language 
+    },
   ];
 
   const sidebarContent = (
@@ -166,7 +175,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         >
                           <div className="flex items-center gap-4">
                             <Icon className="w-5 h-5 text-slate-400 group-hover:text-[#2E7D32] transition-colors" />
-                            <span className="font-medium text-[15px]">{item.name}</span>
+                            <span className="font-medium text-[15px]">{t(item.name)}</span>
                           </div>
                           <svg id={`arrow-${index}`} className="w-4 h-4 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -180,7 +189,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                               onClick={onClose}
                               className="block py-2 text-[14px] text-slate-500 hover:text-[#2E7D32] font-medium transition-colors"
                             >
-                              {child.name}
+                              {t(child.name)}
                             </Link>
                           ))}
                         </div>
@@ -193,10 +202,17 @@ const Sidebar = ({ isOpen, onClose }) => {
                       key={index}
                       to={item.path}
                       onClick={onClose}
-                      className="flex items-center gap-4 px-3 py-3.5 rounded-xl text-slate-600 hover:bg-[#F1F8E9] hover:text-[#2E7D32] transition-all active:scale-[0.98] group"
+                      className="flex items-center justify-between px-3 py-3.5 rounded-xl text-slate-600 hover:bg-[#F1F8E9] hover:text-[#2E7D32] transition-all active:scale-[0.98] group"
                     >
-                      <Icon className="w-5 h-5 text-slate-400 group-hover:text-[#2E7D32] transition-colors" />
-                      <span className="font-medium text-[15px]">{item.name}</span>
+                      <div className="flex items-center gap-4">
+                        <Icon className="w-5 h-5 text-slate-400 group-hover:text-[#2E7D32] transition-colors" />
+                        <span className="font-medium text-[15px]">{t(item.name)}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -211,7 +227,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                   className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-red-50/80 text-red-600 hover:bg-red-100/80 rounded-xl transition-colors font-semibold active:scale-[0.98]"
                 >
                   <HiOutlineLogout className="w-5 h-5 stroke-[2]" />
-                  Logout
+                  {t('Logout')}
                 </button>
               ) : (
                 <Link
@@ -220,7 +236,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                   className="flex items-center justify-center w-full px-4 py-3.5 text-white rounded-xl font-semibold shadow-lg shadow-[#2E7D32]/25 active:scale-[0.98]"
                   style={{ background: themeColors.gradient }}
                 >
-                  Login / Sign Up
+                  {t('Login / Sign Up')}
                 </Link>
               )}
             </div>

@@ -1,5 +1,10 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+
+const SchemeRedirect = () => {
+  const { id } = useParams();
+  return <Navigate to={`/user/schemes/${id}`} replace />;
+};
 
 // Import module routes
 import LandingPage from '../modules/landing/LandingPage';
@@ -33,6 +38,8 @@ const AppRoutes = () => {
     isVendorRoute ||
     isWorkerRoute ||
     [
+      '/user/checkout',
+      '/checkout',
       '/user/privacy',
       '/user/help-support',
       '/user/cancellation-policy',
@@ -40,6 +47,8 @@ const AppRoutes = () => {
       '/terms',
       '/support'
     ].includes(location.pathname);
+
+  const isHomePage = ['/', '/user', '/user/', '/home', '/user/home'].includes(location.pathname);
 
   return (
     <>
@@ -61,7 +70,7 @@ const AppRoutes = () => {
         <Route path="/articles" element={<ArticleListing />} />
         <Route path="/articles/:id" element={<ArticleDetail />} />
 
-        {/* Public utility URLs (Great for iOS/App Store) */}
+        <Route path="/schemes/:id" element={<SchemeRedirect />} />
         <Route path="/privacy" element={<Navigate to="/user/privacy" replace />} />
         <Route path="/support" element={<Navigate to="/user/help-support" replace />} />
         <Route path="/terms" element={<Navigate to="/user/cancellation-policy" replace />} />
@@ -73,7 +82,7 @@ const AppRoutes = () => {
       {!hideGlobalElements && (
         <>
           <LocationPermissionChecker />
-          <Chatbot />
+          {isHomePage && <Chatbot />}
         </>
       )}
     </>

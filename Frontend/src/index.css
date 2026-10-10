@@ -205,24 +205,38 @@ body {
   min-height: 100vh;
 }
 
-/* Hide scrollbar for horizontal scroll */
-.scrollbar-hide {
-  -ms-overflow-style: none;
+/* Hide scrollbars globally for clean app-like UI */
+html,
+body {
   scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
 }
 
-.scrollbar-hide::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Hide scrollbar utility classes */
+.scrollbar-hide,
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Safe area for bottom navigation */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
 }
 
 
@@ -255,4 +269,23 @@ html {
 /* Hide bottom navigation when location modal is open (prevents iOS keyboard push issue) */
 body.hide-bottom-nav nav.fixed.bottom-0 {
   display: none !important;
+}
+
+/* Prevent unwanted browser focus outline / yellow focus rings */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none !important;
+}
+
+/* Chrome/Chromium autofill background and highlight fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: inherit;
+  transition: background-color 5000s ease-in-out 0s;
 }

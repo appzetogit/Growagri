@@ -5,6 +5,46 @@ import { toast } from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import api from '../../../../services/api';
 
+// Send an announcement (in-app + push) to farmers, owners, workers or everyone
+const BroadcastForm = () => {
+  const [form, setForm] = useState({ audience: 'all', title: '', message: '' });
+  const [sending, setSending] = useState(false);
+
+  const send = async (e) => {
+    e.preventDefault();
+    if (!window.confirm(`Send this notification to ${form.audience}?`)) return;
+    try {
+      setSending(true);
+      const res = await api.post('/notifications/admin/broadcast', form);
+      toast.success(res.data.message || 'Broadcast sent');
+      setForm({ ...form, title: '', message: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send broadcast');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <form onSubmit={send} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+      <h2 className="font-bold text-gray-800">Send Push Notification</h2>
+      <div className="flex flex-col md:flex-row gap-3">
+        <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} className="p-2 border border-gray-200 rounded-lg text-sm">
+          <option value="all">Everyone</option>
+          <option value="users">Farmers</option>
+          <option value="vendors">Equipment Owners</option>
+          <option value="workers">Workers</option>
+        </select>
+        <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="flex-1 p-2 border border-gray-200 rounded-lg text-sm" />
+      </div>
+      <textarea required value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Message" className="w-full h-20 p-2 border border-gray-200 rounded-lg text-sm" />
+      <button disabled={sending} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
+        {sending ? 'Sending...' : 'Send'}
+      </button>
+    </form>
+  );
+};
+
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +54,7 @@ const Notifications = () => {
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/notifications', {
+      const res = await api.get('/notifications/admin', {
         params: { limit: 50 }
       });
       if (res.data.success) {
@@ -99,6 +139,8 @@ const Notifications = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
+      <BroadcastForm />
+
       {/* Header */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between">

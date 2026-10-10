@@ -16,7 +16,6 @@ const {
   vendorReachedLocation,
   verifySelfVisit,
   completeSelfJob,
-  collectSelfCash,
   payWorker,
   getVendorRatings,
   getPendingBookings,
@@ -38,7 +37,7 @@ const assignWorkerValidation = [
 ];
 
 const updateStatusValidation = [
-  body('status').isIn(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rejected'])
+  body('status').isIn(Object.values(require('../../utils/constants').BOOKING_STATUS)) // transitions are checked in the controller
     .withMessage('Invalid status')
 ];
 
@@ -62,7 +61,6 @@ router.post('/:id/self/start', authenticate, isVendor, startSelfJob);
 router.post('/:id/self/reached', authenticate, isVendor, vendorReachedLocation);
 router.post('/:id/self/visit/verify', authenticate, isVendor, verifySelfVisit);
 router.post('/:id/self/complete', authenticate, isVendor, completeSelfJob);
-router.post('/:id/self/payment/collect', authenticate, isVendor, collectSelfCash);
 
 // Equipment Trip Routes (Agriculture flow)
 router.post('/:id/trip/start', authenticate, isVendor, startTrip);

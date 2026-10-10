@@ -59,22 +59,13 @@ const isAdminOrVendor = (req, res, next) => {
  */
 const isSuperAdmin = async (req, res, next) => {
   try {
-    /* if (req.userRole !== USER_ROLES.ADMIN && req.userRole !== 'super_admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin role required.'
-      });
-    }
-
-    const Admin = require('../models/Admin');
-    const admin = await Admin.findById(req.user.id);
-
-    if (!admin || admin.role !== 'super_admin') {
+    // authenticate() already loaded the Admin document; its DB role is the source of truth
+    if (!['ADMIN', 'admin', 'super_admin'].includes(req.userRole) || req.user?.role !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Super Admin role required.'
       });
-    } */
+    }
 
     next();
   } catch (error) {

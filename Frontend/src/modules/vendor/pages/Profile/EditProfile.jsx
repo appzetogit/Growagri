@@ -10,6 +10,7 @@ import AddressSelectionModal from '../../../user/pages/Checkout/components/Addre
 import { toast } from 'react-hot-toast';
 import { z } from "zod";
 import flutterBridge from '../../../../utils/flutterBridge';
+import api from '../../../../services/api';
 
 // Zod schema
 const vendorProfileSchema = z.object({
@@ -205,23 +206,7 @@ const EditProfile = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    let baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    if (!baseUrl) {
-      // If no env var, check hostname to determine dev vs prod
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        baseUrl = 'http://localhost:5000';
-      } else {
-        // In production, fallback to same origin (relative path)
-        baseUrl = window.location.origin;
-      }
-    }
-    baseUrl = baseUrl.replace(/\/api$/, '');
-    const response = await fetch(`${baseUrl}/api/image/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
+    const { data } = await api.post('/image/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     if (!data.success) throw new Error(data.message || 'Upload failed');
     return data.imageUrl;
   };
@@ -294,7 +279,7 @@ const EditProfile = () => {
 
     if (!validationResult.success) {
       console.log('Validation failed:', validationResult.error);
-      const errorMessage = validationResult.error?.errors?.[0]?.message || 'Validation failed';
+      const errorMessage = validationResult.error?.issues?.[0]?.message || 'Validation failed';
       toast.error(errorMessage);
       return;
     }
@@ -310,7 +295,7 @@ const EditProfile = () => {
           photoUrl = await uploadFile(photoFile);
         } catch (err) {
           console.error('Photo upload failed:', err);
-          alert('Failed to upload profile photo');
+          toast.error(err.response?.data?.message || 'Failed to upload profile photo');
           setUploading(false);
           return;
         }
@@ -322,7 +307,7 @@ const EditProfile = () => {
           aadharUrl = await uploadFile(aadharFile);
         } catch (err) {
           console.error('Aadhar upload failed:', err);
-          alert('Failed to upload Aadhar document');
+          toast.error(err.response?.data?.message || 'Failed to upload Aadhar document');
           setUploading(false);
           return;
         }
@@ -352,6 +337,7 @@ const EditProfile = () => {
           window.dispatchEvent(new Event('vendorProfileUpdated'));
           window.dispatchEvent(new Event('vendorDataUpdated'));
 
+          toast.success('Profile updated');
           navigate('/vendor/profile');
         } else {
           throw new Error(response.message || 'Failed to update profile');
@@ -359,7 +345,7 @@ const EditProfile = () => {
       } catch (apiError) {
         console.error('API update failed:', apiError);
         // Fallback to local storage if API is mock or fails? No, display error
-        alert(apiError.message || 'Failed to save profile on server.');
+        toast.error(apiError.response?.data?.message || apiError.message || 'Failed to save profile on server.');
       }
 
     } catch (error) {

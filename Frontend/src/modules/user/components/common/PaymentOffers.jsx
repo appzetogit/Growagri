@@ -14,18 +14,7 @@ const PaymentOffers = memo(({ offers = [] }) => {
   // Format offers to ensure consistent structure
   const formatOffers = (rawOffers) => {
     if (!rawOffers || rawOffers.length === 0) {
-      return [
-        {
-          id: 1,
-          title: 'Mobikwik cashback up to ₹...',
-          subtitle: 'Via Mobikwik UPI Payment',
-        },
-        {
-          id: 2,
-          title: '₹100 back - order',
-          subtitle: 'Via Airtel Payment',
-        },
-      ];
+      return [];
     }
 
     return rawOffers.map((offer, index) => {
@@ -50,6 +39,10 @@ const PaymentOffers = memo(({ offers = [] }) => {
   };
 
   const formattedOffers = formatOffers(offers);
+
+  if (!formattedOffers || formattedOffers.length === 0) {
+    return null;
+  }
 
   return (
     <div className="px-4 mb-6">

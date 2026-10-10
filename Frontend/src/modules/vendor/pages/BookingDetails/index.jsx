@@ -153,7 +153,6 @@ export default function BookingDetails() {
   }, []);
 
   useEffect(() => {
-    // Load booking from localStorage (mock data)
     // Load booking from API
     const loadBooking = async () => {
       try {

@@ -378,14 +378,19 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  work_evidence_photo: {
+    type: String,
+    default: null
+  },
   visitLocation: {
     lat: Number,
     lng: Number,
     address: String,
     verifiedAt: Date
   },
-  // Note: Detailed billing (items/parts) is now handled by VendorBill model
-  // workDoneDetails and extraCharges are deprecated in favor of VendorBill
+  // Note: Detailed billing (items/parts) is handled by VendorBill (source of truth for money).
+  // workDoneDetails is kept only for display of extra items on the user/vendor screens.
+  workDoneDetails: { type: mongoose.Schema.Types.Mixed, default: undefined },
 
   // ==========================================
   // 10. CANCELLATION

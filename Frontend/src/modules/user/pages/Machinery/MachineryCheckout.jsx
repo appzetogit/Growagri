@@ -46,9 +46,10 @@ const MachineryCheckout = () => {
                 serviceId: equipment._id,
                 vendorId: equipment.vendorId?._id || equipment.vendorId,
                 categoryId: equipment.categoryId?._id || equipment.categoryId,
-                bookingType: 'machinery',
+                bookingType: date ? 'scheduled' : 'instant',
                 rental_type: rateType,
                 landSize: rateType === 'land_based' ? quantity : undefined,
+                estimatedDuration: rateType !== 'land_based' ? quantity : undefined,
                 scheduledDate: date,
                 scheduledTime: slot,
                 timeSlot: { start: slot, end: slot, date, time: slot },
@@ -78,23 +79,16 @@ const MachineryCheckout = () => {
                             : rateType === 'land_based'
                             ? equipment.pricing?.land_based?.price
                             : equipment.pricing?.daily?.price,
-                        quantity: quantity,
+                        quantity: 1,
                         description: `${quantity} ${rateType === 'hourly' ? 'Hours' : rateType === 'land_based' ? 'Acres' : 'Days'}`
-                    },
-                    // Add implements as additional line items
-                    ...selectedImplements.map(impl => ({
-                        title: impl.title,
-                        price: impl.pricing?.[rateType]?.price || 0,
-                        quantity: quantity,
-                        description: `${impl.title} add-on`
-                    }))
+                    }
                 ]
             };
 
             const res = await bookingService.create(payload);
             if (res.success) {
                 toast.success('Booking Successful!');
-                navigate('/user/bookings');
+                navigate('/user/my-bookings');
             }
         } catch (err) {
             toast.error(err.response?.data?.message || 'Booking failed');

@@ -9,6 +9,13 @@ const EcommerceOrder = require('../../models/EcommerceOrder');
 
 const { BOOKING_STATUS, PAYMENT_STATUS, VENDOR_STATUS } = require('../../utils/constants');
 
+// Platform commission rate from settings (same formula as vendor bills)
+// ponytail: applies the current rate to past bookings; sum VendorBill.companyRevenue instead if historic rate changes must be exact
+const getCommissionRate = async () => {
+  const settings = await require('../../models/Settings').findOne({ type: 'global' });
+  return (100 - require('../../utils/constants').serviceSplitPct(settings)) / 100;
+};
+
 /**
  * Get overall dashboard stats
  */
@@ -68,7 +75,7 @@ const getDashboardStats = async (req, res) => {
 
     const bookingRevData = revenueResult[0] || { totalRevenue: 0, totalBookings: 0 };
     const bookingRevenue = bookingRevData.totalRevenue;
-    const bookingCommission = bookingRevenue * 0.2; // 20% commission
+    const bookingCommission = bookingRevenue * (await getCommissionRate());
 
     // Soil Test Revenue
     const soilTestRevenueResult = await SoilTestRequest.aggregate([
@@ -233,7 +240,7 @@ const getRevenueAnalytics = async (req, res) => {
           },
           revenue: { $sum: '$finalAmount' },
           bookings: { $sum: 1 },
-          platformCommission: { $sum: { $multiply: ['$finalAmount', 0.2] } }
+          platformCommission: { $sum: { $multiply: ['$finalAmount', await getCommissionRate()] } }
         }
       },
       { $sort: { _id: 1 } }
@@ -246,6 +253,7 @@ const getRevenueAnalytics = async (req, res) => {
       const commission = item.platformCommission || 0;
       mergedData[item._id] = {
         date: item._id,
+        bookings: item.bookings || 0,
         bookingRevenue: commission,
         bookingCommission: commission,
         soilTestRevenue: 0,

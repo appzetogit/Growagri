@@ -4,6 +4,7 @@ import { FiDollarSign, FiTrendingUp, FiCalendar, FiArrowRight } from 'react-icon
 import { vendorTheme as themeColors } from '../../../../theme';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
+import { getEarningsOverview } from '../../services/earningsService';
 
 
 const Earnings = () => {
@@ -37,19 +38,16 @@ const Earnings = () => {
   useEffect(() => {
 
 
-    const loadEarnings = () => {
+    const loadEarnings = async () => {
       try {
-        const vendorEarnings = JSON.parse(localStorage.getItem('vendorEarnings') || '{}');
-        const earningsData = {
-          today: vendorEarnings.today || 0,
-          week: vendorEarnings.week || 0,
-          month: vendorEarnings.month || 0,
-          total: vendorEarnings.total || 0,
-        };
-        setEarnings(earningsData);
-
-        const history = JSON.parse(localStorage.getItem('vendorEarningsHistory') || '[]');
-        setEarningsHistory(history);
+        const data = await getEarningsOverview();
+        setEarnings({
+          today: data.today || 0,
+          week: data.week || 0,
+          month: data.month || 0,
+          total: data.total || 0,
+        });
+        setEarningsHistory(data.history || []);
       } catch (error) {
         console.error('Error loading earnings:', error);
       }

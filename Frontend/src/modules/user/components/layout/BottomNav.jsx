@@ -4,6 +4,7 @@ import { FiHome, FiGift, FiShoppingCart, FiUser, FiCalendar } from 'react-icons/
 import { HiHome, HiGift, HiShoppingCart, HiUser, HiCalendar } from 'react-icons/hi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../../../../context/CartContext';
+import { useLanguage } from '../../../../context/LanguageContext';
 import { themeColors } from '../../../../theme';
 
 // Agriculture-themed colors for each nav item (layout unchanged)
@@ -44,6 +45,7 @@ const BottomNav = React.memo(() => {
   const location = useLocation();
   const navRef = useRef(null);
   const { cartCount } = useCart();
+  const { t } = useLanguage();
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
   const navItems = useMemo(() => [
@@ -185,7 +187,7 @@ const BottomNav = React.memo(() => {
                     }}
                     className="text-[10px]"
                   >
-                    {item.label}
+                    {t(item.label)}
                   </motion.span>
                 </div>
               </motion.button>

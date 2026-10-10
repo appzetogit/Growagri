@@ -74,13 +74,8 @@ export const getWithdrawalHistory = async (filters = {}) => {
  */
 export const getBankAccount = async () => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/wallet/bank-account`);
-    // return await response.json();
-
-    // Mock implementation
-    const bankAccount = JSON.parse(localStorage.getItem('vendorBankAccount') || '{}');
-    return bankAccount;
+    const response = await api.get('/vendors/wallet/bank-account');
+    return response.data.data || {};
   } catch (error) {
     console.error('Error fetching bank account:', error);
     throw error;
@@ -94,17 +89,8 @@ export const getBankAccount = async () => {
  */
 export const saveBankAccount = async (bankAccountData) => {
   try {
-    // TODO: Replace with actual API call
-    // const response = await fetch(`${API_BASE_URL}/wallet/bank-account`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(bankAccountData),
-    // });
-    // return await response.json();
-
-    // Mock implementation
-    localStorage.setItem('vendorBankAccount', JSON.stringify(bankAccountData));
-    return bankAccountData;
+    const response = await api.post('/vendors/wallet/bank-account', bankAccountData);
+    return response.data.data || bankAccountData;
   } catch (error) {
     console.error('Error saving bank account:', error);
     throw error;

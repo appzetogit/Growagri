@@ -60,7 +60,7 @@ export const bookingService = {
   // Calls the backend API we built in Step 2 (checkEquipmentAvailability controller)
   checkEquipmentAvailability: async (equipmentId, date, time) => {
     const response = await api.get('/users/bookings/check-availability', {
-      params: { equipmentId, date, time }
+      params: { equipmentId, requestedDate: date, requestedTime: time }
     });
     return response.data;
   }

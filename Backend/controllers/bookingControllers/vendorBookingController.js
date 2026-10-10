@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Booking = require('../../models/Booking');
 const Worker = require('../../models/Worker');
 const { validationResult } = require('express-validator');
-const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
+const { BOOKING_STATUS, PAYMENT_STATUS, isPaymentSettled } = require('../../utils/constants');
 const { createNotification } = require('../notificationControllers/notificationController');
 const { sendNotificationToUser, sendNotificationToVendor, sendNotificationToWorker } = require('../../services/firebaseAdmin');
 const VendorBill = require('../../models/VendorBill');
@@ -133,12 +133,19 @@ const acceptBooking = async (req, res) => {
     const vendorId = req.user.id;
     const { id } = req.params;
 
+    if (req.user.wallet?.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your wallet is blocked for unpaid dues. Please settle dues to accept new bookings.'
+      });
+    }
+
     // ATOMIC UPDATE: Check status and vendorId in query to prevent race conditions
     // Only accept if status is REQUESTED/SEARCHING and NO vendor is assigned yet
     const updatedBooking = await Booking.findOneAndUpdate(
       {
         _id: id,
-        status: { $in: [BOOKING_STATUS.REQUESTED, BOOKING_STATUS.SEARCHING] },
+        status: { $in: [BOOKING_STATUS.REQUESTED, BOOKING_STATUS.SEARCHING, BOOKING_STATUS.CONFIRMED] },
         $or: [
           { vendorId: null }, // Ensures another request didn't just take it
           { vendorId: vendorId } // Direct assigned booking
@@ -259,18 +266,19 @@ const acceptBooking = async (req, res) => {
       const message = 'Vendor has accepted your request. Your booking is confirmed!';
 
       io.to(`user_${booking.userId}`).emit('booking_accepted', {
-        bookingId: booking._id,
+        bookingId: booking._id.toString(),
         bookingNumber: booking.bookingNumber,
         vendor: {
-          id: vendorId,
+          id: vendorId.toString(),
           name: req.user.name,
-          businessName: req.user.businessName
+          businessName: req.user.businessName,
+          rating: req.user.rating || null
         },
         message
       });
 
       io.to(`user_${booking.userId}`).emit('booking_updated', {
-        bookingId: booking._id,
+        bookingId: booking._id.toString(),
         status: booking.status,
         message: 'Vendor has accepted your request'
       });
@@ -527,9 +535,17 @@ const assignWorker = async (req, res) => {
       const io = req.app.get('io');
       if (io) {
         io.to(`user_${booking.userId}`).emit('booking_updated', {
-          bookingId: booking._id,
+          bookingId: booking._id.toString(),
           status: booking.status,
           message: 'Professional assigned to your booking'
+        });
+        io.to(`user_${booking.userId}`).emit('worker_assigned', {
+          bookingId: booking._id.toString(),
+          worker: {
+            id: vendorId.toString(),
+            name: req.user.businessName || req.user.name,
+            phone: req.user.phone
+          }
         });
       }
 
@@ -549,9 +565,9 @@ const assignWorker = async (req, res) => {
       });
     }
 
-    // Check if worker is active
-    const validStatuses = ['active', 'ONLINE', 'ACTIVE'];
-    if (!validStatuses.includes(worker.status)) {
+    // OFFLINE only means "app not open" (they still get a push), so only block disabled workers
+    const blockedStatuses = ['inactive', 'INACTIVE', 'suspended', 'SUSPENDED'];
+    if (blockedStatuses.includes(worker.status) || worker.isActive === false) {
       return res.status(400).json({
         success: false,
         message: `Worker is not active (Status: ${worker.status})`
@@ -607,6 +623,27 @@ const assignWorker = async (req, res) => {
     // Manual push removed - auto handled by createNotification
     // sendNotificationToWorker(workerId, { ... });
 
+    // Send socket event to user for real-time UI transition
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${booking.userId}`).emit('booking_updated', {
+        bookingId: booking._id.toString(),
+        status: booking.status,
+        workerId: worker._id.toString(),
+        workerName: worker.name,
+        message: `${worker.name} has been assigned to your booking.`
+      });
+      io.to(`user_${booking.userId}`).emit('worker_assigned', {
+        bookingId: booking._id.toString(),
+        worker: {
+          id: worker._id.toString(),
+          name: worker.name,
+          phone: worker.phone,
+          profilePhoto: worker.profilePhoto
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Worker assigned successfully',
@@ -637,7 +674,8 @@ const updateBookingStatus = async (req, res) => {
 
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { status, workerPaymentStatus, finalSettlementStatus } = req.body;
+    // Worker payment goes through the pay-worker endpoints, never this generic update
+    const { status, finalSettlementStatus } = req.body;
 
     const booking = await Booking.findOne({ _id: id, vendorId });
 
@@ -667,6 +705,14 @@ const updateBookingStatus = async (req, res) => {
         });
       }
 
+      // Completion only after payment is settled (online / cash OTP / plan) — otherwise use the billing flow
+      if (status === BOOKING_STATUS.COMPLETED && !isPaymentSettled(booking)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Collect payment first (bill + customer OTP) before completing this booking'
+        });
+      }
+
       // Update booking status
       booking.status = status;
 
@@ -684,13 +730,6 @@ const updateBookingStatus = async (req, res) => {
     }
 
     // Update other fields
-    if (workerPaymentStatus) {
-      booking.workerPaymentStatus = workerPaymentStatus;
-      if (workerPaymentStatus === 'PAID' || workerPaymentStatus === 'SUCCESS') {
-        booking.isWorkerPaid = true;
-        booking.workerPaidAt = booking.workerPaidAt || new Date();
-      }
-    }
     if (finalSettlementStatus) booking.finalSettlementStatus = finalSettlementStatus;
 
     await booking.save();
@@ -821,16 +860,10 @@ const startSelfJob = async (req, res) => {
     //   return res.status(400).json({ success: false, message: 'Worker is assigned to this booking. You cannot start it yourself unless you unassign worker.' });
     // }
 
-    if (booking.status !== BOOKING_STATUS.CONFIRMED && booking.status !== BOOKING_STATUS.ASSIGNED) {
-      // Allow ASSIGNED if we consider "Self Assigned" as a state? 
-      // If workerId is null, status usually CONFIRMED.
-      // But lets allow generic flow.
-    }
-
-    // Status Check
-    const allowed = [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.AWAITING_PAYMENT];
-    if (!allowed.includes(booking.status) && booking.status !== BOOKING_STATUS.ACCEPTED) { // flexible
-      // check strict
+    // Only a booking that hasn't started yet can be started (never a completed/cancelled one)
+    const allowed = [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.AWAITING_PAYMENT, BOOKING_STATUS.ACCEPTED];
+    if (!allowed.includes(booking.status)) {
+      return res.status(400).json({ success: false, message: `Cannot start a ${booking.status} booking` });
     }
 
     // Generate Visit OTP
@@ -1032,7 +1065,7 @@ const completeSelfJob = async (req, res) => {
     const Settings = require('../../models/Settings');
     const settings = await Settings.findOne({ type: 'global' });
 
-    let serviceSplitPct = settings?.servicePayoutPercentage ?? 70;
+    let serviceSplitPct = require('../../utils/constants').serviceSplitPct(settings);
     let partsSplitPct = settings?.partsPayoutPercentage ?? 10;
     let serviceGstPct = settings?.serviceGstPercentage ?? 18;
     let partsGstPct = settings?.partsGstPercentage ?? 18;
@@ -1249,143 +1282,6 @@ const completeSelfJob = async (req, res) => {
   }
 };
 
-/**
- * Collect Self Cash
- * ─────────────────
- * Called after user confirms OTP for cash payment.
- *
- * Wallet logic:
- *   dues     += grandTotal          (vendor physically holds this cash)
- *   earnings += vendorTotalEarning  (vendor's rightful share)
- *   Net owed to platform = dues − earnings
- *
- * VendorBill is the ONLY source of truth for earnings.
- */
-const collectSelfCash = async (req, res) => {
-  try {
-    const vendorId = req.user.id;
-    const { id } = req.params;
-    const { otp } = req.body;
-
-    const booking = await Booking.findOne({ _id: id, vendorId }).select('+paymentOtp');
-    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
-    if (booking.status !== BOOKING_STATUS.WORK_DONE) return res.status(400).json({ success: false, message: 'Work not done yet' });
-    if (booking.paymentOtp !== otp) return res.status(400).json({ success: false, message: 'Invalid OTP' });
-
-    // ── Fetch the VendorBill (single source of truth) ──
-    const VendorBill = require('../../models/VendorBill');
-    const bill = await VendorBill.findOne({ bookingId: booking._id });
-    if (!bill) return res.status(500).json({ success: false, message: 'Bill not found — cannot process payment' });
-
-    const grandTotal = bill.grandTotal;
-    const vendorEarning = bill.vendorTotalEarning;
-
-    // ── Update Booking status ──
-    booking.status = BOOKING_STATUS.COMPLETED;
-    booking.paymentStatus = PAYMENT_STATUS.SUCCESS;
-    booking.paymentMethod = 'cash';
-    booking.cashCollected = true;
-    booking.cashCollectedBy = 'vendor';
-    booking.cashCollectorId = vendorId;
-    booking.cashCollectedAt = new Date();
-    booking.completedAt = new Date();
-    booking.paymentOtp = undefined;
-    await booking.save();
-
-    // ── Update VendorBill status ──
-    bill.status = 'paid';
-    bill.paidAt = new Date();
-    await bill.save();
-
-    // ── Update Vendor Wallet (Atomic with $inc) ──
-    const Vendor = require('../../models/Vendor');
-    const vendorDoc = await Vendor.findById(vendorId).select('wallet');
-
-    if (vendorDoc) {
-      const currentDues = (vendorDoc.wallet.dues || 0) + grandTotal;
-      const cashLimit = vendorDoc.wallet.cashLimit || 10000;
-      // Net owed = dues − earnings (vendor keeps their share from cash)
-      const netOwed = currentDues - ((vendorDoc.wallet.earnings || 0) + vendorEarning);
-      const isBlocked = netOwed > cashLimit;
-
-      const updateQuery = {
-        $inc: {
-          'wallet.dues': grandTotal,
-          'wallet.earnings': vendorEarning,
-          'wallet.totalCashCollected': grandTotal
-        }
-      };
-
-      if (isBlocked) {
-        updateQuery.$set = {
-          'wallet.isBlocked': true,
-          'wallet.blockedAt': new Date(),
-          'wallet.blockReason': `Cash limit exceeded. Net owed: ₹${netOwed.toFixed(2)}, Limit: ₹${cashLimit}`
-        };
-      }
-
-      await Vendor.findByIdAndUpdate(vendorId, updateQuery);
-
-      // ── Create Transaction Records ──
-      const Transaction = require('../../models/Transaction');
-
-      // Transaction 1: Cash Collected (Platform is owed this amount)
-      await Transaction.create({
-        vendorId,
-        bookingId: booking._id,
-        type: 'cash_collected',
-        amount: grandTotal,
-        status: 'completed',
-        paymentMethod: 'cash',
-        description: `Cash ₹${grandTotal} collected for booking #${booking.bookingNumber}. Dues increased.`,
-        metadata: {
-          type: 'dues_increase',
-          collectedBy: 'vendor',
-          billId: bill._id.toString(),
-          grandTotal,
-          vendorEarning,
-          companyRevenue: bill.companyRevenue
-        }
-      });
-
-      // Transaction 2: Earnings Credit (Vendor's rightful share)
-      if (vendorEarning > 0) {
-        await Transaction.create({
-          vendorId,
-          bookingId: booking._id,
-          type: 'earnings_credit',
-          amount: vendorEarning,
-          status: 'completed',
-          paymentMethod: 'wallet',
-          description: `Earnings ₹${vendorEarning} credited for booking #${booking.bookingNumber} (70% service + 10% parts)`,
-          metadata: {
-            type: 'earnings_increase',
-            billId: bill._id.toString(),
-            serviceEarning: bill.vendorServiceEarning,
-            partsEarning: bill.vendorPartsEarning
-          }
-        });
-      }
-    }
-
-    // ── Notify user ──
-    const { createNotification } = require('../notificationControllers/notificationController');
-    await createNotification({
-      userId: booking.userId,
-      type: 'payment_received',
-      title: 'Payment Received (Cash)',
-      message: `Payment of ₹${grandTotal} received in cash for booking ${booking.bookingNumber}. Job Completed. Thanks!`,
-      relatedId: booking._id,
-      relatedType: 'booking',
-      priority: 'high'
-    });
-
-    res.status(200).json({ success: true, message: 'Cash collected, job completed', data: booking });
-  } catch (error) {
-    console.error('Collect self cash error:', error);
-    res.status(500).json({ success: false, message: 'Failed to process cash payment' });
-  }
-};
 
 /**
  * Pay Worker (Manual Settlement)
@@ -1405,16 +1301,14 @@ const payWorker = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No worker assigned to this booking' });
     }
 
-    if (booking.isWorkerPaid) {
+    // Atomic claim: blocks double marking from either pay-worker endpoint
+    const claimed = await Booking.updateOne(
+      { _id: booking._id, isWorkerPaid: { $ne: true }, workerPaymentStatus: { $nin: ['PAID', 'SUCCESS'] } },
+      { $set: { isWorkerPaid: true, workerPaymentStatus: 'SUCCESS', workerPaidAt: new Date() } }
+    );
+    if (!claimed.modifiedCount) {
       return res.status(400).json({ success: false, message: 'Worker already paid' });
     }
-
-    // Update booking payment status
-    booking.isWorkerPaid = true;
-    booking.workerPaymentStatus = 'SUCCESS';
-    booking.workerPaidAt = new Date();
-
-    await booking.save();
 
     // Notify Worker
     const { createNotification } = require('../notificationControllers/notificationController');
@@ -1646,22 +1540,31 @@ const startTrip = async (req, res) => {
  * End Trip (Agriculture flow) with Advance Billing & Settlement
  */
 const endTrip = async (req, res) => {
+  let claimed = null;
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { end_kilometer_photo, driver_end_otp, workUnits } = req.body;
+    const { end_kilometer_photo, driver_end_otp, workUnits, work_evidence_photo, workEvidencePhoto } = req.body;
 
-    const booking = await Booking.findOne({ _id: id, vendorId }).populate('serviceId');
-    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!driver_end_otp) {
+      return res.status(400).json({ success: false, message: 'End OTP from the farmer is required.' });
+    }
 
-    // NEW: VERIFY END OTP before proceeding with billing or completion
-    // This ensures the farmer has approved the end of work and quantity
-    if (booking.driver_end_otp && booking.driver_end_otp !== driver_end_otp) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid End OTP. Please verify the code with the farmer.' 
+    // Verify and consume the End OTP atomically, so billing/crediting can only run once
+    claimed = await Booking.findOneAndUpdate(
+      { _id: id, vendorId, driver_end_otp: String(driver_end_otp), status: { $in: [BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE] } },
+      { $set: { driver_end_otp: null } }
+    );
+    if (!claimed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid End OTP, or this trip has already ended.'
       });
     }
+
+    const booking = await Booking.findById(id).populate('serviceId');
+    // Machinery "complete work" already priced the trip into basePrice
+    const alreadyPriced = claimed.status === BOOKING_STATUS.WORK_DONE;
 
     // 1. BILLING CALCULATION
     const service = booking.serviceId;
@@ -1672,7 +1575,9 @@ const endTrip = async (req, res) => {
     const durationMs = now - (booking.startedAt || now);
     const durationHours = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60)));
 
-    if (booking.rental_type === 'hourly') {
+    if (alreadyPriced) {
+      baseAmount = booking.basePrice || 0;
+    } else if (booking.rental_type === 'hourly') {
       baseAmount = (service?.hourly_price || booking.basePrice || 0) * durationHours;
     } else if (booking.rental_type === 'land_based') {
       baseAmount = (service?.land_price || booking.basePrice || 0) * (parseFloat(workUnits) || 1);
@@ -1726,7 +1631,7 @@ const endTrip = async (req, res) => {
       { upsert: true, new: true, runValidators: true }
     );
 
-    // 4. AUTOMATIC WALLET SETTLEMENT (Only for online/prepaid/plan benefit, cash is settled during collectSelfCash)
+    // 4. AUTOMATIC WALLET SETTLEMENT (Only for online/prepaid/plan benefit, cash is settled via /bookings/cash/:id/confirm)
     const Vendor = require('../../models/Vendor');
     const Transaction = require('../../models/Transaction');
     const vendorDoc = await Vendor.findById(vendorId);
@@ -1734,13 +1639,14 @@ const endTrip = async (req, res) => {
     if (vendorDoc) {
       if (!vendorDoc.wallet) vendorDoc.wallet = {};
       const isCashPayment = booking.paymentMethod === 'cash' || booking.paymentMethod === 'pay_at_home';
-      const isPrepaid = booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'success' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'PAID' || booking.paymentMethod === 'plan_benefit';
+      const isPrepaid = booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.paymentMethod === 'plan_benefit';
 
       if (isPrepaid && !isCashPayment) {
-        // For online/prepaid, credit earnings directly
+        // For online/prepaid, credit earnings directly and mark the bill paid
         await Vendor.findByIdAndUpdate(vendorId, {
           $inc: { 'wallet.earnings': vendorEarning }
         });
+        await VendorBill.updateOne({ _id: vendorBill._id }, { $set: { status: BILL_STATUS.PAID, paidAt: new Date() } });
 
         await Transaction.create({
           vendorId,
@@ -1756,10 +1662,17 @@ const endTrip = async (req, res) => {
     }
 
     // 5. UPDATE BOOKING
-    booking.end_kilometer_photo = end_kilometer_photo;
-    booking.driver_end_otp = driver_end_otp;
+    if (end_kilometer_photo) booking.end_kilometer_photo = end_kilometer_photo;
+    const evidence = work_evidence_photo || workEvidencePhoto;
+    if (evidence) {
+      booking.work_evidence_photo = evidence;
+      if (!booking.workPhotos) booking.workPhotos = [];
+      if (!booking.workPhotos.includes(evidence)) {
+        booking.workPhotos.push(evidence);
+      }
+    }
     const isCashPayment = booking.paymentMethod === 'cash' || booking.paymentMethod === 'pay_at_home';
-    const isPrepaid = booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'success' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'PAID' || booking.paymentMethod === 'plan_benefit';
+    const isPrepaid = booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.paymentMethod === 'plan_benefit';
     
     if (isPrepaid) {
       booking.status = BOOKING_STATUS.COMPLETED;
@@ -1823,6 +1736,8 @@ const endTrip = async (req, res) => {
       data: { finalAmount, vendorEarning, billId: vendorBill._id }
     });
   } catch (error) {
+    // Give the OTP back so the vendor can retry after a failure
+    if (claimed) await Booking.updateOne({ _id: claimed._id }, { $set: { driver_end_otp: claimed.driver_end_otp } }).catch(() => {});
     console.error('End trip billing error EXTREME LOG:', {
       error: error.message,
       stack: error.stack,
@@ -1844,7 +1759,6 @@ module.exports = {
   vendorReachedLocation,
   verifySelfVisit,
   completeSelfJob,
-  collectSelfCash,
   payWorker,
   getVendorRatings,
   getPendingBookings,

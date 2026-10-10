@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCloud, FiCloudRain, FiSun, FiWind, FiMapPin, FiArrowRight } from 'react-icons/fi';
+import { FiCloud, FiCloudRain, FiSun } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import weatherService from '../../../services/weatherService';
+import { useLanguage } from '../../../../../context/LanguageContext';
 
 export default function WeatherWidget() {
     const navigate = useNavigate();
+    const { t } = useLanguage();
     const [weather, setWeather] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -34,43 +36,42 @@ export default function WeatherWidget() {
 
     const getWeatherIcon = (description) => {
         const d = description?.toLowerCase() || '';
-        if (d.includes('rain')) return <FiCloudRain className="w-8 h-8 text-white drop-shadow-md" />;
-        if (d.includes('cloud')) return <FiCloud className="w-8 h-8 text-white drop-shadow-md" />;
-        if (d.includes('sun') || d.includes('clear')) return <FiSun className="w-8 h-8 text-white drop-shadow-md" />;
-        return <FiCloud className="w-8 h-8 text-white drop-shadow-md" />;
+        if (d.includes('rain')) return <FiCloudRain className="w-7 h-7 sm:w-8 sm:h-8 text-blue-500 drop-shadow-xs" />;
+        if (d.includes('cloud')) return <FiCloud className="w-7 h-7 sm:w-8 sm:h-8 text-sky-500 drop-shadow-xs" />;
+        if (d.includes('sun') || d.includes('clear')) return <FiSun className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500 drop-shadow-xs" />;
+        return <FiCloud className="w-7 h-7 sm:w-8 sm:h-8 text-sky-500 drop-shadow-xs" />;
     };
 
     const displayTemp = weather ? `${Math.round(weather.current.temp)}°C` : (loading ? "..." : "--");
-    const displayDesc = weather ? weather.current.description : (loading ? "Loading..." : "Unknown");
-    const iconToRender = weather ? getWeatherIcon(weather.current.description) : <FiCloud className="w-8 h-8 text-white drop-shadow-md opacity-50" />;
+    const displayDesc = weather ? weather.current.description : (loading ? "Loading..." : "Sunny");
+    const iconToRender = weather ? getWeatherIcon(weather.current.description) : <FiSun className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500 drop-shadow-xs" />;
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={() => navigate('/user/weather')}
-            className="relative overflow-hidden bg-white border border-slate-100 rounded-[20px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all active:scale-95 group flex items-center gap-3 cursor-pointer"
+            className="relative bg-white border border-slate-100/90 rounded-[20px] sm:rounded-[22px] px-1.5 py-3 sm:px-2.5 sm:py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-md transition-all active:scale-95 group flex flex-col items-center justify-between text-center cursor-pointer min-h-[114px] sm:min-h-[128px]"
         >
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            
-            <div className={`relative w-[42px] h-[42px] rounded-[14px] flex items-center justify-center flex-shrink-0 bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm border border-indigo-100 group-hover:border-indigo-600 z-10 overflow-hidden ${loading ? 'animate-pulse' : ''}`}>
-                <img src="/landing_images/crop_advasory3.jpg" alt="Weather" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-multiply group-hover:opacity-40 transition-opacity" />
-                {/* Adjust icon size slightly for the smaller wrapper */}
-                <div className="scale-75 origin-center flex items-center justify-center z-10 drop-shadow-md">
+            {/* Circular Weather Badge Matching Reference */}
+            <div className="relative w-14 h-14 min-[390px]:w-15 min-[390px]:h-15 sm:w-16 sm:h-16 rounded-full p-1 flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-50 via-sky-50 to-blue-50 border border-sky-100 shadow-xs transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+                <div className="flex items-center justify-center z-10">
                     {iconToRender}
                 </div>
                 
-                {/* Temperature Badge */}
+                {/* Temperature Pill Badge */}
                 {(!loading && weather) && (
-                    <div className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm border-2 border-white z-20">
+                    <div className="absolute top-0.5 right-0.5 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full shadow-xs border border-white z-20">
                         {displayTemp}
                     </div>
                 )}
             </div>
 
-            <div className="flex-1 min-w-0 z-10">
-                <p className="text-[13px] sm:text-sm font-black text-slate-800 leading-tight truncate tracking-tight">Weather</p>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate tracking-wide capitalize">{displayDesc}</p>
+            {/* Title (Single Line, No Subtitle) */}
+            <div className="w-full mt-2 sm:mt-2.5 flex-1 flex flex-col items-center justify-center">
+                <p className="text-[10.5px] min-[360px]:text-[11.5px] min-[390px]:text-[12px] sm:text-[13px] font-bold text-slate-800 leading-tight tracking-tight text-center whitespace-nowrap overflow-hidden text-ellipsis px-0.5">
+                    {t('Weather')}
+                </p>
             </div>
         </motion.div>
     );

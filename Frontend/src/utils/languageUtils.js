@@ -1,6 +1,6 @@
 /**
  * Language Utilities
- * Handles normalization and mapping of language codes
+ * Handles normalization and mapping of language codes and voice locales
  */
 
 export const languageCodeMap = {
@@ -13,7 +13,31 @@ export const languageCodeMap = {
   'Telugu': 'te',
   'Kannada': 'kn',
   'Malayalam': 'ml',
-  'Bengali': 'bn'
+  'Bengali': 'bn',
+  'Odia': 'or',
+  'Assamese': 'as',
+  'Urdu': 'ur',
+  'Hinglish': 'hi'
+};
+
+/**
+ * Standard BCP-47 Speech Recognition & Synthesis Locales for Indian Languages
+ */
+export const voiceLocaleMap = {
+  'English': 'en-IN',
+  'Hindi': 'hi-IN',
+  'Marathi': 'mr-IN',
+  'Gujarati': 'gu-IN',
+  'Punjabi': 'pa-IN',
+  'Tamil': 'ta-IN',
+  'Telugu': 'te-IN',
+  'Kannada': 'kn-IN',
+  'Malayalam': 'ml-IN',
+  'Bengali': 'bn-IN',
+  'Odia': 'or-IN',
+  'Assamese': 'as-IN',
+  'Urdu': 'ur-IN',
+  'Hinglish': 'hi-IN'
 };
 
 export const rtlLanguages = ["ar", "he", "ur", "fa"];
@@ -22,17 +46,24 @@ export const rtlLanguages = ["ar", "he", "ur", "fa"];
  * Normalizes language codes for API use
  */
 export const normalizeLanguageCode = (code) => {
-    // If it's a full name like 'Hindi', map it to 'hi'
-    if (languageCodeMap[code]) return languageCodeMap[code];
-    
-    // If it's already 'hi', 'en' etc, return as is
-    return code?.toLowerCase() || 'en';
+  if (!code) return 'en';
+  if (languageCodeMap[code]) return languageCodeMap[code];
+  return code?.toLowerCase() || 'en';
+};
+
+/**
+ * Get BCP-47 voice locale for SpeechRecognition and SpeechSynthesis
+ */
+export const getVoiceLocale = (lang) => {
+  if (voiceLocaleMap[lang]) return voiceLocaleMap[lang];
+  const code = normalizeLanguageCode(lang);
+  return `${code}-IN`;
 };
 
 /**
  * Checks if a language is RTL
  */
 export const isRTLLanguage = (code) => {
-    const normalized = normalizeLanguageCode(code);
-    return rtlLanguages.includes(normalized);
+  const normalized = normalizeLanguageCode(code);
+  return rtlLanguages.includes(normalized);
 };

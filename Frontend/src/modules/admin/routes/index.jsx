@@ -35,9 +35,11 @@ const StoreApprovals = lazy(() => import('../pages/Products/StoreApprovals'));
 const RegisteredShops = lazy(() => import('../pages/Products/RegisteredShops'));
 const SoilTesting = lazy(() => import('../pages/SoilTesting'));
 const Disputes = lazy(() => import('../pages/Disputes'));
+const SchemeManagement = lazy(() => import('../pages/Schemes'));
 const WebsiteSettings = lazy(() => import('../pages/WebsiteSettings'));
 const EquipmentApproval = lazy(() => import('../pages/EquipmentApproval'));
 const Support = lazy(() => import('../pages/Support'));
+const Workers = lazy(() => import('../pages/Workers'));
 
 
 
@@ -69,11 +71,11 @@ const AdminRoutes = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users/*" element={<Users />} />
           <Route path="vendors/*" element={<Vendors />} />
+          <Route path="workers" element={<Workers />} />
           <Route path="bookings" element={<Bookings />} />
           <Route path="bookings/:id" element={<BookingDetailsPage />} />
-          <Route path="bookings/tracking" element={<BookingTracking />} />
-          <Route path="bookings/notifications" element={<BookingNotifications />} />
-          <Route path="bookings/km-photos" element={<BookingKmPhotos />} />
+          <Route path="bookings/tracking" element={<Navigate to="/admin/bookings" replace />} />
+          <Route path="bookings/km-photos" element={<Navigate to="/admin/bookings" replace />} />
           <Route path="users/kyc" element={<KycVerification />} />
           <Route path="equipment-catalog/*" element={<UserCategories />} />
           <Route path="equipment-approvals/*" element={<EquipmentApproval />} />
@@ -90,6 +92,7 @@ const AdminRoutes = () => {
           <Route path="marketplace/registered-shops" element={<RegisteredShops />} />
           <Route path="soil-tests" element={<SoilTesting />} />
           <Route path="disputes" element={<Disputes />} />
+          <Route path="schemes" element={<SchemeManagement />} />
           <Route path="settlements/*" element={<Settlements />} />
           <Route path="manage-website/*" element={<WebsiteSettings />} />
           <Route path="support" element={<Support />} />

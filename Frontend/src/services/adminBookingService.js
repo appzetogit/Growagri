@@ -41,6 +41,26 @@ export const adminBookingService = {
     }
   },
 
+  // Force a booking into a status (admin override)
+  overrideStatus: async (id, status, note) => {
+    try {
+      const response = await api.patch(`/admin/bookings/${id}/status`, { status, note });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to update status' };
+    }
+  },
+
+  // Refund a paid booking to the customer's wallet (full when amount is empty)
+  refundBooking: async (id, amount, reason) => {
+    try {
+      const response = await api.post(`/admin/bookings/${id}/refund`, { amount, reason });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to refund booking' };
+    }
+  },
+
   // Get bookings with KM photos for monitoring (fraud detection)
   getBookingsWithKmPhotos: async (params) => {
     try {

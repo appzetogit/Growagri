@@ -7,12 +7,14 @@ const {
   getRevenueAnalytics,
   getWorkerPerformance,
   getServicePerformance,
-  getEquipmentROIAnalytics
+  getEquipmentROIAnalytics,
+  getEarningsSummary
 } = require('../../controllers/vendorControllers/vendorDashboardController');
 
 // Routes
 router.get('/dashboard/stats', authenticate, isVendor, getDashboardStats);
 router.get('/dashboard/revenue', authenticate, isVendor, getRevenueAnalytics);
+router.get('/dashboard/earnings-summary', authenticate, isVendor, getEarningsSummary);
 router.get('/dashboard/workers', authenticate, isVendor, getWorkerPerformance);
 router.get('/dashboard/services', authenticate, isVendor, getServicePerformance);
 router.get('/dashboard/equipment-roi', authenticate, isVendor, getEquipmentROIAnalytics);

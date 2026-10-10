@@ -2,6 +2,22 @@ const Category = require('../../models/Category');
 const { validationResult } = require('express-validator');
 const { SERVICE_STATUS } = require('../../utils/constants');
 
+const broadcastCategoryChange = () => {
+  try {
+    const { clearCatalogCache } = require('../publicControllers/catalogController');
+    if (clearCatalogCache) clearCatalogCache();
+  } catch (e) {}
+
+  try {
+    const { getIO } = require('../../sockets');
+    const io = getIO();
+    if (io) {
+      io.emit('categories_updated', { timestamp: Date.now() });
+      console.log('[Socket] Broadcasted categories_updated');
+    }
+  } catch (e) {}
+};
+
 const formatCategory = (cat) => ({
   id: cat._id,
   title: cat.title,
@@ -62,7 +78,13 @@ const getAllCategories = async (req, res) => {
         cityObjectId = cityId;
       }
       
-      query.cityIds = cityObjectId;
+      query.$or = [
+        { cityIds: cityObjectId },
+        { cityIds: cityId.toString() },
+        { cityIds: { $size: 0 } },
+        { cityIds: { $exists: false } },
+        { cityIds: null }
+      ];
     }
 
     const categories = await Category.find(query)
@@ -219,6 +241,8 @@ const createCategory = async (req, res) => {
       .select('-__v')
       .lean();
 
+    broadcastCategoryChange();
+
     res.status(201).json({
       success: true,
       message: 'Category created successfully',
@@ -367,6 +391,8 @@ const updateCategory = async (req, res) => {
       .select('-__v')
       .lean();
 
+    broadcastCategoryChange();
+
     res.status(200).json({
       success: true,
       message: 'Category updated successfully',
@@ -394,6 +420,12 @@ const updateCategory = async (req, res) => {
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    if (await require('../../models/Booking').exists({ categoryId: id })) {
+      return res.status(400).json({
+        success: false,
+        message: 'This category has bookings. Set it inactive instead of deleting it.'
+      });
+    }
     const category = await Category.findByIdAndDelete(id);
 
     if (!category) {
@@ -406,6 +438,8 @@ const deleteCategory = async (req, res) => {
     // Also delete all associated services (equipment models) for this category
     const Service = require('../../models/Service');
     await Service.deleteMany({ categoryId: id });
+
+    broadcastCategoryChange();
 
     res.status(200).json({
       success: true,
@@ -439,6 +473,8 @@ const updateCategoryOrder = async (req, res) => {
 
     category.homeOrder = homeOrder;
     await category.save();
+
+    broadcastCategoryChange();
 
     res.status(200).json({
       success: true,

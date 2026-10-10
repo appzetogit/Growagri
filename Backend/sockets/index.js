@@ -1,6 +1,26 @@
 // Socket.io initialization
 const { Server } = require('socket.io');
-const { authenticateSocket } = require('../middleware/authMiddleware');
+
+const BOOKING_PARTY_FIELD = { USER: 'userId', VENDOR: 'vendorId', WORKER: 'workerId' };
+const ADMIN_ROLES = ['ADMIN', 'admin', 'super_admin'];
+
+// Is this socket a party to the booking? (admins can watch everything)
+const canAccessBooking = async (socket, bookingId, roles = Object.keys(BOOKING_PARTY_FIELD)) => {
+  if (!socket.userId || !bookingId) return false;
+  if (ADMIN_ROLES.includes(socket.userRole)) return true;
+  if (!roles.includes(socket.userRole)) return false;
+  socket.allowedBookings ??= new Set();
+  const key = `${socket.userRole}:${bookingId}`;
+  if (socket.allowedBookings.has(key)) return true;
+  try {
+    const Booking = require('../models/Booking');
+    const ok = !!(await Booking.exists({ _id: bookingId, [BOOKING_PARTY_FIELD[socket.userRole]]: socket.userId }));
+    if (ok) socket.allowedBookings.add(key);
+    return ok;
+  } catch {
+    return false;
+  }
+};
 
 let io = null;
 
@@ -20,10 +40,13 @@ const initializeSocket = (server) => {
   // Authentication middleware for Socket.io
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+      const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
 
       if (!token) {
-        return next(new Error('Authentication error: No token provided'));
+        // Allow unauthenticated guest connections for public real-time events (home content, banners, catalog)
+        socket.userId = null;
+        socket.userRole = 'GUEST';
+        return next();
       }
 
       // Verify token using the same method as HTTP middleware
@@ -35,12 +58,30 @@ const initializeSocket = (server) => {
 
       next();
     } catch (error) {
-      next(new Error('Authentication error: Invalid token'));
+      // Gracefully downgrade invalid/expired token to GUEST so public socket events still work
+      socket.userId = null;
+      socket.userRole = 'GUEST';
+      next();
     }
   });
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id} (User: ${socket.userId}, Role: ${socket.userRole})`);
+    console.log(`Socket connected: ${socket.id} (User: ${socket.userId || 'Guest'}, Role: ${socket.userRole})`);
+
+    // All connected users join public_feed for global catalog and home content broadcasts
+    socket.join('public_feed');
+
+    socket.on('join_city', (cityId) => {
+      if (cityId) {
+        socket.join(`city_${cityId}`);
+      }
+    });
+
+    socket.on('leave_city', (cityId) => {
+      if (cityId) {
+        socket.leave(`city_${cityId}`);
+      }
+    });
 
     // Join user-specific room for notifications
     if (socket.userRole === 'USER') {
@@ -83,6 +124,7 @@ const initializeSocket = (server) => {
 
     // Live Tracking Events
     socket.on('join_tracking', async (bookingId) => {
+      if (!(await canAccessBooking(socket, bookingId))) return;
       socket.join(`booking_${bookingId}`);
       console.log(`User ${socket.userId} joined tracking for booking_${bookingId}`);
 
@@ -144,6 +186,8 @@ const initializeSocket = (server) => {
       const heading = parseFloat(data.heading) || 0;
 
       if (isNaN(lat) || isNaN(lng)) return;
+      // Only the assigned vendor/worker may publish a booking's live location
+      if (!(await canAccessBooking(socket, data.bookingId, ['VENDOR', 'WORKER']))) return;
 
       // Rate limiting: max 1 update per 2 seconds per booking
       const rateLimitKey = `${socket.userId}:${data.bookingId}`;

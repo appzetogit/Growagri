@@ -46,6 +46,12 @@ const adminProductService = {
     getEcommerceOrders: async () => {
         const response = await api.get('/admin/orders');
         return response.data;
+    },
+
+    // packed | shipped | delivered | cancelled (cancel refunds paid amount + restores stock)
+    updateOrderStatus: async (id, status) => {
+        const response = await api.patch(`/admin/orders/${id}/status`, { status });
+        return response.data;
     }
 };
 

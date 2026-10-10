@@ -323,7 +323,7 @@ const getVendorEarnings = async (req, res) => {
 
     // Get earnings from VendorBill (single source of truth)
     const billQuery = {
-      vendorId: require('mongoose').Types.ObjectId(id),
+      vendorId: new (require('mongoose').Types.ObjectId)(id),
       status: 'paid'
     };
 

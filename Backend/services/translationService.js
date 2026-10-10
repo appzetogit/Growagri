@@ -1,17 +1,21 @@
 /**
  * Translation Service
- * Implements Google Cloud Translate API with 24-hour in-memory cache
- * Batching and Object translation support
+ * Powered by google-translate-api-x (Free, Keyless Google Translate)
+ * Features:
+ * - 24-hour in-memory cache
+ * - Native array batch translation
+ * - Object key translation support
+ * - Graceful fallback to original text
  */
-const axios = require('axios');
-const { GOOGLE_TRANSLATE_API_KEY, languageCodeMap } = require('../config/googleCloud');
+const { translate } = require('google-translate-api-x');
+const { languageCodeMap } = require('../config/googleCloud');
 
-// Simple 24h TTL Cache
+// 24h TTL Cache
 const translationCache = new Map();
 const TTL = 24 * 60 * 60 * 1000; // 24 Hours
 
 /**
- * Cleanup expired cache entries
+ * Cleanup expired cache entries periodically
  */
 const cleanupCache = () => {
     const now = Date.now();
@@ -22,84 +26,121 @@ const cleanupCache = () => {
     }
 };
 
-// Interval cleanup every hour
+// Cleanup every hour
 setInterval(cleanupCache, 60 * 60 * 1000);
 
 /**
- * Core Translation Function
+ * Normalize language code (e.g. 'hi-IN' -> 'hi', 'Hindi' -> 'hi')
+ */
+const normalizeCode = (lang) => {
+    if (!lang) return 'en';
+    if (languageCodeMap && languageCodeMap[lang]) return languageCodeMap[lang];
+    const lower = String(lang).toLowerCase().trim();
+    if (lower.includes('-')) return lower.split('-')[0];
+    return lower;
+};
+
+/**
+ * Core Translation Function for Single Text
  */
 const translateText = async (text, targetLang, sourceLang = 'en') => {
-    if (!text || text.trim() === '') return text;
-    if (targetLang === sourceLang) return text;
+    if (!text || typeof text !== 'string' || text.trim() === '') return text;
+    
+    const target = normalizeCode(targetLang);
+    const source = normalizeCode(sourceLang);
+    if (target === source) return text;
 
-    const cacheKey = `${sourceLang}_${targetLang}_${Buffer.from(text).toString('base64')}`;
+    const cacheKey = `${source}_${target}_${Buffer.from(text.trim()).toString('base64')}`;
     const cached = translationCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < TTL)) {
         return cached.translation;
     }
 
-    // Exponential Backoff Retry Logic
-    let retries = 0;
-    const maxRetries = 3;
-    const delays = [1000, 2000, 4000];
+    try {
+        const res = await translate(text, {
+            to: target,
+            from: source,
+            forceBatch: false
+        });
 
-    while (retries <= maxRetries) {
-        try {
-            const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
-            const response = await axios.post(url, {
-                q: text,
-                target: targetLang,
-                source: sourceLang,
-                format: 'text'
+        const translatedText = res && res.text ? res.text : text;
+
+        if (translatedText && translatedText !== text) {
+            translationCache.set(cacheKey, {
+                translation: translatedText,
+                timestamp: Date.now()
             });
-
-            const translation = response.data.data.translations[0].translatedText;
-
-            // Never cache if translation is the same as original
-            if (translation !== text) {
-                translationCache.set(cacheKey, {
-                    translation,
-                    timestamp: Date.now()
-                });
-            }
-
-            return translation;
-        } catch (error) {
-            if (error.response?.status === 429) {
-                if (retries === maxRetries) throw error;
-                await new Promise(resolve => setTimeout(resolve, delays[retries]));
-                retries++;
-            } else {
-                // DETAILED ERROR LOGGING FOR DEBUGGING
-                console.error('[TranslationService] Error:', error.message);
-                if (error.response?.data) {
-                    console.error('[TranslationService] Google API Error Details:', JSON.stringify(error.response.data));
-                }
-                return text; // Fallback to original text
-            }
         }
+
+        return translatedText;
+    } catch (error) {
+        console.error('[TranslationService] translateText Error:', error?.message || error);
+        return text; // Graceful fallback
     }
-    return text;
 };
 
 /**
- * Batch Translation
+ * Batch Translation (Fast native array translation)
  */
 const translateBatch = async (texts, targetLang, sourceLang = 'en') => {
     if (!Array.isArray(texts) || texts.length === 0) return [];
     
-    // Process unique texts only
-    const uniqueTexts = [...new Set(texts)];
-    const translations = await Promise.all(
-        uniqueTexts.map(text => translateText(text, targetLang, sourceLang))
-    );
+    const target = normalizeCode(targetLang);
+    const source = normalizeCode(sourceLang);
+    if (target === source) return texts;
 
-    const translationMap = uniqueTexts.reduce((acc, text, index) => {
-        acc[text] = translations[index];
-        return acc;
-    }, {});
+    // Check which texts are already in cache
+    const resultsMap = new Map();
+    const uncachedTexts = [];
 
-    return texts.map(text => translationMap[text]);
+    for (const text of texts) {
+        if (!text || typeof text !== 'string' || text.trim() === '') {
+            resultsMap.set(text, text);
+            continue;
+        }
+
+        const cacheKey = `${source}_${target}_${Buffer.from(text.trim()).toString('base64')}`;
+        const cached = translationCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < TTL)) {
+            resultsMap.set(text, cached.translation);
+        } else if (!uncachedTexts.includes(text)) {
+            uncachedTexts.push(text);
+        }
+    }
+
+    // Translate uncached in one batch call if any
+    if (uncachedTexts.length > 0) {
+        try {
+            const batchRes = await translate(uncachedTexts, {
+                to: target,
+                from: source,
+                forceBatch: true
+            });
+
+            const resArray = Array.isArray(batchRes) ? batchRes : [batchRes];
+
+            uncachedTexts.forEach((originalText, idx) => {
+                const translated = resArray[idx]?.text || originalText;
+                resultsMap.set(originalText, translated);
+
+                // Save to cache
+                const cacheKey = `${source}_${target}_${Buffer.from(originalText.trim()).toString('base64')}`;
+                translationCache.set(cacheKey, {
+                    translation: translated,
+                    timestamp: Date.now()
+                });
+            });
+        } catch (error) {
+            console.error('[TranslationService] translateBatch Error:', error?.message || error);
+            // Fallback uncached to original text
+            uncachedTexts.forEach((originalText) => {
+                resultsMap.set(originalText, originalText);
+            });
+        }
+    }
+
+    // Return in original order
+    return texts.map(text => resultsMap.get(text) || text);
 };
 
 /**
@@ -108,16 +149,34 @@ const translateBatch = async (texts, targetLang, sourceLang = 'en') => {
 const translateObject = async (obj, targetLang, sourceLang = 'en', keysToTranslate = []) => {
     if (!obj || typeof obj !== 'object') return obj;
 
-    const result = Array.isArray(obj) ? [...obj] : { ...obj };
-    const itemsToTranslate = Array.isArray(obj) ? result : [result];
+    const target = normalizeCode(targetLang);
+    const source = normalizeCode(sourceLang);
+    if (target === source) return obj;
 
-    for (const item of itemsToTranslate) {
-        for (const key of keysToTranslate) {
-            if (item[key] && typeof item[key] === 'string') {
-                item[key] = await translateText(item[key], targetLang, sourceLang);
+    const result = Array.isArray(obj) ? [...obj] : { ...obj };
+    const items = Array.isArray(result) ? result : [result];
+
+    // Collect all string values that need translation
+    const textsToTranslate = [];
+    const mapping = [];
+
+    items.forEach((item, itemIdx) => {
+        if (!item || typeof item !== 'object') return;
+        keysToTranslate.forEach((key) => {
+            if (item[key] && typeof item[key] === 'string' && item[key].trim()) {
+                textsToTranslate.push(item[key]);
+                mapping.push({ itemIdx, key });
             }
-        }
-    }
+        });
+    });
+
+    if (textsToTranslate.length === 0) return result;
+
+    const translatedTexts = await translateBatch(textsToTranslate, target, source);
+
+    mapping.forEach((m, idx) => {
+        items[m.itemIdx][m.key] = translatedTexts[idx] || items[m.itemIdx][m.key];
+    });
 
     return result;
 };

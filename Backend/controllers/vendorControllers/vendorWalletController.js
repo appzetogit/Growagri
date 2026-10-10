@@ -5,7 +5,7 @@ const Withdrawal = require('../../models/Withdrawal');
 const Booking = require('../../models/Booking');
 const Worker = require('../../models/Worker');
 const { uploadPaymentScreenshot } = require('../../utils/cloudinaryUpload');
-const { createOrder, verifyPayment } = require('../../services/razorpayService');
+const { createOrder, verifyAndClaimPayment, releasePayment } = require('../../services/razorpayService');
 
 /**
  * Get vendor wallet with ledger balance
@@ -140,176 +140,6 @@ const getTransactions = async (req, res) => {
   }
 };
 
-/**
- * Record cash collection from customer
- * Uses VendorBill as the single source of truth for earnings.
- */
-const recordCashCollection = async (req, res) => {
-  try {
-    const vendorId = req.user.id;
-    const { bookingId, amount, notes } = req.body;
-
-    if (!bookingId || !amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking ID and valid amount are required'
-      });
-    }
-
-    const vendor = await Vendor.findById(vendorId);
-    if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: 'Vendor not found'
-      });
-    }
-
-    // Verify booking belongs to this vendor
-    const booking = await Booking.findOne({
-      _id: bookingId,
-      vendorId
-    });
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found or does not belong to this vendor'
-      });
-    }
-
-    // Fetch VendorBill (single source of truth for earnings)
-    const VendorBill = require('../../models/VendorBill');
-    const bill = await VendorBill.findOne({ bookingId: booking._id });
-
-    let vendorEarning = 0;
-    const grandTotal = amount;
-
-    if (bill) {
-      vendorEarning = bill.vendorTotalEarning;
-      bill.status = 'paid';
-      bill.paidAt = new Date();
-      await bill.save();
-    }
-
-    // Atomic wallet update
-    const currentDues = (vendor.wallet.dues || 0) + grandTotal;
-    const currentEarnings = (vendor.wallet.earnings || 0) + vendorEarning;
-    const cashLimit = vendor.wallet.cashLimit || 10000;
-    const netOwed = currentDues - currentEarnings;
-
-    const updateQuery = {
-      $inc: {
-        'wallet.dues': grandTotal,
-        'wallet.earnings': vendorEarning,
-        'wallet.totalCashCollected': grandTotal
-      }
-    };
-
-    if (netOwed > cashLimit) {
-      updateQuery.$set = {
-        'wallet.isBlocked': true,
-        'wallet.blockedAt': new Date(),
-        'wallet.blockReason': `Cash limit exceeded. Net owed: ₹${netOwed.toFixed(2)}, Limit: ₹${cashLimit}`
-      };
-
-      // Notify admins
-      try {
-        const { createNotification } = require('../notificationControllers/notificationController');
-        const Admin = require('../../models/Admin');
-
-        const admins = await Admin.find({ isActive: true }).select('_id');
-
-        for (const admin of admins) {
-          await createNotification({
-            adminId: admin._id,
-            type: 'vendor_cash_limit_exceeded',
-            title: '⚠️ Cash Limit Exceeded',
-            message: `${vendor.businessName || vendor.name} exceeded cash limit! Net owed: ₹${netOwed.toFixed(2)}, Limit: ₹${cashLimit}`,
-            relatedId: vendor._id,
-            relatedType: 'vendor',
-            data: {
-              vendorId: vendor._id,
-              vendorName: vendor.businessName || vendor.name,
-              netOwed,
-              cashLimit
-            },
-            pushData: {
-              type: 'admin_alert',
-              link: '/admin/settlements'
-            }
-          });
-        }
-        console.log(`[CashLimit] Notified ${admins.length} admins: ${vendor.name} exceeded limit`);
-      } catch (notifyErr) {
-        console.error('[CashLimit] Failed to notify admins:', notifyErr);
-      }
-    }
-
-    await Vendor.findByIdAndUpdate(vendorId, updateQuery);
-
-    // Create transaction record for Cash Collection
-    const transaction = await Transaction.create({
-      vendorId,
-      bookingId,
-      type: 'cash_collected',
-      amount: grandTotal,
-      status: 'completed',
-      paymentMethod: 'cash',
-      description: `Cash ₹${grandTotal} collected. Dues increased.`,
-      metadata: {
-        notes,
-        type: 'dues_increase',
-        billId: bill?._id?.toString(),
-        vendorEarning,
-        companyRevenue: bill?.companyRevenue
-      }
-    });
-
-    // Create earnings credit transaction
-    if (vendorEarning > 0) {
-      await Transaction.create({
-        vendorId,
-        bookingId,
-        type: 'earnings_credit',
-        amount: vendorEarning,
-        status: 'completed',
-        paymentMethod: 'system',
-        description: `Earnings ₹${vendorEarning} credited for booking #${booking.bookingNumber}`,
-        metadata: {
-          type: 'earnings_increase',
-          billId: bill?._id?.toString(),
-          serviceEarning: bill?.vendorServiceEarning,
-          partsEarning: bill?.vendorPartsEarning
-        }
-      });
-    }
-
-    // Update booking payment status
-    booking.paymentStatus = 'paid';
-    booking.paymentMethod = 'cash';
-    await booking.save();
-
-    const newDues = currentDues;
-    const newEarnings = currentEarnings;
-    const newBalance = newEarnings - newDues;
-
-    res.status(200).json({
-      success: true,
-      message: 'Cash collection recorded successfully',
-      data: {
-        transaction,
-        newBalance,
-        amountDue: newDues
-      }
-    });
-  } catch (error) {
-    console.error('Record cash collection error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to record cash collection'
-    });
-  }
-};
 
 /**
  * Request settlement (vendor pays admin to clear negative balance)
@@ -473,20 +303,26 @@ const createSettlementOrder = async (req, res) => {
 const verifySettlementPayment = async (req, res) => {
   try {
     const vendorId = req.user.id;
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    const isValid = verifyPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-    if (!isValid) {
-      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+    const verified = await verifyAndClaimPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!verified.success) {
+      return res.status(verified.status).json({ success: false, message: verified.error });
+    }
+    if (verified.notes.type !== 'vendor_settlement' || verified.notes.vendorId !== vendorId.toString()) {
+      await releasePayment(razorpay_payment_id);
+      return res.status(400).json({ success: false, message: 'Payment does not belong to this settlement' });
     }
 
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) {
+      await releasePayment(razorpay_payment_id);
       return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
 
     const currentDues = vendor.wallet?.dues || 0;
-    const settlementAmount = parseFloat(amount);
+    // Amount actually paid, as recorded by Razorpay
+    const settlementAmount = verified.amount;
     
     // Create an auto-approved settlement record
     const settlement = await Settlement.create({
@@ -563,19 +399,25 @@ const requestWithdrawal = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
     const pendingAmount = pendingWithdrawals[0]?.total || 0;
-    const availableEarnings = currentEarnings - pendingAmount;
+    // Dues = cash the vendor already holds (incl. their own share), so it is netted off first
+    const currentDues = vendor.wallet?.dues || 0;
+    const availableEarnings = Math.max(0, currentEarnings - currentDues - pendingAmount);
 
-    if (amount > availableEarnings) {
+    if (vendor.wallet?.isBlocked) {
+      return res.status(403).json({ success: false, message: 'Wallet is blocked. Please clear your dues first.' });
+    }
+
+    if (Number(amount) > availableEarnings) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient earnings. Available: ₹${availableEarnings} (Pending: ₹${pendingAmount})`
+        message: `Insufficient earnings. Available: ₹${availableEarnings} (Dues: ₹${currentDues}, Pending: ₹${pendingAmount})`
       });
     }
 
     const withdrawal = await Withdrawal.create({
       vendorId,
       amount,
-      bankDetails,
+      bankDetails: bankDetails || vendor.bankAccount,
       adminNotes: notes,
       status: 'pending'
     });
@@ -778,7 +620,7 @@ const payWorker = async (req, res) => {
       });
     }
 
-    if (booking.workerPaymentStatus === 'PAID') {
+    if (['PAID', 'SUCCESS'].includes(booking.workerPaymentStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Worker already paid for this booking'
@@ -831,21 +673,19 @@ const payWorker = async (req, res) => {
       }
     });
 
-    // Update Worker balance (optional - depends on if we track worker earnings in wallet)
-    if (!worker.wallet) worker.wallet = { balance: 0 };
-    worker.wallet.balance += parseFloat(amount);
-
-    // Update Booking
-    booking.workerPaymentStatus = 'PAID';
-    booking.isWorkerPaid = true;
-    booking.workerPaidAt = new Date();
-    booking.status = 'completed'; // Job is fully done and paid
-    booking.completedAt = booking.completedAt || new Date();
+    // Claim the payment atomically so a double submit can't pay twice.
+    // Paying the worker does not change the job status; completion goes through OTP/payment.
+    const claimed = await Booking.updateOne(
+      { _id: booking._id, workerPaymentStatus: { $nin: ['PAID', 'SUCCESS'] } },
+      { $set: { workerPaymentStatus: 'PAID', isWorkerPaid: true, workerPaidAt: new Date() } }
+    );
+    if (!claimed.modifiedCount) {
+      return res.status(400).json({ success: false, message: 'Worker already paid for this booking' });
+    }
 
     await Promise.all([
       transaction.save(),
-      worker.save(),
-      booking.save()
+      Worker.updateOne({ _id: worker._id }, { $inc: { 'wallet.balance': parseFloat(amount) } })
     ]);
 
     // Notify worker about payment
@@ -924,10 +764,65 @@ const getWithdrawals = async (req, res) => {
   }
 };
 
+/**
+ * Get vendor bank account details
+ */
+const getBankAccount = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const vendor = await Vendor.findById(vendorId).select('bankAccount');
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+    res.status(200).json({
+      success: true,
+      data: vendor.bankAccount || {}
+    });
+  } catch (error) {
+    console.error('Get bank account error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch bank account details' });
+  }
+};
+
+/**
+ * Save or update vendor bank account details
+ */
+const saveBankAccount = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { accountHolderName, bankName, accountNumber, ifscCode, upiId } = req.body;
+
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    vendor.bankAccount = {
+      accountHolderName: accountHolderName !== undefined ? accountHolderName : (vendor.bankAccount?.accountHolderName || ''),
+      bankName: bankName !== undefined ? bankName : (vendor.bankAccount?.bankName || ''),
+      accountNumber: accountNumber !== undefined ? accountNumber : (vendor.bankAccount?.accountNumber || ''),
+      ifscCode: (ifscCode !== undefined ? ifscCode : (vendor.bankAccount?.ifscCode || '')).toUpperCase(),
+      upiId: upiId !== undefined ? upiId : (vendor.bankAccount?.upiId || ''),
+      isVerified: vendor.bankAccount?.isVerified || false,
+      updatedAt: new Date()
+    };
+
+    await vendor.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank account details saved successfully',
+      data: vendor.bankAccount
+    });
+  } catch (error) {
+    console.error('Save bank account error:', error);
+    res.status(500).json({ success: false, message: 'Failed to save bank account details' });
+  }
+};
+
 module.exports = {
   getWallet,
   getTransactions,
-  recordCashCollection,
   requestSettlement,
   getSettlements,
   getWalletSummary,
@@ -935,5 +830,7 @@ module.exports = {
   createSettlementOrder,
   verifySettlementPayment,
   requestWithdrawal,
-  getWithdrawals
+  getWithdrawals,
+  getBankAccount,
+  saveBankAccount
 };

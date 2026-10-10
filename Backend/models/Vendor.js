@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { VENDOR_STATUS } = require('../utils/constants');
 
+// KYC docs are mandatory at signup only; older vendors created before a field existed must still be savable
+function isNewVendor() { return this.isNew; }
+
 const vendorSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -50,16 +53,16 @@ const vendorSchema = new mongoose.Schema({
   aadhar: {
     number: {
       type: String,
-      required: [true, 'Please provide Aadhar number'],
+      required: [isNewVendor, 'Please provide Aadhar number'],
       trim: true
     },
     document: {
       type: String, // Cloudinary URL (Front Side)
-      required: [true, 'Please upload Aadhar Front document']
+      required: [isNewVendor, 'Please upload Aadhar Front document']
     },
     backDocument: {
       type: String, // Cloudinary URL (Back Side)
-      required: [true, 'Please upload Aadhar Back document']
+      required: [isNewVendor, 'Please upload Aadhar Back document']
     }
   },
   pan: {
@@ -223,6 +226,15 @@ const vendorSchema = new mongoose.Schema({
       type: String,
       default: null
     }
+  },
+  bankAccount: {
+    accountHolderName: { type: String, trim: true, default: '' },
+    bankName: { type: String, trim: true, default: '' },
+    accountNumber: { type: String, trim: true, default: '' },
+    ifscCode: { type: String, trim: true, uppercase: true, default: '' },
+    upiId: { type: String, trim: true, default: '' },
+    isVerified: { type: Boolean, default: false },
+    updatedAt: { type: Date, default: Date.now }
   },
   isActive: {
     type: Boolean,

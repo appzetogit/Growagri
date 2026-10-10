@@ -12,7 +12,6 @@ const {
   addWorkerNotes,
   verifyVisit,
   workerReachedLocation,
-  collectCash,
   respondToJob,
   startMachineryWork,
   completeMachineryWork
@@ -43,7 +42,6 @@ router.post('/jobs/:id/visit/verify', authenticate, isWorker, verifyVisit);
 router.post('/jobs/:id/complete', authenticate, isWorker, completeJob);
 router.post('/jobs/:id/machinery/start', authenticate, isWorker, startMachineryWork);
 router.post('/jobs/:id/machinery/complete', authenticate, isWorker, completeMachineryWork);
-router.post('/jobs/:id/payment/collect', authenticate, isWorker, collectCash);
 router.post('/jobs/:id/notes', authenticate, isWorker, addNotesValidation, addWorkerNotes);
 
 module.exports = router;

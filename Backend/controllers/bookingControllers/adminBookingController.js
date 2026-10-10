@@ -1,6 +1,15 @@
 const Booking = require('../../models/Booking');
 const { validationResult } = require('express-validator');
-const { BOOKING_STATUS } = require('../../utils/constants');
+const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
+const { refundBookingToWallet } = require('../../services/refundService');
+const { createNotification } = require('../notificationControllers/notificationController');
+
+// Tell both sides of a booking what the admin did
+const notifyParties = async (booking, title, message) => {
+  const base = { type: 'general', title, message, relatedId: booking._id, relatedType: 'booking' };
+  await createNotification({ ...base, userId: booking.userId }).catch(() => {});
+  if (booking.vendorId) await createNotification({ ...base, vendorId: booking.vendorId }).catch(() => {});
+};
 
 /**
  * Get all bookings with filters and search
@@ -25,8 +34,39 @@ const getAllBookings = async (req, res) => {
     // Build query
     const query = {};
 
-    if (status) query.status = status;
-    if (paymentStatus) query.paymentStatus = paymentStatus;
+    if (status) {
+      if (typeof status === 'string' && status.includes(',')) {
+        const list = status.split(',').map(s => s.trim());
+        const allVariants = new Set();
+        list.forEach(s => {
+          allVariants.add(s);
+          allVariants.add(s.toLowerCase());
+          allVariants.add(s.toUpperCase());
+        });
+        query.status = { $in: Array.from(allVariants) };
+      } else if (typeof status === 'string') {
+        query.status = { $in: [status, status.toLowerCase(), status.toUpperCase()] };
+      } else {
+        query.status = status;
+      }
+    }
+
+    if (paymentStatus) {
+      if (typeof paymentStatus === 'string' && paymentStatus.includes(',')) {
+        const list = paymentStatus.split(',').map(s => s.trim());
+        const allVariants = new Set();
+        list.forEach(s => {
+          allVariants.add(s);
+          allVariants.add(s.toLowerCase());
+          allVariants.add(s.toUpperCase());
+        });
+        query.paymentStatus = { $in: Array.from(allVariants) };
+      } else if (typeof paymentStatus === 'string') {
+        query.paymentStatus = { $in: [paymentStatus, paymentStatus.toLowerCase(), paymentStatus.toUpperCase()] };
+      } else {
+        query.paymentStatus = paymentStatus;
+      }
+    }
     if (userId) query.userId = userId;
     if (vendorId) query.vendorId = vendorId;
     if (workerId) query.workerId = workerId;
@@ -132,7 +172,7 @@ const cancelBooking = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { cancellationReason } = req.body;
+    const { cancellationReason, refund = true } = req.body;
 
     const booking = await Booking.findById(id);
 
@@ -165,9 +205,20 @@ const cancelBooking = async (req, res) => {
 
     await booking.save();
 
+    let refundAmount = 0;
+    if (refund && [PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.COLLECTED_BY_VENDOR].includes(booking.paymentStatus)) {
+      ({ refundAmount } = await refundBookingToWallet({ bookingId: booking._id, reason: 'Cancelled by admin' }));
+    }
+
+    await notifyParties(
+      booking,
+      'Booking Cancelled',
+      `Booking #${booking.bookingNumber} was cancelled by admin.${refundAmount ? ` ₹${refundAmount} refunded to wallet.` : ''}`
+    );
+
     res.status(200).json({
       success: true,
-      message: 'Booking cancelled successfully',
+      message: refundAmount ? `Booking cancelled and ₹${refundAmount} refunded` : 'Booking cancelled successfully',
       data: booking
     });
   } catch (error) {
@@ -292,10 +343,58 @@ const getBookingAnalytics = async (req, res) => {
   }
 };
 
+/**
+ * Admin override: force a booking into any status (no money moves here)
+ */
+const overrideBookingStatus = async (req, res) => {
+  try {
+    const { status, note } = req.body;
+    if (!Object.values(BOOKING_STATUS).includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    const previous = booking.status;
+    booking.status = status;
+    if (status === BOOKING_STATUS.COMPLETED && !booking.completedAt) booking.completedAt = new Date();
+    if (status === BOOKING_STATUS.CANCELLED) {
+      booking.cancelledAt = booking.cancelledAt || new Date();
+      booking.cancelledBy = 'admin';
+      booking.cancellationReason = note || booking.cancellationReason || 'Cancelled by admin';
+    }
+    await booking.save();
+
+    await notifyParties(booking, 'Booking Updated', `Admin changed booking #${booking.bookingNumber} from ${previous} to ${status}.${note ? ` Note: ${note}` : ''}`);
+
+    res.status(200).json({ success: true, message: `Status changed from ${previous} to ${status}`, data: booking });
+  } catch (error) {
+    console.error('Override booking status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update booking status' });
+  }
+};
+
+/**
+ * Admin refund (full or partial) of a paid booking to the customer's wallet
+ */
+const refundBooking = async (req, res) => {
+  try {
+    const { amount, reason } = req.body;
+    const { booking, refundAmount } = await refundBookingToWallet({ bookingId: req.params.id, amount, reason });
+    await notifyParties(booking, 'Refund Processed', `₹${refundAmount} for booking #${booking.bookingNumber} has been refunded to the customer's wallet.`);
+    res.status(200).json({ success: true, message: `₹${refundAmount} refunded to wallet`, data: { refundAmount } });
+  } catch (error) {
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Failed to process refund' });
+  }
+};
+
 module.exports = {
   getAllBookings,
   getBookingById,
   cancelBooking,
+  overrideBookingStatus,
+  refundBooking,
   getBookingAnalytics
 };
 

@@ -10,6 +10,7 @@ const Worker = require('../../models/Worker');
 const Review = require('../../models/Review');
 const { validationResult } = require('express-validator');
 const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
+const { dispatchWave1 } = require('../../services/bookingDispatchService');
 const { createNotification } = require('../notificationControllers/notificationController');
 const { sendNotificationToUser, sendNotificationToVendor, sendNotificationToWorker } = require('../../services/firebaseAdmin');
 
@@ -82,8 +83,64 @@ const createBooking = async (req, res) => {
       serviceId = serviceId._id;
     }
 
-    // Verify service exists
-    const service = await Service.findById(serviceId);
+    // Verify service exists (Service collection, or VendorEquipment / Product machinery fallback)
+    let service = await Service.findById(serviceId);
+    let isVendorEquipmentBooking = false;
+    let vendorEquipmentDoc = null;
+
+    if (!service) {
+      const VendorEquipment = require('../../models/VendorEquipment');
+      vendorEquipmentDoc = await VendorEquipment.findById(serviceId).populate('vendorId').populate('categoryId');
+      if (vendorEquipmentDoc) {
+        isVendorEquipmentBooking = true;
+        const getRate = (p) => {
+          if (!p || p.isEnabled === false) return 0;
+          return Number(p.price) || 0;
+        };
+        const hRate = getRate(vendorEquipmentDoc.pricing?.hourly);
+        const lRate = getRate(vendorEquipmentDoc.pricing?.land_based);
+        const dRate = getRate(vendorEquipmentDoc.pricing?.daily);
+        const bRate = hRate || lRate || dRate || 500;
+
+        service = {
+          _id: vendorEquipmentDoc._id,
+          title: vendorEquipmentDoc.name,
+          category: vendorEquipmentDoc.categoryId?.title || vendorEquipmentDoc.requestedCategoryName || 'Agriculture',
+          categoryId: vendorEquipmentDoc.categoryId?._id || vendorEquipmentDoc.categoryId,
+          basePrice: bRate,
+          hourly_price: hRate,
+          land_price: lRate,
+          land_unit: 'bigha',
+          daily_price: dRate,
+          iconUrl: (vendorEquipmentDoc.images && vendorEquipmentDoc.images.length > 0) ? vendorEquipmentDoc.images[0] : '',
+          images: vendorEquipmentDoc.images || [],
+          rental_type: rental_type || 'hourly',
+          vendorId: vendorEquipmentDoc.vendorId?._id || vendorEquipmentDoc.vendorId,
+          isVendorEquipment: true
+        };
+      } else {
+        const Product = require('../../models/Product');
+        const prodDoc = await Product.findById(serviceId).populate('categoryId');
+        if (prodDoc && prodDoc.type === 'machinery') {
+          service = {
+            _id: prodDoc._id,
+            title: prodDoc.title,
+            category: prodDoc.categoryId?.title || 'Agriculture',
+            categoryId: prodDoc.categoryId?._id || prodDoc.categoryId,
+            basePrice: prodDoc.price || 500,
+            hourly_price: prodDoc.unit === 'hour' ? prodDoc.price : 0,
+            land_price: (prodDoc.unit === 'acre' || prodDoc.unit === 'bigha') ? prodDoc.price : 0,
+            land_unit: prodDoc.unit === 'bigha' ? 'bigha' : 'acre',
+            daily_price: prodDoc.unit === 'day' ? prodDoc.price : 0,
+            iconUrl: prodDoc.imageUrl || (prodDoc.images && prodDoc.images[0]) || '',
+            images: prodDoc.images || (prodDoc.imageUrl ? [prodDoc.imageUrl] : []),
+            rental_type: rental_type || 'hourly',
+            isProductMachinery: true
+          };
+        }
+      }
+    }
+
     if (!service) {
       return res.status(404).json({
         success: false,
@@ -96,7 +153,7 @@ const createBooking = async (req, res) => {
     const category = categoryId ? await Category.findById(categoryId) : null;
 
     // Calculate total value from booked items or fallback to service base price immediately after service load
-    const isAgriService = service.category === 'Agriculture' || (category && category.title === 'Agriculture') || reqServiceCategory === 'Agriculture';
+    const isAgriService = service.category === 'Agriculture' || (category && category.title === 'Agriculture') || reqServiceCategory === 'Agriculture' || isVendorEquipmentBooking;
 
     if (isAgriService) {
       // ── Agriculture Dynamic Multiplier Logic ──
@@ -131,6 +188,7 @@ const createBooking = async (req, res) => {
             // Update this item's price with the calculated agri price
             if (item.card) item.card.price = mainAgriPrice;
             else item.price = mainAgriPrice;
+            item.quantity = 1; // mainAgriPrice already includes the hours/acres/days multiplier
             mainItemHandled = true;
           }
         });
@@ -197,7 +255,7 @@ const createBooking = async (req, res) => {
     // CUSTOM - Check Cash Limit only if payment method is CASH
     const vendorFilters = {
       ...(category ? { service: category.title } : {}),
-      checkCashLimit: paymentMethod === 'cash'
+      checkCashLimit: ['cash', 'pay_at_home'].includes(paymentMethod)
     };
 
     let nearbyVendors = [];
@@ -283,7 +341,7 @@ const createBooking = async (req, res) => {
         };
 
         const serviceIdStr = normalizeId(service._id);
-        const categoryIdStr = normalizeId(finalCategory?._id || categoryId);
+        const categoryIdStr = normalizeId(category?._id || categoryId);
         
         let isFreeBrand = false;
         if (service.brandId) {
@@ -446,10 +504,18 @@ const createBooking = async (req, res) => {
       brandIcon = formattedBookedItems[0].brandIcon || null;
     }
 
+    // Online bookings are held until the payment is verified; vendors are alerted after that
+    if (paymentMethod === 'online' && finalAmount > 0) {
+      bookingStatus = BOOKING_STATUS.AWAITING_PAYMENT;
+    }
+
     const booking = await Booking.create({
       bookingNumber,
       userId,
-      vendorId: null, // Will be assigned when vendor accepts
+      vendorId: (isVendorEquipmentBooking && vendorEquipmentDoc?.vendorId) 
+        ? (vendorEquipmentDoc.vendorId._id || vendorEquipmentDoc.vendorId) 
+        : null,
+      equipmentId: isVendorEquipmentBooking ? vendorEquipmentDoc._id : null,
       serviceId,
       categoryId: finalCategory?._id || categoryId,
       serviceName: service.title,
@@ -516,109 +582,18 @@ const createBooking = async (req, res) => {
       console.log(`User ${userId} upgraded to Plus Membership until ${expiryDate}`);
     }
 
-    // Nearby vendors already found above
-    // WAVE-BASED ALERTING: Sort by distance and only notify first wave
+    // Save distance-sorted candidates; wave 1 is alerted now (or after online payment), later waves by bookingScheduler
     const sortedVendors = nearbyVendors.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-    // Wave 1: First 3 vendors
-    const WAVE_1_COUNT = 3;
-    const wave1Vendors = sortedVendors.slice(0, WAVE_1_COUNT);
-
-    // Store all potential vendors in booking for scheduler to use
     booking.potentialVendors = sortedVendors.map(v => ({
       vendorId: v._id,
       distance: v.distance || 0
     }));
-    booking.currentWave = 1;
-    booking.waveStartedAt = new Date();
-    booking.notifiedVendors = wave1Vendors.map(v => v._id);
     await booking.save();
 
-    if (wave1Vendors.length > 0) {
-      console.log(`[CreateBooking] Wave 1: Alerting ${wave1Vendors.length} closest vendors (of ${sortedVendors.length} total)`);
-
-      // Create BookingRequest entries for Wave 1 vendors
-      const BookingRequest = require('../../models/BookingRequest');
-      const bookingRequests = wave1Vendors.map(vendor => ({
-        bookingId: booking._id,
-        vendorId: vendor._id,
-        status: 'PENDING',
-        wave: 1,
-        distance: vendor.distance || null,
-        sentAt: new Date(),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000) // Expires in 1 hour
-      }));
-
-      try {
-        await BookingRequest.insertMany(bookingRequests, { ordered: false });
-        console.log(`[CreateBooking] Created ${bookingRequests.length} BookingRequest entries`);
-      } catch (err) {
-        // Ignore duplicate key errors (if retrying)
-        if (err.code !== 11000) console.error('[CreateBooking] BookingRequest insert error:', err);
-      }
-    } else {
-      console.warn(`[CreateBooking] NO VENDORS FOUND nearby! Push notifications will not be sent.`);
+    // Online payment: vendors are alerted only after the payment is verified (paymentController.verifyPaymentWebhook)
+    if (booking.status !== BOOKING_STATUS.AWAITING_PAYMENT) {
+      await dispatchWave1(booking._id, req.app.get('io'));
     }
-
-    // Emit Socket.IO event to Wave 1 vendors IMMEDIATELY (before DB notifications)
-    // This ensures instant popup without waiting for notification DB save
-    const io = req.app.get('io');
-    if (io) {
-      console.log('Socket.IO instance found, emitting Wave 1 events...');
-      wave1Vendors.forEach(vendor => {
-        console.log(`[Wave 1] Emitting to vendor_${vendor._id} (dist: ${vendor.distance?.toFixed(1)}km)`);
-        io.to(`vendor_${vendor._id}`).emit('new_booking_request', {
-          bookingId: booking._id,
-          serviceName: service.title,
-          serviceCategory: category ? category.title : 'Category',
-          customerName: user.name,
-          customerPhone: user.phone,
-          scheduledDate: scheduledDate,
-          scheduledTime: scheduledTime,
-          price: finalAmount,
-          basePrice: basePrice,
-          address: address,
-          distance: vendor.distance,
-          brandName: service.brand || '',
-          brandIcon: service.brandIcon || '',
-          rental_type: service.pricingType || '',
-          estimatedDuration: booking.estimatedDuration || '',
-          landSize: address.landSize || '',
-          playSound: true,
-          message: `New booking request within ${vendor.distance?.toFixed(1) || '?'}km!`
-        });
-      });
-    } else {
-      console.error('CRITICAL: Socket.IO instance NOT found on req.app!');
-    }
-
-    // Save notifications to DB in background (don't await — don't block response)
-    Promise.all(wave1Vendors.map(vendor =>
-      createNotification({
-        vendorId: vendor._id,
-        type: 'booking_request',
-        title: 'New Booking Request',
-        message: `New service request for ${service.title} from ${user.name}`,
-        relatedId: booking._id,
-        relatedType: 'booking',
-        data: {
-          bookingId: booking._id,
-          serviceName: service.title,
-          customerName: user.name,
-          customerPhone: user.phone,
-          scheduledDate: scheduledDate,
-          scheduledTime: scheduledTime,
-          location: address,
-          price: finalAmount,
-          distance: vendor.distance
-        },
-        pushData: {
-          type: 'new_booking',
-          dataOnly: false,
-          link: `/vendor/bookings/${booking._id}`
-        }
-      })
-    )).catch(err => console.error('[Notification] Background save error:', err));
 
     // Populate booking details
     const populatedBooking = await Booking.findById(booking._id)
@@ -628,110 +603,87 @@ const createBooking = async (req, res) => {
 
     // NOTIFY USER: Send actionable notification so they can track status
 
-    // Send notification to user
-    await createNotification({
-      userId,
-      type: 'booking_requested',
-      title: 'Booking Created',
-      message: `Your booking ${booking.bookingNumber} has been created successfully.`,
-      relatedId: booking._id,
-      relatedType: 'booking',
-      pushData: {
-        type: 'booking_requested',
-        bookingId: booking._id.toString(),
-        link: `/user/booking/${booking._id}`
-        // dataOnly: true // Removed to ensure User sees the visual notification
-      }
-    });
-
-    // Clear user's cart (both category and main carts if applicable, generally all items for the user)
-    // Ensures cart is empty after successful booking
-    await Cart.findOneAndUpdate(
-      { userId },
-      { $set: { items: [] } }
-    );
-
-    // Send notification to vendor only if assigned (Direct Booking)
-    let vendorObj = null;
-    if (vendorId) {
+    // Online bookings held for payment: notify user, emails, and cart clearing happen after payment is verified
+    if (booking.status !== BOOKING_STATUS.AWAITING_PAYMENT) {
+      // Send notification to user
       await createNotification({
-        vendorId,
-        type: 'booking_created',
-        title: 'New Booking Received',
-        message: `You have received a new booking ${booking.bookingNumber} for ${service.title}.`,
+        userId,
+        type: 'booking_requested',
+        title: 'Booking Created',
+        message: `Your booking ${booking.bookingNumber} has been created successfully.`,
         relatedId: booking._id,
-        relatedType: 'booking'
+        relatedType: 'booking',
+        pushData: {
+          type: 'booking_requested',
+          bookingId: booking._id.toString(),
+          link: `/user/booking/${booking._id}`
+        }
       });
-      // Fetch vendor details for email
-      const Vendor = require('../../models/Vendor');
-      vendorObj = await Vendor.findById(vendorId);
-    }
 
-    // SEND EMAILS (Confirmation)
-    const { sendBookingEmails } = require('../../services/emailService');
-    // Run in background (no await) to speed up response
-    sendBookingEmails(populatedBooking, user, vendorObj, service).catch(err => console.error(err));
+      // Send notification to vendor only if assigned (Direct Booking)
+      let vendorObj = null;
+      if (vendorId) {
+        await createNotification({
+          vendorId,
+          type: 'booking_created',
+          title: 'New Booking Received',
+          message: `You have received a new booking ${booking.bookingNumber} for ${service.title}.`,
+          relatedId: booking._id,
+          relatedType: 'booking'
+        });
+        const Vendor = require('../../models/Vendor');
+        vendorObj = await Vendor.findById(vendorId);
+      }
 
-    // Clear booked items from user's cart
-    try {
-      if (bookedItems && bookedItems.length > 0) {
-        const userCart = await Cart.findOne({ userId });
-        if (userCart && userCart.items.length > 0) {
-          console.log(`[CreateBooking] Clearing ${bookedItems.length} booked items from cart...`);
+      // SEND EMAILS (Confirmation)
+      const { sendBookingEmails } = require('../../services/emailService');
+      sendBookingEmails(populatedBooking, user, vendorObj, service).catch(err => console.error(err));
 
-          // Identify items to remove by title
-          const bookedTitles = new Set(bookedItems.map(item => item.card?.title || item.title));
+      // Clear booked items from user's cart
+      try {
+        if (bookedItems && bookedItems.length > 0) {
+          const userCart = await Cart.findOne({ userId });
+          if (userCart && userCart.items.length > 0) {
+            console.log(`[CreateBooking] Clearing ${bookedItems.length} booked items from cart...`);
 
-          const originalCount = userCart.items.length;
-          userCart.items = userCart.items.filter(item => {
-            const itemTitle = item.title;
-            const itemCardTitle = item.card?.title;
-            // Remove if title matches
-            const shouldRemove = bookedTitles.has(itemTitle) || (itemCardTitle && bookedTitles.has(itemCardTitle));
-            return !shouldRemove;
-          });
+            const bookedTitles = new Set(bookedItems.map(item => item.card?.title || item.title));
+            const originalCount = userCart.items.length;
+            userCart.items = userCart.items.filter(item => {
+              const itemTitle = item.title;
+              const itemCardTitle = item.card?.title;
+              const shouldRemove = bookedTitles.has(itemTitle) || (itemCardTitle && bookedTitles.has(itemCardTitle));
+              return !shouldRemove;
+            });
 
-          if (userCart.items.length < originalCount) {
-            await userCart.save();
-            console.log(`[CreateBooking] Removed ${originalCount - userCart.items.length} items from cart. Remaining: ${userCart.items.length}`);
+            if (userCart.items.length < originalCount) {
+              await userCart.save();
+              console.log(`[CreateBooking] Removed ${originalCount - userCart.items.length} items from cart. Remaining: ${userCart.items.length}`);
+            }
+          }
+        } else if (serviceId) {
+          const userCart = await Cart.findOne({ userId });
+          if (userCart) {
+            const originalCount = userCart.items.length;
+            userCart.items = userCart.items.filter(item => {
+              if (item.serviceId && item.serviceId.toString() === serviceId.toString()) return false;
+              return true;
+            });
+
+            if (userCart.items.length < originalCount) {
+              await userCart.save();
+              console.log(`[CreateBooking] Removed service ${serviceId} from cart.`);
+            }
           }
         }
-      } else if (serviceId) {
-        // Fallback: if no bookedItems passed, check if this service is in cart and remove it.
-        const userCart = await Cart.findOne({ userId });
-        if (userCart) {
-          const originalCount = userCart.items.length;
-          userCart.items = userCart.items.filter(item => {
-            // Check if item.serviceId matches the booked serviceId
-            if (item.serviceId && item.serviceId.toString() === serviceId.toString()) return false;
-            return true;
-          });
-
-          if (userCart.items.length < originalCount) {
-            await userCart.save();
-            console.log(`[CreateBooking] Removed service ${serviceId} from cart.`);
-          }
-        }
+      } catch (cartError) {
+        console.error('[CreateBooking] Failed to clear cart items:', cartError);
       }
-    } catch (cartError) {
-      console.error('[CreateBooking] Failed to clear cart items:', cartError);
-      // specific error shouldn't fail the booking response
-    }
-
-    // Clear user's cart COMPLETELY after booking setup (if vendors were found)
-    // This addresses the user's request while allowing retries if no vendors found
-    try {
-      if (wave1Vendors.length > 0) {
-        await Cart.findOneAndUpdate({ userId }, { $set: { items: [] } });
-      }
-    } catch (e) {
-      console.error('Final cart clear failed:', e);
     }
 
     res.status(201).json({
       success: true,
-      message: wave1Vendors.length > 0 ? 'Booking created successfully' : 'No vendors found nearby',
-      noVendorsFound: wave1Vendors.length === 0,
+      message: sortedVendors.length > 0 ? 'Booking created successfully' : 'No vendors found nearby',
+      noVendorsFound: sortedVendors.length === 0,
       data: populatedBooking
     });
   } catch (error) {
@@ -1028,7 +980,7 @@ const cancelBooking = async (req, res) => {
         pushData: {
           type: 'booking_cancelled',
           bookingId: booking._id.toString(),
-          link: `/vendor/bookings/${booking._id}`
+          link: `/vendor/booking/${booking._id}`
         }
       });
       // Manual FCM push removed
@@ -1134,7 +1086,7 @@ const rescheduleBooking = async (req, res) => {
       pushData: {
         type: 'booking_rescheduled',
         bookingId: booking._id.toString(),
-        link: `/vendor/bookings/${booking._id}`
+        link: `/vendor/booking/${booking._id}`
       }
     });
 
@@ -1356,7 +1308,7 @@ const checkEquipmentAvailability = async (req, res) => {
     // 2. CHECK EXISTING BOOKINGS (Conflict Check)
     const activeBookings = await Booking.find({
       serviceId: equipmentId,
-      status: { $nin: ['CANCELLED', 'COMPLETED', 'REJECTED'] },
+      status: { $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.REJECTED] },
       scheduledDate: { $gte: startOfDay }
     }).sort({ scheduledDate: 1, 'timeSlot.start': 1 }); // Sort chronologically
 

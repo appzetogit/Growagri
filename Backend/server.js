@@ -158,6 +158,7 @@ app.use('/api/users', require('./routes/user-routes/profile.routes'));
 app.use('/api/user/wallet', require('./routes/user-routes/userWallet.routes'));
 app.use('/api/users/bookings', require('./routes/user-routes/booking.routes'));
 app.use('/api/users', require('./routes/user-routes/cart.routes'));
+app.use('/api/user', require('./routes/user-routes/cart.routes'));
 app.use('/api/users/fcm-tokens', require('./routes/user-routes/fcmToken.routes'));
 
 
@@ -212,6 +213,7 @@ app.use('/api/admin', require('./routes/admin-routes/soilTest.routes'));
 app.use('/api/admin', require('./routes/admin-routes/reportManagement.routes'));
 app.use('/api/admin/disputes', require('./routes/admin-routes/disputeManagement.routes'));
 app.use('/api/admin/settlements', require('./routes/admin-routes/settlementManagement.routes'));
+app.use('/api/admin/schemes', require('./routes/admin-routes/schemeManagement.routes'));
 app.use('/api/admin/website', require('./routes/admin-routes/websiteManagement.routes'));
 app.use('/api/admin/admins', require('./routes/admin-routes/adminManagement.routes'));
 app.use('/api/image', require('./routes/admin-routes/image.routes'));
@@ -258,6 +260,7 @@ app.use('/api/products', require('./routes/public-routes/product.routes'));
 app.use('/api/weather', require('./routes/common-routes/weather.routes'));
 app.use('/api/availabilities', require('./routes/common-routes/availability.routes'));
 app.use('/api/public/equipment', require('./routes/public-routes/equipment.routes'));
+app.use('/api/public/schemes', require('./routes/public-routes/scheme.routes'));
 app.use('/api/v1/translate', require('./routes/common-routes/translation.routes'));
 
 // SEO Dynamic Sitemap
@@ -291,7 +294,7 @@ app.use((err, req, res, next) => {
 let server;
 if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
   const PORT = process.env.PORT || 5000;
-  server = app.listen(PORT, () => {
+  server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   });
 

@@ -1,15 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { createOptimizedScrollAnimation, createOptimizedStaggerAnimation } from '../../../../../utils/optimizedScrollTrigger';
 import DetailedServiceCard from '../../../components/common/DetailedServiceCard';
-import intenseBathroom2Image from '../../../../../assets/images/pages/Home/MostBookedServices/intense-bathroom-2.jpg';
-import intenseBathroom3Image from '../../../../../assets/images/pages/Home/MostBookedServices/intense-bathroom-3.jpg';
-import drillHangImage from '../../../../../assets/images/pages/Home/MostBookedServices/dreill&hang.jpg';
-import rollOnWaxImage from '../../../../../assets/images/pages/Home/MostBookedServices/roll-on-wax.webp';
-import tapRepairImage from '../../../../../assets/images/pages/Home/MostBookedServices/tap-repai.jpg';
-import automaticTopLoadImage from '../../../../../assets/images/pages/Home/MostBookedServices/automatic-top-load-machine.webp';
-import spatulaWaxingImage from '../../../../../assets/images/pages/Home/MostBookedServices/spacula-waxing.jpg';
-import fanRepairImage from '../../../../../assets/images/pages/Home/MostBookedServices/fan-repairs.jpg';
-import switchBoardImage from '../../../../../assets/images/pages/Home/MostBookedServices/switch-board.jpg';
 
 const MostBookedServices = React.memo(({ services, onServiceClick, onAddClick }) => {
 

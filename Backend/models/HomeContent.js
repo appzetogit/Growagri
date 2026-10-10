@@ -298,7 +298,12 @@ const homeContentSchema = new mongoose.Schema({
   isBookedVisible: { type: Boolean, default: true },
   isCategorySectionsVisible: { type: Boolean, default: true },
   isCategoriesVisible: { type: Boolean, default: true },
-  isPremiumOfferingsVisible: { type: Boolean, default: true }
+  isPremiumOfferingsVisible: { type: Boolean, default: true },
+
+  // Explore Services Customization
+  exploreServicesTitle: { type: String, default: 'Explore Services' },
+  exploreServicesSubtitle: { type: String, default: 'Discover Services for a Better Tomorrow' },
+  showWeatherTile: { type: Boolean, default: true }
 }, {
   timestamps: true
 });

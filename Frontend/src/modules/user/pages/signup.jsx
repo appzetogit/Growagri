@@ -275,41 +275,57 @@ const Signup = () => {
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative overflow-x-hidden bg-white justify-center items-center"
+      className="min-h-[100dvh] flex flex-col relative overflow-x-hidden bg-white justify-start sm:justify-center items-center pt-[18vh] sm:pt-0 pb-10 sm:pb-0"
     >
+      {/* Back button */}
+      <button 
+        onClick={() => navigate(-1)} 
+        className="absolute left-4 top-4 z-30 sm:hidden w-9 h-9 rounded-full bg-black/25 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/35 active:scale-95 transition-all shadow-sm"
+        aria-label="Back"
+      >
+        <FiChevronLeft className="w-5 h-5 text-white" />
+      </button>
+
       {/* Top Background with Wave */}
       <div
-        className="absolute top-0 left-0 w-full h-[25vh] bg-cover bg-center z-0 sm:hidden"
+        className="absolute top-0 left-0 w-full h-[20vh] min-h-[140px] max-h-[180px] bg-cover bg-center z-0 sm:hidden"
         style={{ backgroundImage: "url('/auth-bg.jpg')", filter: 'brightness(0.95)' }}
       >
-        <svg className="absolute bottom-0 w-full text-white" viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ height: '50px', transform: 'translateY(1px)' }}>
+        <svg className="absolute bottom-0 w-full text-white" viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ height: '44px', transform: 'translateY(1px)' }}>
           <path fill="currentColor" fillOpacity="1" d="M0,224L80,197.3C160,171,320,117,480,122.7C640,128,800,192,960,208C1120,224,1280,192,1360,176L1440,160L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
         </svg>
       </div>
 
-      <div className="bg-transparent px-8 py-4 w-full z-20 sm:max-w-md sm:mx-auto relative flex flex-col justify-center pb-10 sm:pb-0">
-        <div className="mb-8 text-center relative z-10 flex flex-col items-center">
-          {/* Back button */}
-          <button onClick={() => navigate(-1)} className="absolute left-0 top-0 sm:hidden w-8 h-8 rounded-full bg-white/30 backdrop-blur-sm text-[#426B4F] flex items-center justify-center -translate-y-24">
-            <FiChevronLeft className="w-5 h-5 text-white" />
-          </button>
-
-          <div className="relative inline-block mb-2">
-            {step === 'details' ? (
-              <Logo className="h-16 w-auto" />
-            ) : (
-              <h2 className="text-[32px] font-bold tracking-tight mb-2" style={{ color: brandColor }}>
+      <div className="bg-transparent px-7 sm:px-8 py-3 w-full z-20 sm:max-w-md sm:mx-auto relative flex flex-col justify-start sm:justify-center">
+        <div className="mb-6 sm:mb-8 text-center relative z-10 flex flex-col items-center">
+          {step === 'details' ? (
+            <>
+              <div className="relative inline-block mb-3.5 mt-1">
+                <Logo className="h-16 w-auto drop-shadow-sm transition-transform duration-300 hover:scale-105" />
+              </div>
+              <div className="text-center px-2">
+                <h1 className="text-2xl sm:text-[28px] font-extrabold text-gray-900 tracking-tight leading-tight">
+                  Create your <span style={{ color: brandColor }}>new account</span>
+                </h1>
+                <p className="text-xs sm:text-sm font-medium text-gray-500 mt-1.5">
+                  Enter your details to get started
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-[28px] sm:text-[32px] font-bold tracking-tight mb-2" style={{ color: brandColor }}>
                 Verify Phone
               </h2>
-            )}
-          </div>
-          <p className="text-sm font-medium text-gray-500">
-            {step === 'details' ? 'Create your new account' : `Code sent to ${formData.phoneNumber}`}
-          </p>
+              <p className="text-sm font-medium text-gray-500">
+                Code sent to {formData.phoneNumber}
+              </p>
+            </>
+          )}
         </div>
 
         {step === 'details' ? (
-          <form onSubmit={handleDetailsSubmit} className="space-y-5">
+          <form onSubmit={handleDetailsSubmit} className="space-y-4 sm:space-y-5">
             {verificationToken && (
               <button
                 type="button"
@@ -336,7 +352,8 @@ const Signup = () => {
                   required
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="block w-full py-4 bg-transparent border-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                  className="block w-full py-4 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                  style={{ outline: 'none' }}
                   placeholder="Full Name"
                 />
               </div>
@@ -358,9 +375,10 @@ const Signup = () => {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`block w-full py-4 bg-transparent border-none focus:ring-0 font-bold placeholder-[#426B4F]/60 sm:text-sm ${
+                  className={`block w-full py-4 bg-transparent border-none outline-none focus:outline-none focus:ring-0 font-bold placeholder-[#426B4F]/60 sm:text-sm ${
                     errors.email ? 'text-red-500' : 'text-[#426B4F]'
                   }`}
+                  style={{ outline: 'none' }}
                   placeholder="farmer@agri.com"
                 />
                 {(formData.email && !errors.email) && (
@@ -391,7 +409,8 @@ const Signup = () => {
                     required
                     value={formData.phoneNumber}
                     onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                    className="block w-full py-4 bg-transparent border-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                    className="block w-full py-4 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-[#426B4F] font-bold placeholder-[#426B4F]/60 sm:text-sm"
+                    style={{ outline: 'none' }}
                     placeholder="Phone Number"
                   />
                 </div>

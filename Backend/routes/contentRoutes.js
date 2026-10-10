@@ -6,6 +6,7 @@ const { isAdmin } = require('../middleware/roleMiddleware');
 
 // Public routes
 router.get('/faq', contentController.getFAQs);
+router.get('/faq/all', authenticate, isAdmin, contentController.getAllFAQs);
 router.get('/about', contentController.getAbout);
 router.get('/app-guide', contentController.getAppGuide);
 router.get('/policy/:role/:type', contentController.getPolicy);

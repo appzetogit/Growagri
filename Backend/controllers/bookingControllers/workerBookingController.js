@@ -1,6 +1,6 @@
 const Booking = require('../../models/Booking');
 const { validationResult } = require('express-validator');
-const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
+const { BOOKING_STATUS, PAYMENT_STATUS, isPaymentSettled } = require('../../utils/constants');
 
 /**
  * Get assigned jobs for worker
@@ -101,7 +101,8 @@ const updateJobStatus = async (req, res) => {
 
     const workerId = req.user.id;
     const { id } = req.params;
-    const { status, finalSettlementStatus, workerPaymentStatus } = req.body;
+    // Workers can't set their own payment/settlement fields
+    const { status } = req.body;
 
     const booking = await Booking.findOne({ _id: id, workerId });
 
@@ -127,6 +128,14 @@ const updateJobStatus = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: `Invalid status transition from ${booking.status} to ${status}`
+        });
+      }
+
+      // Completion only after payment is settled (online / cash OTP / plan) — otherwise use the billing flow
+      if (status === BOOKING_STATUS.COMPLETED && !isPaymentSettled(booking)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Collect payment first (bill + customer OTP) before completing this job'
         });
       }
 
@@ -171,16 +180,6 @@ const updateJobStatus = async (req, res) => {
         });
       }
 
-    }
-
-    // Update additional fields
-    if (finalSettlementStatus) booking.finalSettlementStatus = finalSettlementStatus;
-    if (workerPaymentStatus) {
-      booking.workerPaymentStatus = workerPaymentStatus;
-      if (workerPaymentStatus === 'PAID' || workerPaymentStatus === 'SUCCESS') {
-        booking.isWorkerPaid = true;
-        booking.workerPaidAt = booking.workerPaidAt || new Date();
-      }
     }
 
     await booking.save();
@@ -262,7 +261,7 @@ const startJob = async (req, res) => {
       pushData: {
         type: 'journey_started',
         bookingId: booking._id.toString(),
-        link: `/vendor/bookings/${booking._id}`
+        link: `/vendor/booking/${booking._id}`
       }
     });
 
@@ -505,7 +504,7 @@ const completeJob = async (req, res) => {
       pushData: {
         type: 'worker_completed',
         bookingId: booking._id.toString(),
-        link: `/vendor/bookings/${booking._id}`
+        link: `/vendor/booking/${booking._id}`
       }
     });
 
@@ -534,152 +533,6 @@ const completeJob = async (req, res) => {
   }
 };
 
-/**
- * Collect Cash & Complete Booking
- * Uses VendorBill as the single source of truth for earnings.
- */
-const collectCash = async (req, res) => {
-  try {
-    const workerId = req.user.id;
-    const { id } = req.params;
-    const { otp } = req.body;
-
-    const booking = await Booking.findOne({ _id: id, workerId }).select('+paymentOtp');
-
-    if (!booking) {
-      return res.status(404).json({ success: false, message: 'Job not found' });
-    }
-
-    if (booking.status !== BOOKING_STATUS.WORK_DONE) {
-      return res.status(400).json({ success: false, message: 'Work is not marked as done yet' });
-    }
-
-    if (booking.paymentOtp !== otp) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
-    // Fetch VendorBill (single source of truth)
-    const VendorBill = require('../../models/VendorBill');
-    const bill = await VendorBill.findOne({ bookingId: booking._id });
-    if (!bill) {
-      return res.status(500).json({ success: false, message: 'Bill not found — cannot process payment' });
-    }
-
-    const grandTotal = bill.grandTotal;
-    const vendorEarning = bill.vendorTotalEarning;
-
-    // Update Booking Status
-    booking.status = BOOKING_STATUS.COMPLETED;
-    booking.paymentStatus = PAYMENT_STATUS.SUCCESS;
-    booking.paymentMethod = 'cash';
-    booking.cashCollected = true;
-    booking.cashCollectedBy = 'worker';
-    booking.cashCollectorId = workerId;
-    booking.cashCollectedAt = new Date();
-    booking.completedAt = new Date();
-    booking.paymentOtp = undefined;
-    await booking.save();
-
-    // Mark bill as paid
-    bill.status = 'paid';
-    bill.paidAt = new Date();
-    await bill.save();
-
-    // Update Vendor Wallet
-    const Vendor = require('../../models/Vendor');
-    if (booking.vendorId) {
-      const vendorDoc = await Vendor.findById(booking.vendorId).select('wallet');
-      if (vendorDoc) {
-        const currentDues = (vendorDoc.wallet.dues || 0) + grandTotal;
-        const cashLimit = vendorDoc.wallet.cashLimit || 10000;
-        const netOwed = currentDues - ((vendorDoc.wallet.earnings || 0) + vendorEarning);
-        const isBlocked = netOwed > cashLimit;
-
-        const updateQuery = {
-          $inc: {
-            'wallet.dues': grandTotal,
-            'wallet.earnings': vendorEarning,
-            'wallet.totalCashCollected': grandTotal
-          }
-        };
-
-        if (isBlocked) {
-          updateQuery.$set = {
-            'wallet.isBlocked': true,
-            'wallet.blockedAt': new Date(),
-            'wallet.blockReason': `Cash limit exceeded. Net owed: ₹${netOwed.toFixed(2)}, Limit: ₹${cashLimit}`
-          };
-        }
-
-        await Vendor.findByIdAndUpdate(booking.vendorId, updateQuery);
-
-        // Create Transactions
-        const Transaction = require('../../models/Transaction');
-
-        // 1. Cash Collected
-        await Transaction.create({
-          vendorId: booking.vendorId,
-          bookingId: booking._id,
-          workerId,
-          type: 'cash_collected',
-          amount: grandTotal,
-          status: 'completed',
-          paymentMethod: 'cash',
-          description: `Cash ₹${grandTotal} collected by worker for booking #${booking.bookingNumber}`,
-          metadata: {
-            type: 'dues_increase',
-            collectedBy: 'worker',
-            billId: bill._id.toString(),
-            grandTotal,
-            vendorEarning,
-            companyRevenue: bill.companyRevenue
-          }
-        });
-
-        // 2. Earnings Credit
-        if (vendorEarning > 0) {
-          await Transaction.create({
-            vendorId: booking.vendorId,
-            bookingId: booking._id,
-            type: 'earnings_credit',
-            amount: vendorEarning,
-            status: 'completed',
-            paymentMethod: 'wallet',
-            description: `Earnings ₹${vendorEarning} credited for booking #${booking.bookingNumber} (70% service + 10% parts)`,
-            metadata: {
-              type: 'earnings_increase',
-              billId: bill._id.toString(),
-              serviceEarning: bill.vendorServiceEarning,
-              partsEarning: bill.vendorPartsEarning
-            }
-          });
-        }
-      }
-    }
-
-    // Notify User
-    const { createNotification } = require('../notificationControllers/notificationController');
-    await createNotification({
-      userId: booking.userId,
-      type: 'payment_received',
-      title: 'Payment Received (Cash)',
-      message: `Payment of ₹${grandTotal} received in cash for booking ${booking.bookingNumber}. Job Completed. Thanks!`,
-      relatedId: booking._id,
-      relatedType: 'booking',
-      priority: 'high'
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Cash collected and job completed',
-      data: booking
-    });
-
-  } catch (error) {
-    console.error('Collect cash error:', error);
-    res.status(500).json({ success: false, message: 'Failed to collect cash' });
-  }
-};
 
 /**
  * Add worker notes to booking
@@ -820,8 +673,11 @@ const startMachineryWork = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    if (booking.driver_start_otp !== otp) {
+    if (!otp || booking.driver_start_otp !== String(otp)) {
       return res.status(400).json({ success: false, message: 'Invalid Start OTP. Please ask farmer for correct OTP.' });
+    }
+    if ([BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED].includes(booking.status)) {
+      return res.status(400).json({ success: false, message: `Cannot start work on a ${booking.status} booking` });
     }
 
     booking.status = BOOKING_STATUS.IN_PROGRESS;
@@ -865,6 +721,9 @@ const completeMachineryWork = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
+    if (booking.status !== BOOKING_STATUS.IN_PROGRESS) {
+      return res.status(400).json({ success: false, message: 'Work has not started or is already completed' });
+    }
 
     // Generate End-Work OTP for Farmer to confirm completion
     const endOtp = Math.floor(1000 + Math.random() * 9000).toString();
@@ -902,7 +761,6 @@ module.exports = {
   workerReachedLocation,
   verifyVisit,
   completeJob,
-  collectCash,
   addWorkerNotes,
   respondToJob,
   startMachineryWork,

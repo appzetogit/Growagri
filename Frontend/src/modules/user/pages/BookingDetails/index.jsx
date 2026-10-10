@@ -1726,7 +1726,7 @@ const BookingDetails = () => {
                   <FiDollarSign className="w-8 h-8 text-orange-600" />
                 </div>
                 <h3 className="text-lg font-bold text-black">Payment Required</h3>
-                <p className="text-sm text-gray-500">The vendor has accepted your request. Please choose a payment method to confirm your booking.</p>
+                <p className="text-sm text-gray-500">{booking.vendorId ? 'The vendor has accepted your request. Please choose a payment method to confirm your booking.' : 'Please complete payment to initiate vendor search.'}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-3">

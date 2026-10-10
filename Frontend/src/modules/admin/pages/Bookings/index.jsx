@@ -3,11 +3,13 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   FiSearch, FiCalendar, FiDownload, FiMoreVertical,
-  FiClock, FiCheckCircle, FiBox, FiTruck, FiXCircle, FiRefreshCw, FiShoppingBag
+  FiClock, FiCheckCircle, FiBox, FiTruck, FiXCircle, FiRefreshCw, FiShoppingBag,
+  FiNavigation, FiEye
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { adminBookingService } from '../../../../services/adminBookingService';
 import { getDashboardStats } from '../../../../services/adminDashboardService';
+import BookingTrackingModal from './components/BookingTrackingModal';
 
 const BookingStatsCard = ({ title, count, icon: Icon, colorClass, bgClass }) => (
   <div className={`p-3 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between ${bgClass}`}>
@@ -25,6 +27,7 @@ const BookingStatsCard = ({ title, count, icon: Icon, colorClass, bgClass }) => 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTrackingBooking, setSelectedTrackingBooking] = useState(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -285,9 +288,23 @@ const Bookings = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
-                        <FiMoreVertical className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setSelectedTrackingBooking(booking)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg transition-all border border-blue-200 shadow-sm active:scale-95"
+                          title="Track Booking Progress"
+                        >
+                          <FiNavigation className="w-3.5 h-3.5" />
+                          Track
+                        </button>
+                        <Link
+                          to={`/admin/bookings/${booking._id}`}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <FiEye className="w-4 h-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -319,6 +336,13 @@ const Bookings = () => {
           </div>
         )}
       </div>
+
+      {/* Booking Tracking Modal */}
+      <BookingTrackingModal
+        isOpen={!!selectedTrackingBooking}
+        onClose={() => setSelectedTrackingBooking(null)}
+        booking={selectedTrackingBooking}
+      />
     </motion.div>
   );
 };

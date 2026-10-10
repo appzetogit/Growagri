@@ -506,7 +506,54 @@ const deleteAllNotifications = async (req, res) => {
   }
 };
 
+/**
+ * Admin broadcast: in-app notification + push to every active account in the audience.
+ * POST /api/notifications/admin/broadcast { audience: 'users'|'vendors'|'workers'|'all', title, message }
+ */
+const broadcastNotification = async (req, res) => {
+  try {
+    const { audience = 'all', title, message } = req.body;
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(400).json({ success: false, message: 'Title and message are required' });
+    }
+
+    const groups = {
+      users: [require('../../models/User'), 'userId'],
+      vendors: [require('../../models/Vendor'), 'vendorId'],
+      workers: [require('../../models/Worker'), 'workerId']
+    };
+    const targets = audience === 'all' ? Object.values(groups) : [groups[audience]].filter(Boolean);
+    if (!targets.length) return res.status(400).json({ success: false, message: 'Invalid audience' });
+
+    const { sendPushNotification } = require('../../services/firebaseAdmin');
+    let recipients = 0;
+    let pushed = 0;
+    for (const [Model, field] of targets) {
+      const accounts = await Model.find({ isActive: { $ne: false } }).select('_id fcmTokens fcmTokenMobile').lean();
+      recipients += accounts.length;
+      if (!accounts.length) continue;
+
+      await Notification.insertMany(accounts.map(a => ({
+        [field]: a._id, type: 'admin_broadcast', title: title.trim(), message: message.trim()
+      })), { ordered: false });
+
+      const tokens = accounts.flatMap(a => [...(a.fcmTokens || []), ...(a.fcmTokenMobile || [])]);
+      // FCM multicast accepts at most 500 tokens per call
+      for (let i = 0; i < tokens.length; i += 500) {
+        const r = await sendPushNotification(tokens.slice(i, i + 500), { title: title.trim(), body: message.trim(), data: { type: 'admin_broadcast' } });
+        pushed += r?.successCount || 0;
+      }
+    }
+
+    res.status(200).json({ success: true, message: `Sent to ${recipients} accounts (${pushed} push deliveries)`, data: { recipients, pushed } });
+  } catch (error) {
+    console.error('Broadcast notification error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send broadcast' });
+  }
+};
+
 module.exports = {
+  broadcastNotification,
   createNotification,
   getUserNotifications,
   getVendorNotifications,

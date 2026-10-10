@@ -10,11 +10,11 @@ const { createNotification } = require('../notificationControllers/notificationC
 const raiseDispute = async (req, res) => {
     try {
         const userId = req.user.id;
-        const userRole = req.user.role;
+        const userRole = req.userRole;
         const { bookingId, reason, description, attachments } = req.body;
 
-        // Check if booking exists
-        const booking = await Booking.findById(bookingId);
+        // Only the booking's own customer or vendor can dispute it
+        const booking = await Booking.findOne({ _id: bookingId, $or: [{ userId }, { vendorId: userId }] });
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
@@ -112,16 +112,37 @@ const getAdminDisputeById = async (req, res) => {
 const resolveDispute = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, resolutionNotes } = req.body;
+        const { status, resolutionNotes, refundAmount, vendorDeduction } = req.body;
         const adminId = req.user.id;
 
-        const dispute = await Dispute.findById(id).populate('bookingId', 'bookingNumber');
+        const dispute = await Dispute.findById(id).populate('bookingId', 'bookingNumber vendorId');
         if (!dispute) {
             return res.status(404).json({ success: false, message: 'Dispute not found' });
         }
 
+        // Optional money outcome of the decision (only when resolving)
+        let moneyNote = '';
+        if (status === 'resolved' && dispute.bookingId) {
+            const { refundBookingToWallet, deductVendorEarnings } = require('../../services/refundService');
+            if (Number(refundAmount) > 0) {
+                try {
+                    const { refundAmount: refunded } = await refundBookingToWallet({ bookingId: dispute.bookingId._id, amount: refundAmount, reason: 'Dispute resolution' });
+                    moneyNote += ` ₹${refunded} refunded to customer wallet.`;
+                } catch (err) {
+                    return res.status(err.status || 500).json({ success: false, message: err.message });
+                }
+            }
+            const deducted = await deductVendorEarnings({
+                vendorId: dispute.bookingId.vendorId,
+                bookingId: dispute.bookingId._id,
+                amount: vendorDeduction,
+                reason: `Dispute adjustment for booking #${dispute.bookingId.bookingNumber}`
+            });
+            if (deducted) moneyNote += ` ₹${deducted} deducted from vendor earnings.`;
+        }
+
         dispute.status = status;
-        dispute.resolutionNotes = resolutionNotes;
+        dispute.resolutionNotes = `${resolutionNotes || ''}${moneyNote}`.trim();
         if (status === 'resolved' || status === 'dismissed') {
             dispute.resolvedAt = new Date();
             dispute.resolvedBy = adminId;
@@ -136,7 +157,7 @@ const resolveDispute = async (req, res) => {
         const notificationData = {
             type: 'dispute_update',
             title: `Dispute Case ${status.toUpperCase()}`,
-            message: `Admin has ${status} your dispute for booking #${bookingNumber}.`,
+            message: `Admin has ${status} your dispute for booking #${bookingNumber}.${moneyNote}`,
             relatedId: dispute._id,
             relatedType: 'dispute',
             data: {

@@ -4,7 +4,7 @@ import { FiDollarSign, FiArrowRight, FiCreditCard, FiAlertCircle, FiCheckCircle,
 import { vendorTheme as themeColors } from '../../../../theme';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
-import { requestWithdrawal, getWalletBalance, getWithdrawalHistory } from '../../services/walletService';
+import { requestWithdrawal, getWalletBalance, getWithdrawalHistory, getBankAccount, saveBankAccount } from '../../services/walletService';
 import { toast } from 'react-hot-toast';
 import LogoLoader from '../../../../components/common/LogoLoader';
 
@@ -49,15 +49,15 @@ const WithdrawalRequest = () => {
 
   const loadData = async () => {
     try {
-      const [walletRes, historyRes] = await Promise.all([
+      const [walletRes, historyRes, savedBank] = await Promise.all([
         getWalletBalance(),
-        getWithdrawalHistory()
+        getWithdrawalHistory(),
+        getBankAccount().catch(() => null)
       ]);
-      setWallet({ available: walletRes.earnings || 0 });
+      setWallet({ available: walletRes?.earnings || 0 });
       setHistory(historyRes || []);
 
-      const savedBank = JSON.parse(localStorage.getItem('vendorBankAccount') || 'null');
-      if (savedBank) {
+      if (savedBank && (savedBank.accountNumber || savedBank.accountHolderName)) {
         setBankAccount({ ...savedBank, confirmAccountNumber: savedBank.accountNumber });
         setIsBankSaved(true);
       }
@@ -97,7 +97,7 @@ const WithdrawalRequest = () => {
     setBankAccount(prev => ({ ...prev, [name]: value }));
   };
 
-  const saveBankDetails = () => {
+  const saveBankDetails = async () => {
     if (!bankAccount.accountHolderName || !bankAccount.accountNumber || !bankAccount.bankName || !bankAccount.ifscCode) {
       toast.error('Please fill all mandatory bank details');
       return;
@@ -108,10 +108,14 @@ const WithdrawalRequest = () => {
       return;
     }
 
-    localStorage.setItem('vendorBankAccount', JSON.stringify(bankAccount));
-    setIsBankSaved(true);
-    setShowBankForm(false);
-    toast.success('Bank details updated');
+    try {
+      await saveBankAccount(bankAccount);
+      setIsBankSaved(true);
+      setShowBankForm(false);
+      toast.success('Bank details saved successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save bank details');
+    }
   };
 
   const handleSubmit = async () => {

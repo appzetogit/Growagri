@@ -8,33 +8,39 @@ import ServiceCategories from './components/ServiceCategories';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { useCart } from '../../../../context/CartContext';
 import { useCity } from '../../../../context/CityContext';
+import { useSocket } from '../../../../context/SocketContext';
 import { toast } from 'react-hot-toast';
 import { registerFCMToken } from '../../../../services/pushNotificationService';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FiArrowLeft, FiX } from 'react-icons/fi';
 
 import { userAuthService } from '../../../../services/authService';
 // Lazy load heavy components for better initial load performance
 import PromoCarousel from './components/PromoCarousel';
 // Lazy load OTHER heavy components
 const NewAndNoteworthy = lazy(() => import('./components/NewAndNoteworthy'));
-const MostBookedServices = lazy(() => import('./components/MostBookedServices'));
 const CuratedServices = lazy(() => import('./components/CuratedServices'));
-const ServiceSectionWithRating = lazy(() => import('./components/ServiceSectionWithRating'));
-const Banner = lazy(() => import('./components/Banner'));
-const ReferEarnSection = lazy(() => import('./components/ReferEarnSection'));
+import ReferEarnSection from './components/ReferEarnSection';
 import CategoryModal from './components/CategoryModal';
 import SearchOverlay from './components/SearchOverlay';
 import WeatherWidget from './components/WeatherWidget';
 import AgriMarketplaceSection from './components/AgriMarketplaceSection';
 import MachineryDiscoverySection from './components/MachineryDiscoverySection';
+import GovernmentSchemesSection from './components/GovernmentSchemesSection';
 import LogoLoader from '../../../../components/common/LogoLoader';
 import AddressSelectionModal from '../Checkout/components/AddressSelectionModal';
 
 
 
-const toAssetUrl = (url) => {
+const toAssetUrl = (url, options = {}) => {
   if (!url) return '';
-  const clean = url.replace('/api/upload', '/upload');
+  let clean = url.replace('/api/upload', '/upload');
+  if (clean.includes('res.cloudinary.com') && clean.includes('/upload/') && !clean.includes('f_auto')) {
+    const width = options.width ? `,w_${options.width}` : '';
+    const height = options.height ? `,h_${options.height}` : '';
+    const crop = options.crop ? `,c_${options.crop}` : '';
+    clean = clean.replace('/upload/', `/upload/f_auto,q_auto${width}${height}${crop}/`);
+  }
   if (clean.startsWith('http')) return clean;
   const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/api$/, '');
   return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`;
@@ -91,8 +97,8 @@ const Home = () => {
     if (!detectedCityName || !cities || cities.length === 0) return;
 
     const matchedCity = cities.find(c => c.name.toLowerCase() === detectedCityName.toLowerCase()) ||
-                        cities.find(c => c.name.toLowerCase().includes(detectedCityName.toLowerCase()) ||
-                                         detectedCityName.toLowerCase().includes(c.name.toLowerCase()));
+      cities.find(c => c.name.toLowerCase().includes(detectedCityName.toLowerCase()) ||
+        detectedCityName.toLowerCase().includes(c.name.toLowerCase()));
 
     if (matchedCity) {
       setIsLocationSupported(true);
@@ -102,9 +108,6 @@ const Home = () => {
       if (!cityLoading && currentId && matchedId !== currentId) {
         selectCity(matchedCity);
         toast.success(`Location updated to ${matchedCity.name}`);
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
       }
     } else {
       setIsLocationSupported(false);
@@ -154,8 +157,8 @@ const Home = () => {
         // Immediate update of selected city if supported
         if (cities && cities.length > 0) {
           const matchedCity = cities.find(c => c.name.toLowerCase() === city.toLowerCase()) ||
-                              cities.find(c => c.name.toLowerCase().includes(city.toLowerCase()) ||
-                                               city.toLowerCase().includes(c.name.toLowerCase()));
+            cities.find(c => c.name.toLowerCase().includes(city.toLowerCase()) ||
+              city.toLowerCase().includes(c.name.toLowerCase()));
           if (matchedCity) {
             selectCity(matchedCity);
           } else {
@@ -164,9 +167,6 @@ const Home = () => {
         }
 
         toast.success(`Location set to ${city}`);
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
       }
     }
     setHouseNumber(savedHouseNumber);
@@ -223,8 +223,8 @@ const Home = () => {
                     // Immediate update of selected city if supported
                     if (cities && cities.length > 0) {
                       const matchedCity = cities.find(c => c.name.toLowerCase() === city.toLowerCase()) ||
-                                          cities.find(c => c.name.toLowerCase().includes(city.toLowerCase()) ||
-                                                           city.toLowerCase().includes(c.name.toLowerCase()));
+                        cities.find(c => c.name.toLowerCase().includes(city.toLowerCase()) ||
+                          city.toLowerCase().includes(c.name.toLowerCase()));
                       if (matchedCity) {
                         selectCity(matchedCity);
                       } else {
@@ -256,9 +256,27 @@ const Home = () => {
     registerFCMToken('user', true).catch(err => {/* Silent fail */ });
   }, []);
 
-  const [categories, setCategories] = useState([]);
-  const [homeContent, setHomeContent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_home_categories');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [homeContent, setHomeContent] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_home_content');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    const cachedCat = localStorage.getItem('cached_home_categories');
+    const cachedHome = localStorage.getItem('cached_home_content');
+    return !cachedCat || !cachedHome;
+  });
 
   // Handle scroll separately (only when needed)
   useEffect(() => {
@@ -274,26 +292,26 @@ const Home = () => {
 
   // Fetch categories and home content on mount (and when city changes)
   useEffect(() => {
-    if (cityLoading) return;
+    if (cityLoading && !currentCity) return;
 
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (!categories.length || !homeContent) {
+          setLoading(true);
+        }
         const cityId = currentCity?._id || currentCity?.id;
 
         const [categoriesRes, homeContentRes] = await Promise.all([
-          publicCatalogService.getCategories(cityId),
+          publicCatalogService.getCategories({ cityId, forceRefresh: true }),
           publicCatalogService.getHomeContent(cityId)
         ]);
 
-        let hasData = false;
-
-        if (categoriesRes.success) {
+        if (categoriesRes.success && categoriesRes.categories) {
           const mappedCategories = categoriesRes.categories.map(cat => ({
             id: cat.id,
             title: cat.title,
             slug: cat.slug,
-            icon: toAssetUrl(cat.icon),
+            icon: toAssetUrl(cat.icon, { width: 120, height: 120, crop: 'fill' }),
             hasSaleBadge: cat.hasSaleBadge,
             badge: cat.badge,
             requiresDriver: cat.requiresDriver,
@@ -301,27 +319,111 @@ const Home = () => {
             showOnHome: cat.showOnHome ?? true
           }));
           setCategories(mappedCategories);
-          if (mappedCategories.length > 0) hasData = true;
+          try {
+            localStorage.setItem('cached_home_categories', JSON.stringify(mappedCategories));
+          } catch { }
         }
 
-        if (homeContentRes.success) {
+        if (homeContentRes.success && homeContentRes.homeContent) {
           setHomeContent(homeContentRes.homeContent);
-          if (homeContentRes.homeContent) hasData = true;
-        }
-
-        if (!hasData && categoriesRes.categories?.length === 0 && !homeContentRes.homeContent) {
-          // If no data, maybe we should still stop loading?
+          try {
+            localStorage.setItem('cached_home_content', JSON.stringify(homeContentRes.homeContent));
+          } catch { }
         }
 
         setLoading(false);
       } catch (error) {
-        // Silent fail
         setLoading(false);
       }
     };
 
     fetchData();
   }, [currentCity, cityLoading]);
+
+  const { socket } = useSocket() || {};
+
+  // Real-time synchronization: Instant updates when Admin adds, edits, deletes or toggles content
+  useEffect(() => {
+    const handleHomeContentUpdate = (eventOrData) => {
+      const payload = eventOrData?.detail || eventOrData;
+      if (!payload) return;
+
+      publicCatalogService.invalidateCache();
+      try {
+        localStorage.removeItem('cached_home_content');
+      } catch { }
+
+      if (payload.homeContent) {
+        setHomeContent(payload.homeContent);
+      } else {
+        const userCityId = currentCity?._id || currentCity?.id;
+        publicCatalogService.getHomeContent(userCityId, true).then(res => {
+          if (res?.success && res?.homeContent) {
+            setHomeContent(res.homeContent);
+          }
+        });
+      }
+    };
+
+    const handleCategoriesUpdate = () => {
+      const userCityId = currentCity?._id || currentCity?.id;
+      publicCatalogService.invalidateCache();
+      try {
+        localStorage.removeItem('cached_home_categories');
+      } catch { }
+      publicCatalogService.getCategories({ cityId: userCityId, forceRefresh: true }).then(res => {
+        if (res?.success && res?.categories) {
+          const mappedCategories = res.categories.map(cat => ({
+            id: cat.id,
+            title: cat.title,
+            slug: cat.slug,
+            icon: toAssetUrl(cat.icon, { width: 120, height: 120, crop: 'fill' }),
+            hasSaleBadge: cat.hasSaleBadge,
+            badge: cat.badge,
+            requiresDriver: cat.requiresDriver,
+            sectionType: cat.sectionType || 'General',
+            showOnHome: cat.showOnHome ?? true
+          }));
+          setCategories(mappedCategories);
+        }
+      });
+    };
+
+    // 1. WebSocket network updates
+    if (socket) {
+      socket.on('home_content_updated', handleHomeContentUpdate);
+      socket.on('categories_updated', handleCategoriesUpdate);
+    }
+
+    // 2. Custom window events (same-window communication)
+    window.addEventListener('home_content_updated', handleHomeContentUpdate);
+    window.addEventListener('categories_updated', handleCategoriesUpdate);
+
+    // 3. BroadcastChannel (cross-tab communication)
+    let bc = null;
+    if (typeof window !== 'undefined' && window.BroadcastChannel) {
+      try {
+        bc = new BroadcastChannel('groo_catalog_sync');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'HOME_CONTENT_UPDATED') {
+            handleHomeContentUpdate(event.data);
+          } else if (event.data?.type === 'CATEGORIES_UPDATED') {
+            handleCategoriesUpdate();
+          }
+        };
+      } catch (e) { }
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('home_content_updated', handleHomeContentUpdate);
+        socket.off('categories_updated', handleCategoriesUpdate);
+      }
+      window.removeEventListener('home_content_updated', handleHomeContentUpdate);
+      window.removeEventListener('categories_updated', handleCategoriesUpdate);
+      if (bc) bc.close();
+    };
+  }, [socket, currentCity]);
   // Open category modal from navigation state (e.g. from Cart 'Add Services')
   useEffect(() => {
     if (!loading && categories.length > 0 && (location.state?.openCategoryId || location.state?.openCategoryName)) {
@@ -366,11 +468,8 @@ const Home = () => {
         return;
       }
     }
-    if (promo.slug) {
-      navigate(`/user/${promo.slug}`);
-      return;
-    }
-    if (promo.route && !promo.slug) {
+    // Brand/slug pages were removed; slug-only promos fall back to their route
+    if (promo.route) {
       if (promo.scrollToSection) {
         navigate(promo.route, {
           state: { scrollToSection: promo.scrollToSection }
@@ -564,242 +663,200 @@ const Home = () => {
           )}
 
           <>
-            {/* Hero Section - Promo Carousel (Includes Banners and Promos) */}
-            {(homeContent?.isPromosVisible !== false || homeContent?.isBannersVisible !== false) && (
-                <motion.section variants={itemVariants} className="relative z-0">
-                  <PromoCarousel
-                    promos={[
-                      ...(homeContent?.banners || []).map(b => ({
-                        id: b.id || b._id,
-                        title: b.text || '',
-                        subtitle: '',
-                        buttonText: '',
-                        image: toAssetUrl(b.imageUrl),
-                        targetCategoryId: b.targetCategoryId,
-                        slug: b.slug,
-                        order: b.order || 0,
-                        route: null
-                      })),
-                      ...(homeContent?.promos || []).map(promo => ({
-                        id: promo.id || promo._id,
-                        title: promo.title || '',
-                        subtitle: promo.subtitle || promo.description || '',
-                        buttonText: promo.buttonText || 'Book now',
-                        className: promo.gradientClass || 'from-[#00A6A6] to-[#008a8a]',
-                        image: toAssetUrl(promo.imageUrl),
-                        targetCategoryId: promo.targetCategoryId,
-                        slug: promo.slug,
-                        scrollToSection: promo.scrollToSection,
-                        order: promo.order || 0,
-                        route: null
-                      }))
-                    ].sort((a, b) => (a.order || 0) - (b.order || 0))}
-                    onPromoClick={handlePromoClick}
-                  />
-                </motion.section>
-              )}
+            {/* Hero Section - Promo Carousel */}
+            {homeContent?.isPromosVisible !== false && (homeContent?.promos || []).length > 0 && (
+              <motion.section variants={itemVariants} className="relative z-0 mb-0 pb-0">
+                <PromoCarousel
+                  promos={(homeContent?.promos || []).map(promo => ({
+                    id: promo.id || promo._id,
+                    title: promo.title || '',
+                    subtitle: promo.subtitle || promo.description || '',
+                    buttonText: promo.buttonText || 'Book now',
+                    className: promo.gradientClass || 'from-[#00A6A6] to-[#008a8a]',
+                    image: toAssetUrl(promo.imageUrl, { width: 800 }),
+                    targetCategoryId: promo.targetCategoryId,
+                    slug: promo.slug,
+                    scrollToSection: promo.scrollToSection,
+                    order: promo.order || 0,
+                    route: null
+                  })).sort((a, b) => (a.order || 0) - (b.order || 0))}
+                  onPromoClick={handlePromoClick}
+                />
+              </motion.section>
+            )}
 
-              {/* Quick Agri Actions (Modern Premium Grid) */}
-              {homeContent?.isPremiumOfferingsVisible !== false && (
-                <motion.section variants={itemVariants} className="px-5 py-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex flex-col">
-                      <h2 className="text-[18px] sm:text-[20px] font-black text-slate-900 tracking-tight">Explore Services</h2>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Tab Create</p>
-                    </div>
+            {/* Quick Agri Actions (3-Column Grid Matching Reference) */}
+            {homeContent?.isPremiumOfferingsVisible !== false && (
+              <motion.section variants={itemVariants} className="px-3 sm:px-5 pt-1 pb-3 mt-2 sm:mt-3">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex flex-col">
+                    <h2 className="text-[18px] sm:text-[20px] font-black text-slate-900 tracking-tight">
+                      {homeContent?.exploreServicesTitle || 'Explore Services'}
+                    </h2>
+                    {(homeContent?.exploreServicesSubtitle || 'Discover Services for a Better Tomorrow') && (
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                        {homeContent?.exploreServicesSubtitle || 'Discover Services for a Better Tomorrow'}
+                      </p>
+                    )}
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {(homeContent?.premiumOfferings || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map((item, idx) => (
-                      <motion.div
-                        key={item.id || item._id || idx}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        onClick={() => {
-                          if (item.actionType === 'navigate' && item.route && item.route.trim() !== '') {
-                            navigate(item.route.trim());
-                          } else {
-                            // setActiveSectionTab: use title as primary (admin sets category sectionType = tab title)
-                            // Fall back to actionPayload if title is missing
-                            const tabKey = (item.title || item.actionPayload || '').trim();
-                            if (tabKey) setActiveSectionTab(tabKey);
-                          }
-                        }}
-                        className="relative overflow-hidden bg-white border border-slate-100 rounded-[20px] p-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all active:scale-95 group flex items-center gap-3 cursor-pointer"
-                      >
-                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: `linear-gradient(to bottom right, ${item.colorCode}1a, transparent)` }} />
-                         <div className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all duration-300 shadow-sm border z-10 overflow-hidden" style={{ backgroundColor: `${item.colorCode}1a`, color: item.colorCode, borderColor: `${item.colorCode}33` }}>
-                           {item.imageUrl ? (
-                             <img src={toAssetUrl(item.imageUrl)} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                           ) : (
-                             <span className="text-xl font-bold">{item.title?.charAt(0)}</span>
-                           )}
-                         </div>
-                         <div className="flex-1 min-w-0 z-10">
-                            <p className="text-[13px] sm:text-sm font-black text-slate-800 leading-tight truncate tracking-tight">{item.title}</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate tracking-wide">{item.subtitle}</p>
-                         </div>
-                      </motion.div>
-                    ))}
-                    {/* Weather Button */}
-                    <WeatherWidget />
-                  </div>
-                </motion.section>
-              )}
-
-
-              {/* Categories Sections - Only show categories whose sectionType is NOT a tab (premiumOfferings tab titles) */}
-              {homeContent?.isCategoriesVisible !== false && categories.length > 0 && (() => {
-                // Collect all tab titles from premiumOfferings to exclude those sectionTypes
-                const tabSectionTypes = new Set(
-                  (homeContent?.premiumOfferings || []).map(item => (item.title || '').trim().toLowerCase())
-                );
-
-                // Only show categories that are NOT tab-based (i.e. sectionType not in tabSectionTypes)
-                const nonTabCategories = categories.filter(c =>
-                  c.showOnHome !== false &&
-                  !tabSectionTypes.has((c.sectionType || 'General').trim().toLowerCase())
-                );
-
-                if (nonTabCategories.length === 0) return null;
-
-                const sectionTypes = [...new Set(nonTabCategories.map(c => (c.sectionType || 'General').trim()))];
-                return (
-                  <>
-                    {sectionTypes.map(sectionType => {
-                      const sectionCategories = nonTabCategories.filter(c => (c.sectionType || 'General').trim() === sectionType);
-                      if (sectionCategories.length === 0) return null;
-                      return (
-                        <motion.section key={sectionType} variants={itemVariants} className="relative overflow-hidden pt-2 mb-4">
-                          <div className="absolute inset-0 bg-gradient-to-b from-gray-50/30 to-transparent pointer-events-none -z-10" />
-                          <ServiceCategories
-                            title={sectionType === 'General' ? 'General Services' : sectionType}
-                            subtitle={sectionType === 'General' ? 'ALL OTHER SERVICES' : `EXPLORE ${sectionType.toUpperCase()}`}
-                            categories={sectionCategories}
-                            onCategoryClick={handleCategoryClick}
-                            onSeeAllClick={() => { }}
-                          />
-                        </motion.section>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-
-              {/* Curated Services */}
-              {homeContent?.isCuratedVisible !== false && (
-                <motion.div variants={itemVariants}>
-                  <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
-                    <CuratedServices
-                      services={(homeContent?.curated || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => ({
-                        id: item.id || item._id,
-                        title: item.title,
-                        gif: toAssetUrl(item.gifUrl),
-                        slug: item.slug,
-                        targetCategoryId: item.targetCategoryId
-                      }))}
-                      onServiceClick={handleServiceClick}
-                    />
-                  </Suspense>
-                </motion.div>
-              )}
-
-              {/* New & Noteworthy */}
-              {homeContent?.isNoteworthyVisible !== false && (
-                <motion.div variants={itemVariants}>
-                  <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
-                    <NewAndNoteworthy
-                      services={(homeContent?.noteworthy || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => ({
-                        id: item.id || item._id,
-                        title: item.title,
-                        image: toAssetUrl(item.imageUrl),
-                        slug: item.slug,
-                        targetCategoryId: item.targetCategoryId
-                      }))}
-                      onServiceClick={handleServiceClick}
-                    />
-                  </Suspense>
-                </motion.div>
-              )}
-
-              {/* Most Booked */}
-              {homeContent?.isBookedVisible !== false && (
-                <motion.div variants={itemVariants}>
-                  <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
-                    <MostBookedServices
-                      services={(homeContent?.booked || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => ({
-                        id: item.id || item._id,
-                        title: item.title,
-                        rating: item.rating,
-                        reviews: item.reviews,
-                        price: item.price,
-                        originalPrice: item.originalPrice,
-                        discount: item.discount,
-                        image: toAssetUrl(item.imageUrl),
-                        targetCategoryId: item.targetCategoryId,
-                        slug: item.slug
-                      }))}
-                      onServiceClick={handleServiceClick}
-                      onAddClick={handleAddClick}
-                    />
-                  </Suspense>
-                </motion.div>
-              )}
-
-
-              {/* Machinery Discovery Section */}
-              <motion.div variants={itemVariants}>
-                <MachineryDiscoverySection />
-              </motion.div>
-
-              {/* Agriculture Marketplace */}
-              <motion.div variants={itemVariants}>
-                <AgriMarketplaceSection />
-              </motion.div>
-
-              {/* Dynamic Sections */}
-              {homeContent?.isCategorySectionsVisible !== false && (homeContent?.categorySections || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map((section, sIdx) => (
-                <motion.div key={section._id || sIdx} variants={itemVariants}>
-                  <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
-                    <ServiceSectionWithRating
-                      title={section.title}
-                      subtitle={section.subtitle}
-                      services={section.cards?.map((card, cIdx) => {
-                        const processedImage = toAssetUrl(card.imageUrl);
-                        return {
-                          id: card._id || cIdx,
-                          title: card.title,
-                          rating: card.rating || "4.8",
-                          reviews: card.reviews || "10k+",
-                          price: card.price,
-                          originalPrice: card.originalPrice,
-                          discount: card.discount,
-                          image: processedImage,
-                          targetCategoryId: card.targetCategoryId,
-                          slug: card.slug
-                        };
-                      }) || []}
-                      onSeeAllClick={() => {
-                        if (section.seeAllTargetCategoryId) {
-                          const cat = categories.find(c => (c.id === section.seeAllTargetCategoryId || c._id === section.seeAllTargetCategoryId));
-                          if (cat) handleCategoryClick(cat);
+                {/* 3-Column Grid */}
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
+                  {(homeContent?.premiumOfferings || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map((item, idx) => (
+                    <motion.div
+                      key={item.id || item._id || idx}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.04 }}
+                      onClick={() => {
+                        if (item.actionType === 'navigate' && item.route && item.route.trim() !== '') {
+                          navigate(item.route.trim());
+                        } else {
+                          // setActiveSectionTab: use title as primary (admin sets category sectionType = tab title)
+                          // Fall back to actionPayload if title is missing
+                          const tabKey = (item.title || item.actionPayload || '').trim();
+                          if (tabKey) setActiveSectionTab(tabKey);
                         }
                       }}
-                      onServiceClick={(service) => handleServiceClick(service)}
-                      onAddClick={handleAddClick}
-                    />
-                  </Suspense>
-                </motion.div>
-              ))}
+                      className="relative bg-white border border-slate-100/90 rounded-[20px] sm:rounded-[22px] px-1.5 py-3 sm:px-2.5 sm:py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-md transition-all active:scale-95 group flex flex-col items-center justify-between text-center cursor-pointer min-h-[114px] sm:min-h-[128px]"
+                    >
+                      {/* Circular Illustration / Image Badge */}
+                      <div
+                        className="relative w-14 h-14 min-[390px]:w-15 min-[390px]:h-15 sm:w-16 sm:h-16 rounded-full p-1 flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 shadow-xs border overflow-hidden"
+                        style={{
+                          backgroundColor: item.colorCode ? `${item.colorCode}14` : '#f0fdf4',
+                          borderColor: item.colorCode ? `${item.colorCode}29` : '#dcfce7'
+                        }}
+                      >
+                        {item.imageUrl ? (
+                          <img
+                            src={toAssetUrl(item.imageUrl, { width: 140, height: 140, crop: 'fill' })}
+                            alt={item.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <span className="text-xl font-bold" style={{ color: item.colorCode || '#166534' }}>
+                            {item.title?.charAt(0)}
+                          </span>
+                        )}
+                      </div>
 
-              {/* Refer & Earn Section */}
+                      {/* Title (Single Line, No Subtitle) */}
+                      <div className="w-full mt-2 sm:mt-2.5 flex-1 flex flex-col items-center justify-center">
+                        <p className="text-[10.5px] min-[360px]:text-[11.5px] min-[390px]:text-[12px] sm:text-[13px] font-bold text-slate-800 leading-tight tracking-tight text-center whitespace-nowrap overflow-hidden text-ellipsis px-0.5">
+                          {item.title}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {/* Weather Button (Dynamic Toggle from Admin) */}
+                  {homeContent?.showWeatherTile !== false && <WeatherWidget />}
+                </div>
+              </motion.section>
+            )}
+
+
+            {/* Categories Sections - Only show categories whose sectionType is NOT a tab (premiumOfferings tab titles) */}
+            {homeContent?.isCategoriesVisible !== false && categories.length > 0 && (() => {
+              // Collect all tab titles from premiumOfferings to exclude those sectionTypes
+              const tabSectionTypes = new Set(
+                (homeContent?.premiumOfferings || []).map(item => (item.title || '').trim().toLowerCase())
+              );
+
+              // Only show categories that are NOT tab-based (i.e. sectionType not in tabSectionTypes)
+              const nonTabCategories = categories.filter(c =>
+                c.showOnHome !== false &&
+                !tabSectionTypes.has((c.sectionType || 'General').trim().toLowerCase())
+              );
+
+              if (nonTabCategories.length === 0) return null;
+
+              const sectionTypes = [...new Set(nonTabCategories.map(c => (c.sectionType || 'General').trim()))];
+              return (
+                <>
+                  {sectionTypes.map(sectionType => {
+                    const sectionCategories = nonTabCategories.filter(c => (c.sectionType || 'General').trim() === sectionType);
+                    if (sectionCategories.length === 0) return null;
+                    return (
+                      <motion.section key={sectionType} variants={itemVariants} className="relative overflow-hidden pt-2 mb-4">
+                        <div className="absolute inset-0 bg-gradient-to-b from-gray-50/30 to-transparent pointer-events-none -z-10" />
+                        <ServiceCategories
+                          title={sectionType === 'General' ? 'General Services' : sectionType}
+                          subtitle={sectionType === 'General' ? 'ALL OTHER SERVICES' : `EXPLORE ${sectionType.toUpperCase()}`}
+                          categories={sectionCategories}
+                          onCategoryClick={handleCategoryClick}
+                          onSeeAllClick={() => { }}
+                        />
+                      </motion.section>
+                    );
+                  })}
+                </>
+              );
+            })()}
+
+            {/* Curated Services */}
+            {homeContent?.isCuratedVisible !== false && (
               <motion.div variants={itemVariants}>
-                <Suspense fallback={<div className="h-32 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
-                  <ReferEarnSection onReferClick={handleReferClick} />
+                <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
+                  <CuratedServices
+                    services={(homeContent?.curated || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => ({
+                      id: item.id || item._id,
+                      title: item.title,
+                      gif: toAssetUrl(item.gifUrl),
+                      slug: item.slug,
+                      targetCategoryId: item.targetCategoryId
+                    }))}
+                    onServiceClick={handleServiceClick}
+                  />
                 </Suspense>
               </motion.div>
-            </>
+            )}
+
+            {/* New & Noteworthy */}
+            {homeContent?.isNoteworthyVisible !== false && (
+              <motion.div variants={itemVariants}>
+                <Suspense fallback={<div className="h-40 bg-gray-50 animate-pulse rounded-xl mx-4" />}>
+                  <NewAndNoteworthy
+                    services={(homeContent?.noteworthy || []).sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => ({
+                      id: item.id || item._id,
+                      title: item.title,
+                      image: toAssetUrl(item.imageUrl),
+                      slug: item.slug,
+                      targetCategoryId: item.targetCategoryId
+                    }))}
+                    onServiceClick={handleServiceClick}
+                  />
+                </Suspense>
+              </motion.div>
+            )}
+
+
+
+            {/* Government Schemes Section */}
+            <motion.div variants={itemVariants}>
+              <GovernmentSchemesSection />
+            </motion.div>
+
+            {/* Refer & Earn Section */}
+            <motion.div variants={itemVariants}>
+              <ReferEarnSection onReferClick={handleReferClick} />
+            </motion.div>
+
+            {/* Machinery Discovery Section */}
+            <motion.div variants={itemVariants}>
+              <MachineryDiscoverySection />
+            </motion.div>
+
+            {/* Agriculture Marketplace */}
+            <motion.div variants={itemVariants}>
+              <AgriMarketplaceSection />
+            </motion.div>
+
+
+          </>
         </main>
       </motion.div>
 
@@ -814,54 +871,82 @@ const Home = () => {
         currentCity={currentCity}
       />
 
-      {/* Section Tab Bottom Sheet Modal */}
+      {/* Section Tab Full Page Modal */}
       <AnimatePresence>
         {activeSectionTab && (
-          <div className="fixed inset-0 z-[9990] flex items-end justify-center">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setActiveSectionTab(null)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-            />
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative bg-white w-full rounded-t-[32px] p-6 pb-12 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-10 max-h-[80vh] overflow-y-auto"
-            >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-              
-              <div className="flex justify-between items-center mb-6">
-                <h4 className="font-bold text-gray-900 text-lg">{activeSectionTab}</h4>
+          <motion.div
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 240 }}
+            className="fixed inset-0 z-[9999] bg-[#F8FBFF] flex flex-col h-full w-full overflow-hidden"
+          >
+            {/* Top Navigation Bar */}
+            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3.5 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveSectionTab(null)}
-                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200"
+                  className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all"
+                  aria-label="Back"
                 >
-                  ✕
+                  <FiArrowLeft className="w-5 h-5" />
                 </button>
+                <div>
+                  <h1 className="font-black text-slate-900 text-base sm:text-lg leading-tight line-clamp-1">
+                    {activeSectionTab}
+                  </h1>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-0.5">
+                    Explore Services
+                  </p>
+                </div>
               </div>
 
-              {categories.filter(c => (c.sectionType || '').trim().toLowerCase() === (activeSectionTab || '').trim().toLowerCase()).length > 0 ? (
-                <ServiceCategories
-                  title={activeSectionTab}
-                  subtitle={`EXPLORE ALL ${activeSectionTab.toUpperCase()}`}
-                  categories={categories.filter(c => (c.sectionType || '').trim().toLowerCase() === (activeSectionTab || '').trim().toLowerCase())}
-                  onCategoryClick={(cat) => {
-                    setActiveSectionTab(null);
-                    handleCategoryClick(cat);
-                  }}
-                  onSeeAllClick={() => {}}
-                />
-              ) : (
-                <div className="py-12 text-center text-gray-500 text-sm">
-                  No services available in this section yet.
-                </div>
-              )}
-            </motion.div>
-          </div>
+              <button
+                onClick={() => setActiveSectionTab(null)}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-600 transition-all"
+                aria-label="Close"
+              >
+                <FiX className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Full-Page Body */}
+            <div className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+              {(() => {
+                const sectionCategories = categories.filter(
+                  c => (c.sectionType || '').trim().toLowerCase() === (activeSectionTab || '').trim().toLowerCase()
+                );
+
+                if (sectionCategories.length > 0) {
+                  return (
+                    <div className="max-w-2xl mx-auto space-y-6">
+                      <ServiceCategories
+                        showHeader={false}
+                        categories={sectionCategories}
+                        onCategoryClick={(cat) => {
+                          setActiveSectionTab(null);
+                          handleCategoryClick(cat);
+                        }}
+                        onSeeAllClick={() => { }}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="py-20 text-center flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-2xl font-bold">
+                      !
+                    </div>
+                    <h3 className="font-bold text-slate-700 text-base mb-1">No Services Available</h3>
+                    <p className="text-slate-400 text-xs max-w-xs">
+                      Currently no services or equipment are listed under {activeSectionTab}.
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

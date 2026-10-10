@@ -129,11 +129,11 @@ const VendorSearchModal = ({ isOpen, onClose, currentStep, acceptedVendor, onRet
                 <h4 className="font-black text-xl text-gray-900 mb-1">{acceptedVendor.businessName}</h4>
                 <div className="flex items-center gap-4 text-xs font-bold text-gray-500 mt-3">
                   <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-                    <span className="text-yellow-400">★</span> {acceptedVendor.rating || '4.9'}
+                    <span className="text-yellow-400">★</span> {acceptedVendor.rating ? Number(acceptedVendor.rating).toFixed(1) : 'New'}
                   </span>
                   <span className="flex items-center gap-1.5 bg-green-50 text-green-600 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-tighter text-[10px]">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                    {acceptedVendor.distance || 'Nearby'}
+                    Accepted
                   </span>
                 </div>
               </div>

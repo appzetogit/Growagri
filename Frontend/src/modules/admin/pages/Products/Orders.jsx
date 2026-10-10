@@ -260,6 +260,27 @@ const EcommerceOrders = () => {
                                         }`} />
                                         <p className="font-extrabold text-slate-800 uppercase text-xs">{selectedOrder.deliveryStatus}</p>
                                     </div>
+                                    {!['delivered', 'cancelled'].includes(selectedOrder.deliveryStatus) && (
+                                        <select
+                                            value=""
+                                            onChange={async (e) => {
+                                                const status = e.target.value;
+                                                if (!status || !window.confirm(`Mark this order as ${status}?`)) return;
+                                                try {
+                                                    const res = await adminProductService.updateOrderStatus(selectedOrder._id, status);
+                                                    toast.success(res.message || `Order ${status}`);
+                                                    setSelectedOrder({ ...selectedOrder, deliveryStatus: status });
+                                                    fetchOrders();
+                                                } catch (err) {
+                                                    toast.error(err.response?.data?.message || 'Failed to update order');
+                                                }
+                                            }}
+                                            className="mt-2 w-full p-1.5 text-xs border border-slate-200 rounded-lg bg-white"
+                                        >
+                                            <option value="">Update status...</option>
+                                            {['packed', 'shipped', 'delivered', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    )}
                                 </div>
                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Payment Status</p>

@@ -8,6 +8,7 @@ import { CartProvider } from './context/CartContext';
 import { CityProvider } from './context/CityContext';
 import { EcommerceCartProvider } from './context/EcommerceCartContext';
 import { initializePushNotifications, setupForegroundNotificationHandler } from './services/pushNotificationService';
+import AutoTranslator from './components/common/AutoTranslator';
 // Global common imports removed here as they are now handled in AppRoutes.jsx for conditional rendering
 // import { LocationPermissionChecker, Chatbot } from './components/common';
 
@@ -70,6 +71,7 @@ function App() {
           <CartProvider>
             <EcommerceCartProvider>
               <div className="App">
+                <AutoTranslator />
                 <AppRoutes />
                 {/* Global components moved to routes/index.jsx */}
                 <Toaster

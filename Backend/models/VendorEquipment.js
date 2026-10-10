@@ -98,6 +98,7 @@ const vendorEquipmentSchema = new mongoose.Schema({
     default: null
   },
   // Machine Verification & Status
+  adminRemarks: { type: String, default: null },
   status: {
     type: String,
     enum: ['pending', 'approved', 'active', 'inactive', 'rejected'],
