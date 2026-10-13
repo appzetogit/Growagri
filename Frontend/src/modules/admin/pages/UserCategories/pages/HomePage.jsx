@@ -7,6 +7,7 @@ import ToggleSwitch from "../components/ToggleSwitch";
 import { ensureIds, saveCatalog, slugify, toAssetUrl } from "../utils";
 
 import { homeContentService, serviceService } from "../../../../../services/catalogService";
+import { getYouTubeVideoId } from "../../../../../utils/videoUtils";
 
 const RedirectionSelector = ({
   targetCategoryId,
@@ -636,8 +637,6 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700 w-24">Image</th>
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Title</th>
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Subtitle</th>
-                      <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Action Type</th>
-                      <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Target / Route</th>
                       <th className="text-center py-3 px-4 text-sm font-bold text-gray-700 w-28">Order</th>
                       <th className="text-center py-3 px-4 text-sm font-bold text-gray-700 w-28">Actions</th>
                     </tr>
@@ -660,14 +659,6 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                         </td>
                         <td className="py-4 px-4">
                           <div className="text-sm text-gray-600">{p.subtitle || "—"}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-700">
-                            {p.actionType === 'navigate' ? 'Route' : 'Section Tab'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="text-sm text-gray-600 font-mono text-xs">{p.actionType === 'navigate' ? p.route : (p.actionPayload || p.title || '—')}</div>
                         </td>
                         <td className="py-4 px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -787,6 +778,17 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                             ) : (
                               <video src={s.gifUrl} className="h-14 w-14 object-cover rounded-lg border border-gray-200" controls />
                             )
+                          ) : getYouTubeVideoId(s.youtubeUrl) ? (
+                            <div className="relative h-14 w-14 rounded-lg overflow-hidden border border-gray-200 bg-black group shadow-sm">
+                              <img
+                                src={`https://img.youtube.com/vi/${getYouTubeVideoId(s.youtubeUrl)}/hqdefault.jpg`}
+                                alt="YouTube preview"
+                                className="h-14 w-14 object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
+                                <span className="text-[9px] text-white font-bold bg-red-600 px-1 py-0.5 rounded shadow">YT</span>
+                              </div>
+                            </div>
                           ) : (
                             <div className="h-14 w-14 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
                               <span className="text-[10px] text-gray-400">No media</span>
@@ -1188,29 +1190,6 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                 )}
               </div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Action Type</label>
-              <select
-                value={premiumOfferingsForm.actionType}
-                onChange={(e) => setPremiumOfferingsForm({ ...premiumOfferingsForm, actionType: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-              >
-                <option value="setActiveSectionTab">Category Section Tab (Filters by Title)</option>
-                <option value="navigate">Navigate to Page / Route</option>
-              </select>
-            </div>
-            {premiumOfferingsForm.actionType === 'navigate' && (
-              <div className="col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Route</label>
-                <input
-                  type="text"
-                  value={premiumOfferingsForm.route || ''}
-                  onChange={(e) => setPremiumOfferingsForm({ ...premiumOfferingsForm, route: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                  placeholder="e.g. /user/agri-marketplace"
-                />
-              </div>
-            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
@@ -1327,6 +1306,30 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
               placeholder="https://youtube.com/..."
             />
+            {curatedForm.youtubeUrl && getYouTubeVideoId(curatedForm.youtubeUrl) && (
+              <div className="mt-3 relative inline-block group">
+                <div className="relative h-28 w-44 rounded-lg overflow-hidden border border-gray-200 bg-black shadow-sm">
+                  <img
+                    src={`https://img.youtube.com/vi/${getYouTubeVideoId(curatedForm.youtubeUrl)}/hqdefault.jpg`}
+                    alt="YouTube Video Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
+                    <span className="bg-red-600 text-white text-xs font-semibold px-2 py-0.5 rounded flex items-center gap-1 shadow">
+                      ▶ YouTube Preview
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCuratedForm(p => ({ ...p, youtubeUrl: "" }))}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600 transition-colors"
+                  title="Remove YouTube URL"
+                >
+                  <FiTrash2 className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

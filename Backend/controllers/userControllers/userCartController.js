@@ -69,6 +69,24 @@ const getUserCart = async (req, res) => {
             };
           }
         }
+
+        // 4. Fallback to Category
+        if (!populatedService) {
+          const cat = await Category.findById(item.serviceId).lean();
+          if (cat) {
+            populatedService = {
+              _id: cat._id,
+              title: cat.title,
+              iconUrl: cat.icon || '',
+              slug: cat.slug,
+              hourly_price: Number(cat.hourlyPrice) || 0,
+              land_price: 0,
+              land_unit: 'acre',
+              daily_price: 0,
+              isCategoryService: true
+            };
+          }
+        }
       }
 
       if (item.categoryId && mongoose.Types.ObjectId.isValid(item.categoryId)) {
@@ -153,6 +171,7 @@ const addToCart = async (req, res) => {
     let service = null;
     let vendorEquipment = null;
     let productDoc = null;
+    let categoryDoc = null;
     let resolvedVendorId = vendorId || null;
     let resolvedEquipmentId = equipmentId || null;
 
@@ -171,12 +190,16 @@ const addToCart = async (req, res) => {
           } else {
             const Product = require('../../models/Product');
             productDoc = await Product.findById(serviceId);
+            if (!productDoc) {
+              const Category = require('../../models/Category');
+              categoryDoc = await Category.findById(serviceId);
+            }
           }
         }
       }
 
       // If serviceId is provided, but not found in any collection AND title is missing, return 404
-      if (!service && !vendorEquipment && !productDoc && !title) {
+      if (!service && !vendorEquipment && !productDoc && !categoryDoc && !title) {
         return res.status(404).json({
           success: false,
           message: 'Service not found'
@@ -240,7 +263,7 @@ const addToCart = async (req, res) => {
         pricing_context: pricing_context || 'any',
         parentSourceId: parentSourceId || null,
         // Agriculture rental guideline prices
-        hourly_price: hourly_price || service?.hourly_price || (vendorEquipment?.pricing?.hourly?.price ? Number(vendorEquipment.pricing.hourly.price) : 0),
+        hourly_price: hourly_price || service?.hourly_price || (vendorEquipment?.pricing?.hourly?.price ? Number(vendorEquipment.pricing.hourly.price) : 0) || Number(categoryDoc?.hourlyPrice) || 0,
         land_price: land_price || service?.land_price || (vendorEquipment?.pricing?.land_based?.price ? Number(vendorEquipment.pricing.land_based.price) : 0),
         land_unit: land_unit || service?.land_unit || 'acre',
         daily_price: daily_price || service?.daily_price || (vendorEquipment?.pricing?.daily?.price ? Number(vendorEquipment.pricing.daily.price) : 0),

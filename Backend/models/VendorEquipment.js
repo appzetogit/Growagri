@@ -109,6 +109,10 @@ const vendorEquipmentSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  commissionPercentage: {
+    type: Number,
+    default: null
+  },
   // Metadata for start/end work flow (future use)
   totalHoursWorked: {
     type: Number,

@@ -47,6 +47,10 @@ const categorySchema = new mongoose.Schema({
     type: String,
     default: 'General'
   },
+  hourlyPrice: {
+    type: Number,
+    default: 0
+  },
   homeOrder: {
     type: Number,
     default: 0,

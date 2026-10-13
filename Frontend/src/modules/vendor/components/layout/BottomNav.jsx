@@ -16,8 +16,8 @@ const BottomNav = memo(({ isGlobal = false }) => {
     const handleResize = () => {
       const activeEl = document.activeElement;
       const isInputFocused = activeEl && (
-        activeEl.tagName === 'INPUT' || 
-        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
         activeEl.hasAttribute('contenteditable')
       );
       if (isInputFocused && window.innerHeight < originalHeight - 150) {
@@ -69,7 +69,7 @@ const BottomNav = memo(({ isGlobal = false }) => {
     return [
       { path: '/vendor/dashboard', icon: FiHome, activeIcon: HiHome, label: 'Home' },
       { path: '/vendor/equipment', icon: FiTruck, activeIcon: FiTruck, label: 'Machinery' },
-      { path: '/vendor/jobs', icon: FiBriefcase, activeIcon: HiBriefcase, label: 'Rentals', badge: badgeCount },
+      { path: '/vendor/jobs', icon: FiBriefcase, activeIcon: HiBriefcase, label: 'Bookings', badge: badgeCount },
       { path: '/vendor/wallet', icon: FaWallet, activeIcon: FaWallet, label: 'Wallet' },
       { path: '/vendor/profile', icon: FiUser, activeIcon: HiUser, label: 'Profile' },
     ];

@@ -16,7 +16,9 @@ import {
   startTrip,
   endTrip,
   machineryStartWork,
-  machineryCompleteWork
+  machineryCompleteWork,
+  acceptBooking,
+  rejectBooking
 } from '../../services/bookingService';
 import vendorBillService from '../../../../services/vendorBillService';
 import { CashCollectionModal, ConfirmDialog, OperatorPaymentModal } from '../../components/common';
@@ -80,7 +82,7 @@ const BookingCountdown = ({ booking }) => {
         setTimeLeft('');
         return;
       }
-      
+
       const totalMins = Math.floor(diff / 60000);
       const mins = totalMins % 60;
       const totalHours = Math.floor(totalMins / 60);
@@ -246,7 +248,7 @@ export default function BookingDetails() {
       if (res?.settings?.bookingCommissionPercentage !== undefined) {
         setBookingCommissionPct(res.settings.bookingCommissionPercentage);
       }
-    }).catch(() => {});
+    }).catch(() => { });
     window.addEventListener('vendorJobsUpdated', loadBooking);
 
     return () => {
@@ -468,7 +470,7 @@ export default function BookingDetails() {
       : booking?.status === 'completed';
 
     if (!validStatus) return false;
-    
+
     // If online payment and bill is already generated, hide the button (no OTP required)
     if (booking?.vendorBillId && booking?.paymentMethod !== 'cash' && booking?.paymentMethod !== 'pay_at_home' && booking?.paymentMethod !== 'plan_benefit') {
       return false;
@@ -496,7 +498,7 @@ export default function BookingDetails() {
       const token = sessionStorage.getItem('vendorAccessToken') || localStorage.getItem('vendorAccessToken');
       const url = `${import.meta.env.VITE_API_BASE_URL}/vendors/bookings/${id}/bill/download?token=${token}`;
       const fileName = `Invoice_${booking.bookingNumber}.pdf`;
-      
+
       const result = await flutterBridge.downloadFile(url, fileName);
       if (result && result.success) {
         toast.success('Download started...');
@@ -507,6 +509,62 @@ export default function BookingDetails() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleAcceptBooking = async () => {
+    try {
+      setActionLoading(true);
+      toast.loading('Accepting booking...');
+      const result = await acceptBooking(id);
+      toast.dismiss();
+      if (result?.alreadyTaken) {
+        toast.error('This job was already accepted by another vendor.');
+      } else {
+        toast.success('Booking accepted successfully!');
+      }
+      window.dispatchEvent(new Event('vendorJobsUpdated'));
+      window.dispatchEvent(new Event('vendorStatsUpdated'));
+      const updated = await getBookingById(id);
+      if (updated?.data) {
+        setBooking(prev => ({ ...prev, ...updated.data, status: updated.data.status }));
+      }
+    } catch (error) {
+      toast.dismiss();
+      const status = error?.response?.status;
+      if (status === 409) {
+        toast.error('This job was already accepted by another vendor.');
+      } else {
+        toast.error(error?.response?.data?.message || 'Failed to accept booking');
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectBooking = async () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Decline Booking',
+      message: 'Are you sure you want to decline this booking?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          toast.loading('Declining booking...');
+          await rejectBooking(id);
+          toast.dismiss();
+          toast.success('Booking declined');
+          window.dispatchEvent(new Event('vendorJobsUpdated'));
+          window.dispatchEvent(new Event('vendorStatsUpdated'));
+          navigate('/vendor/jobs');
+        } catch (error) {
+          toast.dismiss();
+          toast.error(error?.response?.data?.message || 'Failed to decline booking');
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
   };
 
   if (!booking) {
@@ -686,8 +744,8 @@ export default function BookingDetails() {
 
   // Base Logic (Services)
   // Use bill.originalServiceBase if available, else fallback to totalServiceBase (for older bookings), else booking.basePrice
-  const originalBase = bill 
-    ? (bill.originalServiceBase || bill.totalServiceBase || 0) 
+  const originalBase = bill
+    ? (bill.originalServiceBase || bill.totalServiceBase || 0)
     : (parseFloat(booking?.basePrice) || 0);
 
   // Extra Services & Parts from vendor bill (if available)
@@ -721,12 +779,33 @@ export default function BookingDetails() {
   });
 
   // Tax Logic
-  // Use bill.originalGST if available, else fallback to totalGST
-  const originalGST = bill ? (bill.originalGST || bill.totalGST || 0) : (originalBase * 0.18);
+  const isRental = !!(booking?.rental_type || booking?.equipmentId || booking?.landSize || (booking?.serviceCategory && (booking.serviceCategory.toLowerCase().includes('machinery') || booking.serviceCategory.toLowerCase().includes('tractor') || booking.serviceCategory.toLowerCase().includes('equipment') || booking.serviceCategory.toLowerCase().includes('agriculture'))));
+
+  let serviceGstPercent = bill?.payoutConfig?.serviceGstPercentage ?? bill?.services?.[0]?.gstPercentage;
+  if ((!serviceGstPercent || serviceGstPercent === 0) && booking?.tax && booking?.basePrice) {
+    serviceGstPercent = Math.round((booking.tax * 100) / booking.basePrice);
+  }
+  if ((!serviceGstPercent || serviceGstPercent === 0) && isRental) {
+    serviceGstPercent = 18;
+  }
+  if (serviceGstPercent === undefined || serviceGstPercent === null) {
+    serviceGstPercent = 18;
+  }
+
+  const originalGST = (bill && bill.originalGST > 0)
+    ? bill.originalGST
+    : (booking?.tax && booking.tax > 0)
+      ? Number(booking.tax)
+      : parseFloat(((originalBase * serviceGstPercent) / 100).toFixed(2));
+
   const totalGST = originalGST + extraServiceGST + partsGST;
 
   // Final Total from bill or booking
-  const finalTotal = bill?.grandTotal || (booking?.finalAmount || 0);
+  let finalTotal = (bill && bill.grandTotal > originalBase)
+    ? bill.grandTotal
+    : (booking?.finalAmount && booking.finalAmount > originalBase)
+      ? booking.finalAmount
+      : (totalServiceBase + totalGST + partsBase + (Number(booking?.visitingCharges) || 0));
   const hasBill = !!bill;
 
   return (
@@ -1081,12 +1160,11 @@ export default function BookingDetails() {
             <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mb-1">TOTAL INVOICE AMOUNT</p>
             <h2 className="text-4xl font-black">₹{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
             <div className="mt-2.5">
-              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID'
+              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-              }`}>
-                💰 Payment: {booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID' ? 'Received (Wallet Credited)' : 'Pending'}
+                }`}>
+                💰 Payment: {booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID' ? 'Received' : 'Pending'}
               </span>
             </div>
             {isPlanBenefit && (
@@ -1630,6 +1708,32 @@ export default function BookingDetails() {
 
         {/* Action Buttons */}
         <div className="space-y-3 mb-4">
+          {/* Accept / Decline Buttons for incoming bookings */}
+          {['searching', 'requested', 'pending'].includes(booking.status?.toLowerCase()) && (
+            <div className="flex gap-3 mb-2">
+              <button
+                onClick={handleRejectBooking}
+                disabled={actionLoading}
+                className="flex-1 py-3.5 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+              >
+                <FiX className="w-5 h-5" />
+                Decline
+              </button>
+              <button
+                onClick={handleAcceptBooking}
+                disabled={actionLoading}
+                className="flex-1 py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                style={{
+                  background: themeColors.button,
+                  boxShadow: `0 4px 12px ${themeColors.button}40`,
+                }}
+              >
+                <FiCheck className="w-5 h-5" />
+                Accept Booking
+              </button>
+            </div>
+          )}
+
           <button
             onClick={handleViewTimeline}
             className="w-full py-4 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
@@ -1715,7 +1819,7 @@ export default function BookingDetails() {
                   <p className="text-[10px] text-gray-500">Operation details and photos submitted.</p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Start KM Photo</p>

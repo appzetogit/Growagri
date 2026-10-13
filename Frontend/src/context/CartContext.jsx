@@ -69,10 +69,15 @@ export const CartProvider = ({ children }) => {
       const response = await cartService.addToCart(itemData);
 
       if (response.success && response.data) {
-        // Replace temp item with real item from server, but preserve local fields (like category) just in case
-        setCartItems(prev => prev.map(item =>
-          item._id === tempId ? { ...item, ...response.data } : item
-        ));
+        if (Array.isArray(response.data)) {
+          setCartItems(response.data);
+          setCartCount(response.data.length);
+        } else {
+          // Replace temp item with real item from server, but preserve local fields (like category) just in case
+          setCartItems(prev => prev.map(item =>
+            item._id === tempId ? { ...item, ...response.data } : item
+          ));
+        }
       } else {
         // Revert on failure (if success false but no throw)
         setCartItems(prev => prev.filter(item => item._id !== tempId));

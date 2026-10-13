@@ -161,16 +161,8 @@ const EquipmentInventory = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex flex-wrap gap-2">
                     <StatusBadge status={item.status} />
-                    {/* Listing Type Badge */}
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border ${
-                      item.listingType === 'rental'
-                        ? 'bg-orange-50 text-orange-600 border-orange-100'
-                        : 'bg-blue-50 text-blue-600 border-blue-100'
-                    }`}>
-                      {item.listingType === 'rental' ? '🔧 Tool Rental' : '🚜 Machine Service'}
-                    </span>
                     {/* Implements (new schema) */}
                     {item.implements?.map(impl => (
                       <span key={impl._id || impl.subCategoryId?._id} className="inline-block px-2 py-0.5 rounded-lg bg-slate-50 text-slate-500 text-[9px] font-bold border border-slate-100">
@@ -183,28 +175,6 @@ const EquipmentInventory = () => {
                         + {sub.title}
                       </span>
                     ))}
-                  </div>
-
-                  {/* Pricing Overview */}
-                  <div className="flex items-center gap-4">
-                    {item.pricing?.hourly?.isEnabled && (
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">Hourly</span>
-                        <span className="text-xs font-black text-slate-700">₹{item.pricing.hourly.price}</span>
-                      </div>
-                    )}
-                    {item.pricing?.land_based?.isEnabled && (
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">Per Acre</span>
-                        <span className="text-xs font-black text-slate-700">₹{item.pricing.land_based.price}</span>
-                      </div>
-                    )}
-                    {(item.pricing?.daily?.isEnabled || item.pricing?.monthly?.isEnabled) && (
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">Daily</span>
-                        <span className="text-xs font-black text-slate-700">₹{item.pricing.daily?.price || item.pricing.monthly?.price}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

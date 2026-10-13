@@ -432,32 +432,32 @@ const BookingConfirmation = () => {
                         </div>
                         {item.card?.subtitle && <p className="text-xs text-gray-400 mt-0.5 ml-8 line-clamp-1">{item.card.subtitle}</p>}
                         {item.card?.duration && <p className="text-xs text-gray-400 mt-0.5 ml-8">⏱ {item.card.duration}</p>}
-                        
+
                         {/* Dynamic Agri & Rental Info */}
                         {booking.rental_type && (
                           <div className="ml-8 mt-2 space-y-1">
                             <span className="text-[10px] font-black tracking-widest uppercase text-teal-600 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 inline-block mb-1">
                               {booking.rental_type.replace('_', ' ')}
                             </span>
-                            
+
                             {booking.rental_type === 'land_based' && booking.landSize && (
                               <p className="text-xs text-gray-500 font-medium">Area: <span className="text-gray-900 font-bold">{booking.landSize}{typeof booking.landSize === 'string' && booking.landSize.match(/[a-zA-Z]/) ? '' : ' Acres'}</span></p>
                             )}
-                            
+
                             {booking.rental_type === 'hourly' && booking.estimatedDuration && (
                               <p className="text-xs text-gray-500 font-medium">Duration: <span className="text-gray-900 font-bold">{booking.estimatedDuration} Hours</span></p>
                             )}
-                            
+
                             {['daily', 'monthly'].includes(booking.rental_type) && booking.estimatedDuration && (
                               <p className="text-xs text-gray-500 font-medium">Duration: <span className="text-gray-900 font-bold">{booking.estimatedDuration} Days</span></p>
                             )}
-                            
+
                             {booking.cropType && (
                               <p className="text-xs text-gray-500 font-medium">Crop: <span className="text-gray-900">{booking.cropType}</span></p>
                             )}
                           </div>
                         )}
-                        
+
                       </div>
                       <span className="text-sm font-bold text-gray-900 ml-3 shrink-0">₹{((item.card?.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}</span>
                     </div>
@@ -508,8 +508,8 @@ const BookingConfirmation = () => {
               {(booking.tax > 0 || booking.paymentMethod === 'plan_benefit') && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">
-                    GST ({booking.basePrice - booking.discount > 0 
-                      ? Math.round((booking.tax * 100) / (booking.basePrice - booking.discount)) 
+                    GST ({booking.basePrice - booking.discount > 0
+                      ? Math.round((booking.tax * 100) / (booking.basePrice - booking.discount))
                       : 18}%)
                   </span>
                   {booking.paymentMethod === 'plan_benefit' ? (
@@ -533,8 +533,8 @@ const BookingConfirmation = () => {
                   </div>
                 ) : (
                   <span className={`font-medium ${(booking.visitingCharges || booking.visitationFee || 0) === 0 ? 'text-slate-400 font-normal italic' : 'text-slate-700'}`}>
-                    {(booking.visitingCharges || booking.visitationFee || 0) === 0 
-                      ? 'Not Added' 
+                    {(booking.visitingCharges || booking.visitationFee || 0) === 0
+                      ? 'Not Added'
                       : `₹${(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}`}
                   </span>
                 )}

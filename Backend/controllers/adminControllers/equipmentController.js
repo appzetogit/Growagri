@@ -41,16 +41,21 @@ exports.getAllEquipment = async (req, res) => {
  */
 exports.updateEquipmentStatus = async (req, res) => {
   try {
-    const { status, remarks } = req.body;
+    const { status, remarks, commissionPercentage } = req.body;
     const { id } = req.params;
 
     if (!['approved', 'rejected', 'pending'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
+    const updateFields = { status, adminRemarks: remarks };
+    if (commissionPercentage !== undefined && commissionPercentage !== null && commissionPercentage !== '') {
+      updateFields.commissionPercentage = Number(commissionPercentage);
+    }
+
     const equipment = await VendorEquipment.findByIdAndUpdate(
       id,
-      { status, adminRemarks: remarks },
+      updateFields,
       { new: true }
     );
 

@@ -104,13 +104,13 @@ const CuratedServices = React.memo(({ services, onServiceClick }) => {
       </div>
 
       <div ref={cardsRef} className="flex gap-2 overflow-x-auto px-6 pb-2 scrollbar-hide">
-        {serviceList.map((service) => (
+        {serviceList.map((service, index) => (
           <ServiceCard
-            key={service.id}
+            key={service.id || service._id || index}
             title={service.title}
             gif={service.gif}
             youtubeUrl={service.youtubeUrl}
-
+            onClick={() => onServiceClick?.(service)}
           />
         ))}
       </div>

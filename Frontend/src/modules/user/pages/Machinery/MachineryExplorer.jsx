@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FiSearch, FiFilter, FiMapPin, FiTruck, 
-  FiClock, FiStar, FiChevronRight, FiMap 
+  FiClock, FiStar, FiChevronRight, FiMap, FiArrowLeft 
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
@@ -60,11 +60,21 @@ const MachineryExplorer = () => {
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-100 px-5 pt-4 pb-4">
         <div className="max-w-xl mx-auto space-y-4">
            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-black text-slate-800 tracking-tight">Machinery Catalog</h1>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                  <FiMapPin className="text-orange-500" /> {currentCity?.name || 'Globally Available'}
-                </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.history.state && window.history.state.idx > 0 ? navigate(-1) : navigate('/user')}
+                  className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 hover:bg-slate-50 active:scale-95 flex items-center justify-center text-slate-700 transition-all shadow-sm"
+                  aria-label="Back"
+                >
+                  <FiArrowLeft size={18} />
+                </button>
+                <div>
+                  <h1 className="text-xl font-black text-slate-800 tracking-tight">Machinery Catalog</h1>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    <FiMapPin className="text-orange-500" /> {currentCity?.name || 'Globally Available'}
+                  </p>
+                </div>
               </div>
               <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                 <FiTruck size={20} />

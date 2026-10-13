@@ -9,17 +9,18 @@ import { categoryService, serviceService, homeContentService } from "../../../..
 import { z } from "zod";
 
 const categorySchema = z.object({
-  title: z.string().min(2, "Category title must be at least 2 characters"),
+  sectionType: z.string().min(1, "Please select a Home Page Tab Section"),
+  title: z.string().trim().min(2, "Category title must be at least 2 characters"),
+  homeIconUrl: z.string().min(1, "Please upload a home / profile icon"),
+  hourlyPrice: z.coerce.number({ invalid_type_error: "Please enter a valid hourly price" }).min(1, "1 Hour price must be greater than 0"),
   slug: z.string().optional(),
-  homeIconUrl: z.string().optional(),
   homeBadge: z.string().optional(),
-  hasSaleBadge: z.boolean(),
-  showOnHome: z.boolean(),
+  hasSaleBadge: z.boolean().optional(),
+  showOnHome: z.boolean().optional(),
   parentCategory: z.string().nullable().optional(),
   parentCategories: z.array(z.string()).optional(),
   isAlwaysMain: z.boolean().default(false),
   requiresDriver: z.boolean().default(false),
-  sectionType: z.string().default('General'),
   trackingType: z.string().default('none'),
 });
 
@@ -33,6 +34,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [premiumOfferings, setPremiumOfferings] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const [form, setForm] = useState({
     title: "",
@@ -46,7 +48,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
     isAlwaysMain: false,
     trackingType: "none",
     requiresDriver: false,
-    sectionType: "General",
+    sectionType: "",
+    hourlyPrice: "",
   });
 
   const categoriesBase = useMemo(() => {
@@ -81,6 +84,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
   const fetchCategories = async () => {
     try {
       setFetching(true);
+      setSelectedIds([]);
       const params = { status: 'active' };
       if (selectedCity) params.cityId = selectedCity;
 
@@ -108,7 +112,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
           isAlwaysMain: !!cat.isAlwaysMain,
           trackingType: cat.trackingType || 'none',
           requiresDriver: cat.requiresDriver || false,
-          sectionType: cat.sectionType || 'General',
+          sectionType: cat.sectionType || '',
+          hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
         }));
 
         setCatalog({ ...catalog, categories: mapped });
@@ -143,6 +148,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
         hasSaleBadge: false, showOnHome: true, parentCategory: "",
         parentCategories: [], isAlwaysMain: false,
         trackingType: "none", requiresDriver: false,
+        sectionType: "", hourlyPrice: "",
       });
       return;
     }
@@ -160,7 +166,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       isAlwaysMain: !!editing.isAlwaysMain,
       trackingType: editing.trackingType || "none",
       requiresDriver: Boolean(editing.requiresDriver),
-      sectionType: editing.sectionType || "General",
+      sectionType: editing.sectionType || "",
+      hourlyPrice: editing.hourlyPrice !== undefined && editing.hourlyPrice !== null ? editing.hourlyPrice : "",
     });
   }, [editingId, editing]);
 
@@ -171,7 +178,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       hasSaleBadge: false, showOnHome: true, parentCategory: "",
       parentCategories: [], isAlwaysMain: false,
       trackingType: "none", requiresDriver: false,
-      sectionType: "General",
+      sectionType: "", hourlyPrice: "",
     });
     setIsModalOpen(false);
   };
@@ -197,7 +204,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
     isAlwaysMain: !!cat.isAlwaysMain,
     trackingType: cat.trackingType || 'none',
     requiresDriver: cat.requiresDriver || false,
-    sectionType: cat.sectionType || 'General',
+    sectionType: cat.sectionType || '',
+    hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
   });
 
   const upsert = async () => {
@@ -205,6 +213,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       ...form,
       title: form.title.trim(),
       slug: slugify(form.title.trim()),
+      hourlyPrice: form.hourlyPrice === "" ? undefined : Number(form.hourlyPrice),
     });
 
     if (!val.success) {
@@ -263,10 +272,59 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       const res = await categoryService.delete(id);
       if (res.success) {
         toast.success("Deleted");
+        setSelectedIds(prev => prev.filter(item => item !== id));
         fetchCategories();
       }
     } catch (error) {
       toast.error("Delete failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(categoriesFiltered.map(c => c.id).filter(Boolean));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected categor${selectedIds.length === 1 ? 'y' : 'ies'}?`)) return;
+    
+    try {
+      setLoading(true);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const id of selectedIds) {
+        try {
+          const res = await categoryService.delete(id);
+          if (res.success) successCount++;
+          else failCount++;
+        } catch (err) {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} categor${successCount === 1 ? 'y' : 'ies'} deleted successfully`);
+        setSelectedIds([]);
+        fetchCategories();
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} categor${failCount === 1 ? 'y' : 'ies'} (check if they have active bookings)`);
+      }
+    } catch (error) {
+      toast.error("Bulk delete failed");
     } finally {
       setLoading(false);
     }
@@ -308,8 +366,22 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
   return (
     <div className="space-y-6">
       <CardShell icon={FiGrid}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-gray-600 font-bold uppercase tracking-tight">{categoriesFiltered.length} Items</div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600 font-bold uppercase tracking-tight">{categoriesFiltered.length} Items</div>
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl animate-in fade-in duration-150">
+                <span className="text-xs font-black text-rose-700">{selectedIds.length} Selected</span>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={loading}
+                  className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <FiTrash2 className="w-3.5 h-3.5" /> Delete Selected ({selectedIds.length})
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -319,12 +391,9 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                 className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-white"
               />
             </div>
-            <button onClick={() => setShowReorderModal(true)} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold flex items-center gap-2">
-              <FiMove /> Reorder
-            </button>
             <button
               onClick={() => { reset(); setIsModalOpen(true); }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-colors"
             >
               <FiPlus /> Add Category
             </button>
@@ -335,15 +404,20 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
           <table className="w-full">
             <thead>
               <tr className="border-b-2 border-gray-200 bg-gray-50/50">
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                    checked={categoriesFiltered.length > 0 && categoriesFiltered.every(c => selectedIds.includes(c.id))}
+                    onChange={handleSelectAll}
+                  />
+                </th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest w-12">#</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest w-20">Icon</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Category Name</th>
-                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Parent Categories</th>
-                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Section Tab</th>
+                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Parent Category</th>
+                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">1 Hr Rate</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Hierarchy</th>
-                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Tracking</th>
-                <th className="text-center py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest w-20">Sort</th>
-                <th className="text-center py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest w-30">Status</th>
                 <th className="text-center py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
@@ -362,8 +436,17 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                   Array.isArray(child.parentCategories) &&
                   child.parentCategories.some(parent => getCategoryId(parent) === c.id)
                 );
+                const isSelected = selectedIds.includes(c.id);
                 return (
-                  <tr key={c.id} className={`hover:bg-blue-50/30 transition-colors ${isSub ? 'bg-slate-50/30' : 'bg-white'}`}>
+                  <tr key={c.id} className={`hover:bg-blue-50/30 transition-colors ${isSelected ? 'bg-blue-50/50' : isSub ? 'bg-slate-50/30' : 'bg-white'}`}>
+                    <td className="py-4 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(c.id)}
+                      />
+                    </td>
                     <td className="py-4 px-4 text-sm font-bold text-gray-400">{idx + 1}</td>
                     <td className="py-4 px-4">
                       {c.homeIconUrl ? (
@@ -381,7 +464,11 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex flex-col gap-1.5">
-                        {parents.length > 0 ? (
+                        {c.sectionType ? (
+                          <span className="px-2.5 py-1 bg-purple-50 text-purple-700 rounded text-xs font-bold border border-purple-200 inline-block w-fit">
+                            {c.sectionType}
+                          </span>
+                        ) : parents.length > 0 ? (
                           <>
                             <div className="flex flex-wrap gap-1">
                               {parents.map(parent => (
@@ -400,8 +487,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="inline-block whitespace-nowrap px-2 py-1 bg-purple-50 text-purple-700 rounded text-[10px] font-black border border-purple-200">
-                        {c.sectionType || 'General'}
+                      <span className="inline-block whitespace-nowrap px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs font-black border border-amber-200">
+                        ₹{c.hourlyPrice || 0}/hr
                       </span>
                     </td>
                     <td className="py-4 px-4">
@@ -425,25 +512,6 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded w-fit ${c.trackingType === 'timestamp' ? 'bg-indigo-100 text-indigo-700' : c.trackingType === 'odometer' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {c.trackingType?.toUpperCase() || 'NONE'}
-                        </span>
-                        {c.requiresDriver && <span className="text-[9px] text-rose-600 font-black uppercase">● Driver Required</span>}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => moveOrder(c.id, idx - 1)} disabled={idx === 0} className="p-1 text-gray-400 hover:text-blue-600 disabled:opacity-20"><FiChevronUp /></button>
-                        <button onClick={() => moveOrder(c.id, idx + 1)} disabled={idx === categoriesFiltered.length - 1} className="p-1 text-gray-400 hover:text-blue-600 disabled:opacity-20"><FiChevronDown /></button>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`px-2 py-1 text-[10px] font-black rounded uppercase ${c.showOnHome ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {c.showOnHome ? 'Visible' : 'Hidden'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
                       <div className="flex justify-center gap-2">
                         <button onClick={() => { setEditingId(c.id); setIsModalOpen(true); }} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><FiEdit2 /></button>
                         <button onClick={() => remove(c.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-100"><FiTrash2 /></button>
@@ -452,84 +520,58 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                   </tr>
                 );
               })}
+              {categoriesFiltered.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-sm font-bold text-gray-400">
+                    No categories found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </CardShell>
 
-      <Modal isOpen={isModalOpen} onClose={reset} title={editing ? "Edit Category" : "Add Category"} size="lg">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Title</label>
-              <input
-                value={form.title}
-                onChange={e => setForm({ ...form, title: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="e.g. Tractor, Rotavator"
-              />
-            </div>
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Parent Categories (Select multiple)</label>
-              <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-xl p-3 bg-white space-y-2">
-                {categoriesBase.filter(c => c.id !== editingId).map(c => (
-                  <label key={c.id} className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      checked={form.parentCategories.includes(c.id)}
-                      onChange={e => {
-                        const checked = e.target.checked;
-                        setForm(p => ({
-                          ...p,
-                          parentCategories: checked ? [...p.parentCategories, c.id] : p.parentCategories.filter(id => id !== c.id)
-                        }));
-                      }}
-                    />
-                    <span className="text-sm font-semibold text-gray-700 group-hover:text-primary-600">{c.title}</span>
-                  </label>
-                ))}
-                {categoriesBase.filter(c => c.id !== editingId).length === 0 && (
-                  <p className="text-xs text-gray-400 italic">No main categories available</p>
-                )}
-              </div>
-              <p className="text-[10px] text-gray-500 mt-1">If none selected, this will be a Main Category.</p>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="alwaysMain"
-                checked={form.isAlwaysMain}
-                onChange={e => setForm({ ...form, isAlwaysMain: e.target.checked })}
-                className="h-4 w-4 accent-primary-600"
-              />
-              <label htmlFor="alwaysMain" className="text-base font-bold text-gray-900">Always show in Main List</label>
-            </div>
-            <p className="text-[11px] text-gray-400 leading-tight pl-7">Useful for tools like "Rotavator" that should be visible even when they are sub-categories.</p>
-          </div>
-
+      <Modal isOpen={isModalOpen} onClose={reset} title={editing ? "Edit Category" : "Add Category"} size="md">
+        <div className="space-y-4">
+          {/* Home Page Tab Section (First) */}
           <div>
-            <label className="block text-base font-bold text-gray-900 mb-2">Home Page Tab Section</label>
+            <label className="block text-sm font-bold text-gray-800 mb-1">
+              Home Page Tab Section <span className="text-red-500">*</span>
+            </label>
             <select
               value={form.sectionType}
               onChange={e => setForm({ ...form, sectionType: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 font-semibold"
+              className="w-full px-3.5 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-semibold text-gray-800 text-sm bg-white"
             >
-              <option value="General">General (Default scrolling list)</option>
+              <option value="" disabled>Select a category</option>
               {premiumOfferings.filter(o => o.actionPayload || o.title).map(o => {
                 const sectionName = o.actionPayload || o.title;
-                return <option key={o._id || o.id} value={sectionName}>{o.title} - ({sectionName})</option>
+                return <option key={o._id || o.id} value={sectionName}>{o.title}</option>
               })}
             </select>
           </div>
 
+          {/* Title (Under Home Page Tab Section) */}
           <div>
-            <label className="block text-base font-bold text-gray-900 mb-2">Home Icon</label>
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 bg-gray-50/30">
-              <div className="flex flex-col items-center gap-3">
+            <label className="block text-sm font-bold text-gray-800 mb-1">
+              Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.title}
+              onChange={e => setForm({ ...form, title: e.target.value })}
+              className="w-full px-3.5 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-sm"
+              placeholder="e.g. Tractor, Rotavator"
+            />
+          </div>
+
+          {/* Home Icon */}
+          <div>
+            <label className="block text-sm font-bold text-gray-800 mb-1">
+              Home Icon <span className="text-red-500">*</span>
+            </label>
+            <div className={`border border-dashed rounded-xl p-3 bg-gray-50/50 ${form.homeIconUrl ? 'border-emerald-300 bg-emerald-50/20' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between gap-3">
                 <input
                   type="file"
                   accept="image/*"
@@ -541,79 +583,54 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                     if (res.success) setForm({ ...form, homeIconUrl: res.imageUrl });
                     setUploadingIcon(false);
                   }}
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
                 />
-                {uploadingIcon && <p className="text-xs text-primary-600 font-bold animate-pulse">Uploading...</p>}
+                {uploadingIcon && <p className="text-xs text-primary-600 font-bold animate-pulse whitespace-nowrap">Uploading...</p>}
                 {form.homeIconUrl && (
-                  <div className="relative group mt-2">
-                    <img src={toAssetUrl(form.homeIconUrl)} className="h-20 w-20 object-contain bg-white rounded-xl shadow-sm border border-gray-200 p-2" />
-                    <button onClick={() => setForm({ ...form, homeIconUrl: "" })} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><FiX /></button>
+                  <div className="relative group shrink-0">
+                    <img src={toAssetUrl(form.homeIconUrl)} className="h-10 w-10 object-contain bg-white rounded-lg shadow-sm border border-gray-200 p-1" />
+                    <button onClick={() => setForm({ ...form, homeIconUrl: "" })} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white p-0.5 rounded-full shadow hover:bg-red-600 transition-colors"><FiX className="w-3 h-3" /></button>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="bg-orange-50/50 p-5 rounded-2xl border border-orange-100 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-orange-700 uppercase tracking-wider">⚙ Machinery Classification</span>
+          {/* Hourly Price (1 Hour Rate) */}
+          <div>
+            <label className="block text-sm font-bold text-gray-800 mb-1">
+              1 Hour Price (₹) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">₹</span>
+              <input
+                type="number"
+                min="1"
+                value={form.hourlyPrice}
+                onChange={e => setForm({ ...form, hourlyPrice: e.target.value === '' ? '' : Number(e.target.value) })}
+                className="w-full pl-8 pr-3.5 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm"
+                placeholder="Enter 1 hour rate (e.g. 500)"
+              />
             </div>
-            <p className="text-xs text-orange-600 font-medium">Only set this for Equipment Catalog categories. Leave as "None" for Soil Testing or E-commerce.</p>
-            <div className="flex flex-col sm:flex-row gap-4 items-center">
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-bold text-orange-700 mb-1 uppercase tracking-tighter">Tracking Type</label>
-                <select
-                  value={form.trackingType}
-                  onChange={e => setForm({ ...form, trackingType: e.target.value })}
-                  className="w-full text-sm font-bold p-3 rounded-xl border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                >
-                  <option value="none">None (Default - Not a Machine)</option>
-                  <option value="odometer">Odometer (Moving Machine - Tractor/Harvester)</option>
-                  <option value="timestamp">Timestamp (Static Tool - Pump/Sprayer)</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-3 pt-5">
-                <input
-                  id="reqDriver"
-                  type="checkbox"
-                  checked={form.requiresDriver}
-                  onChange={e => setForm({ ...form, requiresDriver: e.target.checked })}
-                  className="h-5 w-5 accent-orange-500"
-                />
-                <label htmlFor="reqDriver" className="text-sm font-bold text-orange-800 uppercase cursor-pointer">Requires registered Driver/Operator</label>
-              </div>
-            </div>
+            <p className="text-[11px] text-gray-400 mt-0.5">Kitna charge legi yeh category 1 hour ka (Hourly rate)</p>
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-3 pt-2">
             <button
               onClick={upsert}
               disabled={loading}
-              className="flex-1 py-4 bg-primary-600 text-white rounded-2xl font-black uppercase text-sm shadow-xl shadow-primary-200 hover:bg-primary-700 hover:shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-bold uppercase text-xs shadow-md shadow-primary-200 hover:bg-primary-700 active:scale-95 transition-all flex items-center justify-center gap-1.5"
             >
               {loading ? (
-                <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-              ) : <FiSave className="w-5 h-5" />}
+                <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+              ) : <FiSave className="w-4 h-4" />}
               {loading ? "SAVING..." : (editing ? "Update Category" : "Add Category")}
             </button>
-            <button onClick={reset} className="px-8 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+            <button onClick={reset} className="px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={showReorderModal} onClose={() => setShowReorderModal(false)} title="Reorder Categories">
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {categoriesFiltered.map((c, i) => (
-            <div key={c.id} draggable onDragStart={e => handleDragStart(e, i)} onDragOver={handleDragOver} onDrop={e => handleDrop(e, i)} className={`p-3 border rounded-lg bg-white flex items-center justify-between cursor-move hover:border-blue-300 ${draggedItem === i ? 'opacity-40' : ''}`}>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-black text-gray-300">#{i + 1}</span>
-                <span className="text-sm font-black uppercase">{c.title}</span>
-              </div>
-              <FiMove className="text-gray-400" />
-            </div>
-          ))}
-        </div>
-      </Modal>
     </div>
   );
 };

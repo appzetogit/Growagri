@@ -51,20 +51,29 @@ const BillingPage = () => {
     try {
       setLoading(true);
       const bookingRes = await getBookingById(id);
-      setBooking(bookingRes.data || bookingRes);
+      const bData = bookingRes.data || bookingRes;
+      setBooking(bData);
+
+      const isRental = !!(bData?.rental_type || bData?.equipmentId || bData?.landSize || (bData?.serviceCategory && (bData.serviceCategory.toLowerCase().includes('machinery') || bData.serviceCategory.toLowerCase().includes('tractor') || bData.serviceCategory.toLowerCase().includes('equipment') || bData.serviceCategory.toLowerCase().includes('agriculture'))));
 
       // Load settings from backend bill
       const billRes = await vendorBillService.getBill(id);
-      if (billRes.success && billRes.bill) {
-        if (billRes.bill.payoutConfig) {
-          const pc = billRes.bill.payoutConfig;
-          setPayoutSettings({
-            serviceGstPct: pc.serviceGstPercentage ?? 18,
-            partsGstPct: pc.partsGstPercentage ?? 18,
-            servicePayoutPct: pc.serviceSplitPercentage ?? 90,
-            partsPayoutPct: pc.partsSplitPercentage ?? 10
-          });
+      if (billRes.success && billRes.bill && billRes.bill.payoutConfig) {
+        const pc = billRes.bill.payoutConfig;
+        let gst = pc.serviceGstPercentage;
+        if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
+          gst = Math.round((bData.tax * 100) / bData.basePrice);
         }
+        if ((gst === 0 || gst === undefined) && isRental) {
+          gst = 18;
+        }
+
+        setPayoutSettings({
+          serviceGstPct: gst ?? 18,
+          partsGstPct: pc.partsGstPercentage ?? 18,
+          servicePayoutPct: isRental ? (pc.serviceSplitPercentage ?? 90) : (pc.serviceSplitPercentage ?? 90),
+          partsPayoutPct: pc.partsSplitPercentage ?? 10
+        });
       } else {
         // Fallback global settings
         try {
@@ -73,10 +82,18 @@ const BillingPage = () => {
           const data = await res.json();
           if (data.success && data.data?.global) {
             const g = data.data.global;
+            let gst = isRental ? (g.rentalGstPercentage ?? 18) : (g.serviceGstPercentage ?? 18);
+            if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
+              gst = Math.round((bData.tax * 100) / bData.basePrice);
+            }
+            if ((gst === 0 || gst === undefined) && isRental) {
+              gst = 18;
+            }
+
             setPayoutSettings({
-              serviceGstPct: g.serviceGstPercentage ?? 18,
+              serviceGstPct: gst,
               partsGstPct: g.partsGstPercentage ?? 18,
-              servicePayoutPct: g.servicePayoutPercentage ?? 90,
+              servicePayoutPct: isRental ? (g.rentalPayoutPercentage ?? 90) : (g.servicePayoutPercentage ?? 90),
               partsPayoutPct: g.partsPayoutPercentage ?? 10
             });
           }
@@ -99,7 +116,11 @@ const BillingPage = () => {
     // Original booking base (service)
     const isPlanBooking = booking.paymentMethod === 'plan_benefit';
     const originalBase = isPlanBooking ? 0 : (booking.basePrice || 0);
-    const originalServiceGST = isPlanBooking ? 0 : parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
+    const originalServiceGST = isPlanBooking 
+      ? 0 
+      : (booking.tax && booking.tax > 0 && (serviceGstPct === Math.round((booking.tax * 100) / originalBase) || serviceGstPct === 0))
+        ? Number(booking.tax)
+        : parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
     const visitingCharges = Number(booking.visitingCharges) || 0;
 
     const finalBillAmount = parseFloat((originalBase + originalServiceGST + visitingCharges).toFixed(2));
@@ -151,14 +172,12 @@ const BillingPage = () => {
     try {
       setOtpLoading(true);
       
-      // Save bill first ONLY if it hasn't been generated yet
-      if (!booking?.vendorBillId) {
-        await vendorBillService.createOrUpdateBill(id, {
-          parts: [],
-          customItems: [],
-          transportCharges: 0
-        });
-      }
+      // Update bill to ensure accurate amounts
+      await vendorBillService.createOrUpdateBill(id, {
+        parts: [],
+        customItems: [],
+        transportCharges: 0
+      });
 
       const res = await vendorWalletService.initiateCashCollection(
         id,

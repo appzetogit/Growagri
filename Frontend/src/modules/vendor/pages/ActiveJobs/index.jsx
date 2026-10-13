@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiBriefcase, FiMapPin, FiClock, FiUser, FiFilter, FiSearch, FiLoader, FiPackage } from 'react-icons/fi';
+import { FiBriefcase, FiMapPin, FiClock, FiUser, FiFilter, FiSearch, FiLoader, FiPackage, FiCheck, FiX } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
 import LogoLoader from '../../../../components/common/LogoLoader';
 
-import { getBookings, assignWorker as assignWorkerApi } from '../../services/bookingService';
+import { getBookings, assignWorker as assignWorkerApi, acceptBooking, rejectBooking } from '../../services/bookingService';
 import { ConfirmDialog } from '../../components/common';
 
 const ActiveJobs = memo(() => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('in_progress'); // Default to showing active jobs
+  const [filter, setFilter] = useState('all'); // Default to All bookings
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -106,6 +106,55 @@ const ActiveJobs = memo(() => {
         } catch (error) {
           console.error("Error assigning to self:", error);
           toast.error("Failed to assign to yourself");
+        }
+      }
+    });
+  };
+
+  const handleAccept = async (jobId) => {
+    try {
+      toast.loading('Accepting booking...');
+      const result = await acceptBooking(jobId);
+      toast.dismiss();
+      if (result?.alreadyTaken) {
+        toast.error('This job was already accepted by another vendor.');
+      } else {
+        toast.success('Booking accepted successfully!');
+      }
+      window.dispatchEvent(new Event('vendorJobsUpdated'));
+      window.dispatchEvent(new Event('vendorStatsUpdated'));
+      loadJobs();
+    } catch (error) {
+      toast.dismiss();
+      const status = error?.response?.status;
+      if (status === 409) {
+        toast.error('This job was already accepted by another vendor.');
+      } else {
+        toast.error(error?.response?.data?.message || 'Failed to accept booking');
+      }
+      loadJobs();
+    }
+  };
+
+  const handleReject = async (jobId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Decline Booking',
+      message: 'Are you sure you want to decline this booking?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          toast.loading('Declining booking...');
+          await rejectBooking(jobId);
+          toast.dismiss();
+          toast.success('Booking declined');
+          window.dispatchEvent(new Event('vendorJobsUpdated'));
+          window.dispatchEvent(new Event('vendorStatsUpdated'));
+          loadJobs();
+        } catch (error) {
+          toast.dismiss();
+          toast.error(error?.response?.data?.message || 'Failed to decline booking');
+          loadJobs();
         }
       }
     });
@@ -279,9 +328,9 @@ const ActiveJobs = memo(() => {
                     {/* Header Section */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <div
-                            className="p-1.5 rounded-lg"
+                            className="p-1.5 rounded-lg flex-shrink-0"
                             style={{
                               background: `${statusColor}15`,
                             }}
@@ -289,14 +338,12 @@ const ActiveJobs = memo(() => {
                             <FiBriefcase className="w-4 h-4" style={{ color: statusColor }} />
                           </div>
                           <h3 className="font-bold text-gray-800 text-base">{job.serviceType}</h3>
-                        </div>
-                        <div className="ml-8 mb-2">
                           <span
-                            className="text-xs font-bold px-3 py-1.5 rounded-full"
+                            className="text-xs font-bold px-2.5 py-0.5 rounded-full capitalize"
                             style={{
                               background: `linear-gradient(135deg, ${statusColor} 0%, ${statusColor}dd 100%)`,
                               color: '#FFFFFF',
-                              boxShadow: `0 2px 8px ${hexToRgba(statusColor, 0.3)}`,
+                              boxShadow: `0 2px 6px ${hexToRgba(statusColor, 0.25)}`,
                             }}
                           >
                             {job.status.replace('_', ' ')}
@@ -402,15 +449,37 @@ const ActiveJobs = memo(() => {
                       )}
                     </div>
 
-                    <div className="mt-3 flex items-center gap-1.5 pl-8">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        job.paymentStatus === 'SUCCESS' || job.paymentStatus === 'paid' || job.paymentStatus === 'success' || job.paymentStatus === 'PAID'
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                          : 'bg-amber-50 text-amber-600 border border-amber-100'
-                      }`}>
-                        💰 Payment: {job.paymentStatus === 'SUCCESS' || job.paymentStatus === 'paid' || job.paymentStatus === 'success' || job.paymentStatus === 'PAID' ? 'Received (Wallet Credited)' : 'Pending'}
-                      </span>
-                    </div>
+
+
+                    {/* Accept / Reject Buttons for Incoming Jobs (SEARCHING, REQUESTED, PENDING) */}
+                    {['SEARCHING', 'REQUESTED', 'PENDING'].includes(job.status?.toUpperCase()) && (
+                      <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReject(job.id);
+                          }}
+                          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                        >
+                          <FiX className="w-4 h-4" />
+                          Decline
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAccept(job.id);
+                          }}
+                          className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm"
+                          style={{
+                            background: themeColors.button,
+                            boxShadow: `0 2px 8px ${themeColors.button}30`,
+                          }}
+                        >
+                          <FiCheck className="w-4 h-4" />
+                          Accept Booking
+                        </button>
+                      </div>
+                    )}
 
                     {/* Quick Action Button for Unassigned Jobs */}
                     {['ACCEPTED', 'CONFIRMED'].includes(job.status?.toUpperCase()) && !job.assignedTo && (

@@ -70,20 +70,41 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
   });
 
   // Tax Logic
-  // Use bill.originalGST if available
-  const originalGST = bill ? (bill.originalGST || 0) : (originalBase * 0.18);
-  const totalGST = originalGST + extraServiceGST + partsGST;
+  const isRental = !!(booking.rental_type || booking.equipmentId || booking.landSize || (booking.serviceCategory && (booking.serviceCategory.toLowerCase().includes('machinery') || booking.serviceCategory.toLowerCase().includes('tractor') || booking.serviceCategory.toLowerCase().includes('equipment') || booking.serviceCategory.toLowerCase().includes('agriculture'))));
 
-  const serviceGstPercent = bill
-    ? (bill.payoutConfig?.serviceGstPercentage ?? bill.services?.[0]?.gstPercentage ?? 18)
-    : 18;
+  let serviceGstPercent = bill?.payoutConfig?.serviceGstPercentage ?? bill?.services?.[0]?.gstPercentage;
+  if ((!serviceGstPercent || serviceGstPercent === 0) && booking.tax && booking.basePrice) {
+    serviceGstPercent = Math.round((booking.tax * 100) / booking.basePrice);
+  }
+  if ((!serviceGstPercent || serviceGstPercent === 0) && isRental) {
+    serviceGstPercent = 18;
+  }
+  if (serviceGstPercent === undefined || serviceGstPercent === null) {
+    serviceGstPercent = 18;
+  }
+
   const partsGstPercent = bill
     ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 18)
     : 18;
 
+  // Use bill.originalGST if available and > 0, else booking.tax, else calculated
+  let originalGST = (bill && bill.originalGST > 0)
+    ? bill.originalGST
+    : (booking.tax && booking.tax > 0)
+      ? Number(booking.tax)
+      : parseFloat(((originalBase * serviceGstPercent) / 100).toFixed(2));
+
+  if (isPlanBenefit) originalGST = 0;
+  const totalGST = originalGST + extraServiceGST + partsGST;
+
   // Final Total
-  // Ideally, use grandTotal from bill if available
-  const finalTotal = bill?.grandTotal || (booking.finalAmount || 0);
+  let finalTotal = (bill && bill.grandTotal > originalBase)
+    ? bill.grandTotal
+    : (totalServiceBase + totalGST + partsBase + (Number(booking.visitingCharges) || 0));
+
+  if (!bill && booking.finalAmount && booking.finalAmount > originalBase) {
+    finalTotal = booking.finalAmount;
+  }
 
   // --- 2. Identity Helpers ---
   const categoryName = booking.serviceCategory || 'General';

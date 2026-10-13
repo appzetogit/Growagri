@@ -104,13 +104,13 @@ const UserRoutes = () => {
 
 
   // Check if we are on public pages (login/signup) where we shouldn't fetch bookings
-  const isPublicPage = location.pathname.includes('/login') || 
-                       location.pathname.includes('/signup') ||
-                       location.pathname.includes('/privacy') ||
-                       location.pathname.includes('/faq') ||
-                       location.pathname.includes('/help-support') ||
-                       location.pathname.includes('/cancellation-policy') ||
-                       location.pathname.includes('/schemes');
+  const isPublicPage = location.pathname.includes('/login') ||
+    location.pathname.includes('/signup') ||
+    location.pathname.includes('/privacy') ||
+    location.pathname.includes('/faq') ||
+    location.pathname.includes('/help-support') ||
+    location.pathname.includes('/cancellation-policy') ||
+    location.pathname.includes('/schemes');
 
   return (
     <ErrorBoundary>

@@ -47,8 +47,7 @@ const iconMap = {
   "Scheme Management": FiAward,
   "Equipment Catalog": FiGrid,
   "Machinery Management": FiPackage,
-  "Manage Website": FiGlobe,
-  "Machinery Approvals": FiTruck
+  "Manage Website": FiGlobe
 };
 
 // Helper function to convert child name to route path
@@ -71,8 +70,6 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/equipment-catalog": {
       "Home": "/admin/equipment-catalog/home",
       "Manage Categories": "/admin/equipment-catalog/categories",
-      "Manage Equipment Types": "/admin/equipment-catalog/sections",
-      "Machinery Approvals": "/admin/equipment-approvals"
     },
     "/admin/payments": {
       "Payment Overview": "/admin/payments/overview",
@@ -102,9 +99,6 @@ const getChildRoute = (parentRoute, childName) => {
       "Withdrawals": "/admin/settlements/withdrawals",
       "Owners with Due": "/admin/settlements/vendors",
       "History": "/admin/settlements/history",
-    },
-    "/admin/products": {
-      "Equipment Approval": "/admin/products",
     },
     "/admin/marketplace": {
       "Marketplace Manager": "/admin/marketplace",

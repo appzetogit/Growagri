@@ -180,12 +180,23 @@ const acceptBooking = async (req, res) => {
     // Booking successfully accepted by THIS vendor
     const booking = updatedBooking;
     
-    // --- LINK EQUIPMENT IF AGRI ---
-    if (booking.serviceCategory === 'Agriculture' || booking.categoryId?.title === 'Agriculture') {
-      const VendorEquipment = require('../../models/VendorEquipment');
-      const eq = await VendorEquipment.findOne({ vendorId: vendorId, categoryId: booking.categoryId });
-      if (eq) {
-        booking.equipmentId = eq._id;
+    // --- LINK EQUIPMENT IF AGRI OR MACHINERY ---
+    if (booking.categoryId) {
+      try {
+        const VendorEquipment = require('../../models/VendorEquipment');
+        const eq = await VendorEquipment.findOne({
+          vendorId: vendorId,
+          $or: [
+            { categoryId: booking.categoryId },
+            { 'implements.subCategoryId': booking.categoryId },
+            { subCategoryIds: booking.categoryId }
+          ]
+        });
+        if (eq) {
+          booking.equipmentId = eq._id;
+        }
+      } catch (linkErr) {
+        console.error('[AcceptBooking] Error linking equipment:', linkErr);
       }
     }
 
@@ -1065,9 +1076,37 @@ const completeSelfJob = async (req, res) => {
     const Settings = require('../../models/Settings');
     const settings = await Settings.findOne({ type: 'global' });
 
-    let serviceSplitPct = require('../../utils/constants').serviceSplitPct(settings);
+    const isRentalBooking = !!(
+      booking.rental_type ||
+      booking.equipmentId ||
+      booking.landSize ||
+      (booking.serviceCategory && (
+        booking.serviceCategory.toLowerCase().includes('machinery') ||
+        booking.serviceCategory.toLowerCase().includes('tractor') ||
+        booking.serviceCategory.toLowerCase().includes('equipment') ||
+        booking.serviceCategory.toLowerCase().includes('agriculture')
+      ))
+    );
+
+    let serviceSplitPct = isRentalBooking
+      ? (settings?.rentalPayoutPercentage ?? 90)
+      : require('../../utils/constants').serviceSplitPct(settings);
     let partsSplitPct = settings?.partsPayoutPercentage ?? 10;
-    let serviceGstPct = settings?.serviceGstPercentage ?? 18;
+    
+    let serviceGstPct = isRentalBooking
+      ? (settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
+          ? Number(settings.rentalGstPercentage)
+          : (Number(settings?.serviceGstPercentage) || 18))
+      : (settings?.serviceGstPercentage !== undefined && settings?.serviceGstPercentage !== null
+          ? Number(settings.serviceGstPercentage)
+          : 18);
+
+    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
+      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
+      if (bookingGstPct > 0) {
+        serviceGstPct = bookingGstPct;
+      }
+    }
     let partsGstPct = settings?.partsGstPercentage ?? 18;
 
     // ═══════════════════════════════════════════
@@ -1076,7 +1115,9 @@ const completeSelfJob = async (req, res) => {
 
     // -- Original booking service (from basePrice) --
     const originalBase = Number(booking.basePrice) || 0;
-    const originalGST = parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
+    const originalGST = (booking.tax && booking.tax > 0) 
+      ? Number(booking.tax) 
+      : parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
 
     // -- Vendor-added services --
     const billServices = (billDetails?.services || []).map(svc => {
@@ -1590,9 +1631,18 @@ const endTrip = async (req, res) => {
     // 2. FETCH SPLIT CONFIG
     const settings = await Settings.findOne({ type: 'global' });
     const serviceSplitPct = settings?.rentalPayoutPercentage ?? 90;
-    const gstPct = settings?.serviceGstPercentage ?? 18;
+    let gstPct = settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
+      ? Number(settings.rentalGstPercentage)
+      : (Number(settings?.serviceGstPercentage) || 18);
 
-    const gstAmount = parseFloat(((baseAmount * gstPct) / 100).toFixed(2));
+    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
+      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
+      if (bookingGstPct > 0) {
+        gstPct = bookingGstPct;
+      }
+    }
+
+    const gstAmount = (booking.tax && booking.tax > 0) ? Number(booking.tax) : parseFloat(((baseAmount * gstPct) / 100).toFixed(2));
     const finalAmount = parseFloat((baseAmount + gstAmount).toFixed(2));
     const vendorEarning = parseFloat(((baseAmount * serviceSplitPct) / 100).toFixed(2));
 

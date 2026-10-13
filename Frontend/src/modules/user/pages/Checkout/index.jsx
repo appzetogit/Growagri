@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { FiArrowLeft, FiShoppingCart, FiTrash2, FiMinus, FiPlus, FiPhone, FiHome, FiClock, FiEdit2, FiCheckCircle, FiInfo, FiCreditCard, FiDollarSign } from 'react-icons/fi';
+import { FiArrowLeft, FiShoppingCart, FiTrash2, FiMinus, FiPlus, FiPhone, FiHome, FiClock, FiCalendar, FiEdit2, FiCheckCircle, FiInfo, FiCreditCard, FiDollarSign } from 'react-icons/fi';
 import { MdStar } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
@@ -57,7 +57,7 @@ const Checkout = () => {
   const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState(false); // Payment confirmation modal
 
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
 
   const [selectedTime, setSelectedTime] = useState(null);
   const [visitedFee, setVisitedFee] = useState(0);
@@ -186,13 +186,20 @@ const Checkout = () => {
             let items = cartRes.data || [];
             if (category) {
               const normalizedCategory = category.toLowerCase().trim();
-              items = items.filter(item => {
-                const itemCat = (item.category || item.categoryTitle || 'Other').toLowerCase().trim();
-                return itemCat === normalizedCategory;
+              const filtered = items.filter(item => {
+                const itemCat = (item.category || '').toLowerCase().trim();
+                const itemCatTitle = (item.categoryTitle || '').toLowerCase().trim();
+                const itemTitle = (item.title || '').toLowerCase().trim();
+                return itemCat === normalizedCategory ||
+                  itemCatTitle === normalizedCategory ||
+                  itemTitle === normalizedCategory ||
+                  ((normalizedCategory === 'agriculture' || normalizedCategory.includes('agri')) &&
+                    (itemCat === 'agriculture' || itemCatTitle === 'agriculture' || item.hourly_price || item.land_price || item.daily_price));
               });
+              items = filtered.length > 0 ? filtered : items;
             }
             setCartItems(items);
-            
+
             // Auto-select date/time if exists in cart
             const itemWithSlot = items.find(i => i.scheduledDate || i.timeSlot);
             if (itemWithSlot) {
@@ -242,10 +249,17 @@ const Checkout = () => {
           let items = cartResponse.data || [];
           if (category) {
             const normalizedCategory = category.toLowerCase().trim();
-            items = items.filter(item => {
-              const itemCat = (item.category || 'Other').toLowerCase().trim();
-              return itemCat === normalizedCategory;
+            const filtered = (cartResponse.data || []).filter(item => {
+              const itemCat = (item.category || '').toLowerCase().trim();
+              const itemCatTitle = (item.categoryTitle || '').toLowerCase().trim();
+              const itemTitle = (item.title || '').toLowerCase().trim();
+              return itemCat === normalizedCategory ||
+                itemCatTitle === normalizedCategory ||
+                itemTitle === normalizedCategory ||
+                ((normalizedCategory === 'agriculture' || normalizedCategory.includes('agri')) &&
+                  (itemCat === 'agriculture' || itemCatTitle === 'agriculture' || item.hourly_price || item.land_price || item.daily_price));
             });
+            items = filtered.length > 0 ? filtered : (cartResponse.data || []);
           }
           setCartItems(items);
         }
@@ -387,7 +401,7 @@ const Checkout = () => {
         paymentMethod: paymentMethod === 'online' ? 'online' : 'pay_at_home',
         rental_type: rentalType,
         bookedItems: bookedItemsData,
-        
+
         // --- AGRICULTURE SPECIFIC ---
         landSize: landSize || 1,
         cropType: cropType || '',
@@ -620,9 +634,9 @@ const Checkout = () => {
 
       if (rentalType === 'daily' || rentalType === 'monthly' || rentalType === 'land_based') {
         finalTimeDisplay = 'Full Day';
-        timeSlotObj = { 
-          start: '00:00', 
-          end: '23:59' 
+        timeSlotObj = {
+          start: '00:00',
+          end: '23:59'
         };
       } else if (bookingType === 'instant') {
         finalDate = new Date();
@@ -1454,9 +1468,13 @@ const Checkout = () => {
     const svc = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
     return !!(svc.hourly_price || svc.land_price || svc.daily_price ||
       item.hourly_price || item.land_price || item.daily_price ||
-      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture');
+      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture' ||
+      item.equipmentId || item.vendorEquipmentId || item.isRental || item.rental_type ||
+      item.type === 'machinery' || item.type === 'equipment' ||
+      svc.type === 'machinery' || svc.type === 'equipment');
   });
-  const currentGst = gstPercentage;
+  const isMachineryOrRental = hasAgriItems || !!rentalType || location.state?.rentalType || location.state?.isRental;
+  const currentGst = isMachineryOrRental ? (rentalGstPercentage !== undefined ? rentalGstPercentage : 5) : gstPercentage;
   const taxesAndFee = Math.round((itemTotal * currentGst) / 100);
   // Visited fee logic: if Total is 0 (All free), user might still pay visited fee?
   // User says "no payemtn". So maybe visited fee also waived? Or user pays visited fee?
@@ -1489,8 +1507,8 @@ const Checkout = () => {
 
   const getTimeSlots = () => {
     // ── Agriculture: Different Time Slots for Equipment ──
-    const isAgri = cartItems.some(item => item.categoryTitle === 'Agriculture' || item.category === 'Agriculture');
-    
+    const isAgri = hasAgriItems;
+
     // Shift slots apply only for Daily or Land-based Agricultural rentals (not Hourly)
     if (isAgri && rentalType !== 'hourly') {
       return [
@@ -1652,7 +1670,7 @@ const Checkout = () => {
         )}
 
         {/* Cart Items */}
-        <div className="space-y-4 mb-4">
+        <div className="space-y-2.5 mb-2.5">
           {cartItems.map((item) => {
             const brandName = item.brand || item.sectionTitle;
             const categoryName = item.categoryTitle || item.category;
@@ -1662,52 +1680,64 @@ const Checkout = () => {
               categoryName === 'Agriculture');
 
             return (
-              <div key={item._id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+              <div key={item._id} className="bg-white border border-gray-200 rounded-xl p-3 shadow-xs relative overflow-hidden">
                 {/* Brand Header */}
                 {(brandName || categoryName) && (
-                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-50">
+                  <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-gray-50">
                     {item.sectionIcon ? (
-                      <img src={toAssetUrl(item.sectionIcon)} className="w-5 h-5 rounded-md object-cover border border-gray-100" alt="" />
+                      <img src={toAssetUrl(item.sectionIcon)} className="w-4 h-4 rounded object-cover border border-gray-100" alt="" />
                     ) : (
-                      <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                      <div className="w-4 h-4 rounded bg-gray-100 flex items-center justify-center text-[9px] font-bold text-gray-500">
                         {(brandName || "B").charAt(0)}
                       </div>
                     )}
                     <div className="flex flex-col leading-none">
-                      {brandName && <span className="text-xs font-bold text-gray-900">{brandName}</span>}
-                      {categoryName && <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mt-0.5">{categoryName}</span>}
+                      {brandName && <span className="text-[11px] font-bold text-gray-900">{brandName}</span>}
+                      {categoryName && <span className="text-[9px] font-medium text-gray-400 uppercase tracking-wide mt-0.5">{categoryName}</span>}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 pr-4">
-                    <h3 className="text-base font-bold text-gray-900 mb-1 leading-snug">{item.title}</h3>
+                <div className="flex items-start justify-between mb-2.5 gap-2.5">
+                  {/* Machinery / Service Image */}
+                  {(item.icon || (itemSvc && itemSvc.iconUrl)) && (
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-lg bg-slate-50 border border-slate-100 p-1 shrink-0 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={toAssetUrl(item.icon || itemSvc.iconUrl)}
+                        alt={item.title}
+                        className="w-full h-full object-contain"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex-1 pr-3">
+                    <h3 className="text-sm font-bold text-gray-900 leading-snug line-clamp-1">{item.title}</h3>
                     {item.description && (
-                      <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
+                      <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{item.description}</p>
                     )}
                     {item.duration && (
-                      <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-400">
                         <FiClock className="w-3 h-3" />
                         {item.duration}
                       </div>
                     )}
                   </div>
                   {!item.isPlan && !isAgri && (
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-end gap-1.5">
                       <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
                         <button
                           onClick={() => handleQuantityChange(item._id, -1)}
-                          className="p-1.5 hover:bg-white rounded-md transition-all shadow-sm"
+                          className="p-1 hover:bg-white rounded transition-all shadow-xs"
                         >
-                          <FiMinus className="w-3.5 h-3.5 text-gray-600" />
+                          <FiMinus className="w-3 h-3 text-gray-600" />
                         </button>
-                        <span className="w-6 text-center text-sm font-bold text-gray-900">{item.serviceCount || 1}</span>
+                        <span className="w-5 text-center text-xs font-bold text-gray-900">{item.serviceCount || 1}</span>
                         <button
                           onClick={() => handleQuantityChange(item._id, 1)}
-                          className="p-1.5 hover:bg-white rounded-md transition-all shadow-sm"
+                          className="p-1 hover:bg-white rounded transition-all shadow-xs"
                         >
-                          <FiPlus className="w-3.5 h-3.5 text-gray-900" />
+                          <FiPlus className="w-3 h-3 text-gray-900" />
                         </button>
                       </div>
                     </div>
@@ -1715,60 +1745,34 @@ const Checkout = () => {
                   {!item.isPlan && (
                     <button
                       onClick={() => handleRemoveItem(item._id)}
-                      className="absolute top-3 right-3 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                      className="absolute top-2.5 right-2.5 p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                      title="Remove item"
                     >
-                      <FiTrash2 className="w-4 h-4" />
+                      <FiTrash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-black text-slate-900 line-clamp-1">
-                        {calculateItemPrice(item) === 0 ? (
-                          <span className="text-emerald-600">Free</span>
-                        ) : (
-                          `₹${calculateItemPrice(item).toLocaleString('en-IN')}`
-                        )}
-                      </span>
-                      {calculateItemPrice(item) === 0 && (
-                        <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 uppercase tracking-wider">
-                          WITH PLAN
-                        </span>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base font-black text-slate-900 line-clamp-1">
+                      {calculateItemPrice(item) === 0 ? (
+                        <span className="text-emerald-600">Free</span>
+                      ) : (
+                        `₹${calculateItemPrice(item).toLocaleString('en-IN')}`
                       )}
-                    </div>
-                    {isAgri && (
-                      <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100 uppercase tracking-widest shadow-sm">
-                        {rentalType.replace('_', ' ')}
+                    </span>
+                    {calculateItemPrice(item) === 0 && (
+                      <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-200 uppercase tracking-wider">
+                        WITH PLAN
                       </span>
                     )}
                   </div>
 
-                  {calculateItemPrice(item) > 0 && (() => {
-                    const svc = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
-                    let unitLabel = "Unit Price";
-                    let unitPrice = svc.hourly_price || item.unitPrice || (item.price / (item.serviceCount || 1));
-                    
-                    if (isAgri) {
-                       if (rentalType === 'hourly') {
-                         unitPrice = svc.hourly_price || unitPrice;
-                         unitLabel = "Hourly Rate";
-                       } else if (rentalType === 'land_based') {
-                         unitPrice = svc.land_price || unitPrice;
-                         unitLabel = "Per " + (svc.land_unit || item.land_unit || 'acre');
-                       } else if (rentalType === 'daily' || rentalType === 'monthly') {
-                         unitPrice = svc.daily_price || unitPrice;
-                         unitLabel = "Daily Rate";
-                       }
-                    }
-
-                    return (
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 font-bold uppercase tracking-tight">
-                        <span>{unitLabel}: ₹{unitPrice.toLocaleString('en-IN')}</span>
-                        {item.serviceCount > 1 && <span>• Qty: {item.serviceCount}</span>}
-                      </div>
-                    );
-                  })()}
+                  {/* Hourly Rate Badge */}
+                  <span className="text-[10px] font-bold bg-slate-50 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 shadow-xs">
+                    Hourly Rate
+                  </span>
                 </div>
               </div>
             )
@@ -1796,8 +1800,8 @@ const Checkout = () => {
             }
             initialQuantity={
               rentalType === 'hourly' ? (estimatedDuration || 1)
-              : rentalType === 'land_based' ? (landSize || 1)
-              : (localDays || 1)
+                : rentalType === 'land_based' ? (landSize || 1)
+                  : (localDays || 1)
             }
             selectedDate={selectedDate}
             selectedTime={selectedTime}
@@ -1820,39 +1824,38 @@ const Checkout = () => {
 
         {/* ══ AGRI DETAILS CARD (New) ══ */}
         {/* ══ CROP TYPE CARD (Consolidated) ══ */}
-        {cartItems.some(item => item.category === 'Agriculture' || item.categoryTitle === 'Agriculture') && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-teal-50 text-teal-600 rounded-lg flex items-center justify-center">🌾</span>
+        {hasAgriItems && (
+          <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
+            <h3 className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 bg-teal-50 text-teal-600 rounded-md flex items-center justify-center text-xs">🌾</span>
               Crop Information
             </h3>
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">What crop are you growing?</label>
+              <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">What crop are you growing?</label>
               <input
                 type="text"
                 placeholder="e.g. Wheat, Rice, Sugarcane"
                 value={cropType}
                 onChange={(e) => setCropType(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium"
+                className="w-full p-2 bg-gray-50 border border-gray-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all font-medium"
               />
             </div>
           </div>
         )}
         {/* ═══════════════════════════════════════════════════ */}
 
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FiPhone className="w-5 h-5 text-gray-600" />
+            <div className="flex items-center gap-2.5">
+              <FiPhone className="w-4 h-4 text-gray-600" />
               <div>
-                <p className="text-sm font-medium text-black">{contactDetails.name || JSON.parse(localStorage.getItem('userData'))?.name || 'Verified Farmer'}</p>
-                <p className="text-xs text-gray-600">{contactDetails.phone || userPhone || 'Loading...'}</p>
+                <p className="text-xs font-bold text-black">{contactDetails.name || JSON.parse(localStorage.getItem('userData'))?.name || 'Verified Farmer'}</p>
+                <p className="text-[11px] text-gray-500">{contactDetails.phone || userPhone || 'Loading...'}</p>
               </div>
             </div>
             <button
               onClick={() => setShowContactModal(true)}
-              className="text-sm font-medium hover:underline"
+              className="text-xs font-bold hover:underline"
               style={{ color: themeColors.button }}
             >
               Change
@@ -1861,70 +1864,62 @@ const Checkout = () => {
         </div>
 
         {/* Payment Summary */}
-        <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 mb-6 shadow-sm overflow-hidden relative">
+        <div className="bg-white border-2 border-slate-100 rounded-xl p-3.5 mb-2.5 shadow-xs overflow-hidden relative">
           {/* Decorative Background for Header */}
           <div className="absolute top-0 left-0 right-0 h-1" style={{ background: themeColors.gradient }}></div>
 
-          <h3 className="text-lg font-bold text-slate-900 mb-5 flex items-center gap-2">
-            <FiShoppingCart className="w-5 h-5" style={{ color: themeColors.button }} />
+          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <FiShoppingCart className="w-4 h-4" style={{ color: themeColors.button }} />
             Payment Summary
           </h3>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Original Price (before plan) */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Item Total</span>
-              <span className="text-sm font-medium text-slate-900">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-600">Item Total</span>
+              <span className="font-semibold text-slate-900">
                 ₹{totalOriginalPrice.toLocaleString('en-IN')}
               </span>
             </div>
 
             {/* Discount Line */}
             {displaySavings > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-green-600">Discount</span>
-                <span className="text-sm font-medium text-green-600">-₹{displaySavings.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-medium text-green-600">Discount</span>
+                <span className="font-semibold text-green-600">-₹{displaySavings.toLocaleString('en-IN')}</span>
               </div>
             )}
 
             {/* Upgrade Credit (for plan upgrades) */}
             {upgradePreview && upgradePreview.credit > 0 && (
-              <div className="flex justify-between items-center text-green-600">
-                <span className="text-sm font-medium">Plan Credit</span>
-                <span className="text-sm font-bold">-₹{upgradePreview.credit.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between items-center text-xs text-green-600">
+                <span className="font-medium">Plan Credit</span>
+                <span className="font-bold">-₹{upgradePreview.credit.toLocaleString('en-IN')}</span>
               </div>
             )}
 
             {/* Taxes */}
             {displayTax > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500">GST ({currentGst}%)</span>
-                <span className="text-sm font-medium text-slate-700">₹{displayTax.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">GST ({currentGst}%)</span>
+                <span className="font-medium text-slate-700">₹{displayTax.toLocaleString('en-IN')}</span>
               </div>
             )}
 
-            {/* Visited Fee */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">Convenience Fee</span>
-              <span className={`text-sm font-medium ${displayFee === 0 ? 'text-slate-400 font-normal italic' : 'text-slate-700'}`}>
-                {displayFee === 0 ? 'Not Added' : `₹${displayFee.toLocaleString('en-IN')}`}
-              </span>
-            </div>
-
             {/* Divider */}
-            <div className="border-t border-slate-200 pt-4 mt-2">
+            <div className="border-t border-slate-200 pt-2.5 mt-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-base font-bold text-slate-900">Total Payable</span>
+                <span className="text-sm font-bold text-slate-900">Total Payable</span>
                 <div className="flex flex-col items-end">
                   {totalAmount === 0 ? (
                     <>
-                      <span className="text-sm font-medium text-slate-400 line-through">
+                      <span className="text-xs font-medium text-slate-400 line-through">
                         ₹{Math.round(totalOriginalPrice + displayTax + displayFee).toLocaleString('en-IN')}
                       </span>
-                      <span className="text-xl font-black text-green-600">FREE</span>
+                      <span className="text-base font-black text-green-600">FREE</span>
                     </>
                   ) : (
-                    <span className="text-xl font-black text-slate-900">
+                    <span className="text-base font-black text-slate-900">
                       ₹{totalAmount.toLocaleString('en-IN')}
                     </span>
                   )}
@@ -1935,13 +1930,13 @@ const Checkout = () => {
         </div>
 
         {/* Important Note regarding Base Price */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex items-start gap-4 shadow-sm">
-          <div className="bg-blue-100 p-2 rounded-full shrink-0 mt-0.5">
-            <FiInfo className="w-5 h-5 text-blue-600" />
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 mb-2.5 flex items-start gap-2.5 shadow-xs">
+          <div className="bg-blue-100 p-1.5 rounded-full shrink-0 mt-0.5">
+            <FiInfo className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-blue-900 mb-1">Note</h4>
-            <p className="text-sm text-blue-800 leading-relaxed font-medium">
+            <h4 className="text-xs font-bold text-blue-900 mb-0.5">Note</h4>
+            <p className="text-xs text-blue-800 leading-relaxed font-medium">
               This is a base booking cost. Additional service cost is decided by the vendor after service bill preparation.
             </p>
           </div>
@@ -1966,14 +1961,14 @@ const Checkout = () => {
         )}
 
         {/* Cancellation Policy */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <h3 className="text-base font-bold text-black mb-2">Cancellation policy</h3>
-          <p className="text-sm text-gray-700 mb-2">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
+          <h3 className="text-xs font-bold text-black mb-1">Cancellation policy</h3>
+          <p className="text-xs text-gray-600 mb-1.5 leading-relaxed">
             Free cancellations if done more than 12 hrs before the service or if a professional isn't assigned. A fee will be charged otherwise.
           </p>
           <button
             onClick={() => navigate('/user/cancellation-policy')}
-            className="text-sm font-medium hover:underline"
+            className="text-xs font-bold hover:underline"
             style={{ color: themeColors.button }}
           >
             Read full policy
@@ -1982,46 +1977,46 @@ const Checkout = () => {
 
         {/* Payment Method Selection */}
         {totalAmount > 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-teal-50 text-teal-600 rounded-lg flex items-center justify-center">💳</span>
+          <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
+            <h3 className="text-xs font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+              <span className="w-5 h-5 bg-teal-50 text-teal-600 rounded-md flex items-center justify-center text-xs">💳</span>
               Payment Method
             </h3>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentMethod('online')}
-                className={`p-3.5 rounded-xl border-2 flex items-center justify-between transition-all text-left
+                className={`p-2.5 rounded-lg border-2 flex items-center justify-between transition-all text-left
                   ${paymentMethod === 'online' ? 'border-teal-500 bg-teal-50/20' : 'border-gray-100 hover:border-gray-200'}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${paymentMethod === 'online' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                    <FiCreditCard className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-7 h-7 rounded-md flex items-center justify-center ${paymentMethod === 'online' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                    <FiCreditCard className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-gray-800 block">Pay Online</span>
-                    <span className="text-[10px] text-gray-500 font-medium">UPI, Cards, Netbanking</span>
+                    <span className="text-xs font-bold text-gray-800 block">Pay Online</span>
+                    <span className="text-[9px] text-gray-400 font-medium">UPI, Cards, Netbanking</span>
                   </div>
                 </div>
-                {paymentMethod === 'online' && <FiCheckCircle className="text-teal-500" />}
+                {paymentMethod === 'online' && <FiCheckCircle className="text-teal-500 w-4 h-4" />}
               </button>
 
               <button
                 type="button"
                 onClick={() => setPaymentMethod('pay_at_home')}
-                className={`p-3.5 rounded-xl border-2 flex items-center justify-between transition-all text-left
+                className={`p-2.5 rounded-lg border-2 flex items-center justify-between transition-all text-left
                   ${paymentMethod === 'pay_at_home' ? 'border-teal-500 bg-teal-50/20' : 'border-gray-100 hover:border-gray-200'}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${paymentMethod === 'pay_at_home' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                    <FiDollarSign className="w-4 h-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-7 h-7 rounded-md flex items-center justify-center ${paymentMethod === 'pay_at_home' ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                    <FiDollarSign className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-gray-800 block">Pay After Work (Cash)</span>
-                    <span className="text-[10px] text-gray-500 font-medium">Pay cash directly to professional</span>
+                    <span className="text-xs font-bold text-gray-800 block">Pay After Work (Cash)</span>
+                    <span className="text-[9px] text-gray-400 font-medium">Pay cash directly to professional</span>
                   </div>
                 </div>
-                {paymentMethod === 'pay_at_home' && <FiCheckCircle className="text-teal-500" />}
+                {paymentMethod === 'pay_at_home' && <FiCheckCircle className="text-teal-500 w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -2089,9 +2084,9 @@ const Checkout = () => {
                         const { day, date: dateNum } = formatDate(selectedDate);
                         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                         const month = monthNames[selectedDate.getMonth()];
-                        
+
                         let displayStr = `${day}, ${dateNum} ${month}`;
-                        
+
                         if (rentalType === 'monthly' && endDate) {
                           const { day: eDay, date: eDateNum } = formatDate(endDate);
                           const eMonth = monthNames[endDate.getMonth()];
@@ -2111,7 +2106,7 @@ const Checkout = () => {
                           const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
                           if (timeDisplay && timeDisplay !== '00:00') displayStr += ` • ${timeDisplay}`;
                         }
-                        
+
                         return displayStr;
                       })() : (
                         <span className="text-gray-400">
@@ -2152,12 +2147,12 @@ const Checkout = () => {
           <button
             onClick={
               searchingVendors ? undefined :
-              plan ? () => setShowPaymentConfirmModal(true) :
-              !(houseNumber || addressDetails) ? handleProceed :
-              (bookingType === 'scheduled' && (!selectedDate || (rentalType === 'hourly' && !selectedTime))) ?
-                () => setShowTimeSlotModal(true) :
-              (paymentMethod === 'online' && totalAmount > 0) ? handlePayNow :
-              handleSearchVendors
+                plan ? () => setShowPaymentConfirmModal(true) :
+                  !(houseNumber || addressDetails) ? handleProceed :
+                    (bookingType === 'scheduled' && (!selectedDate || (rentalType === 'hourly' && !selectedTime))) ?
+                      () => setShowTimeSlotModal(true) :
+                      (paymentMethod === 'online' && totalAmount > 0) ? handlePayNow :
+                        handleSearchVendors
             }
             disabled={searchingVendors}
             className="w-full text-white py-3 rounded-lg text-base font-semibold transition-colors disabled:opacity-50 shadow-lg shadow-teal-500/30"
@@ -2165,12 +2160,12 @@ const Checkout = () => {
           >
             {searchingVendors ? 'Searching for vendors...' :
               !(houseNumber || addressDetails) ? 'Add address to proceed' :
-              (bookingType === 'scheduled' && (!selectedDate || (rentalType === 'hourly' && !selectedTime))) ?
-                (rentalType === 'monthly' ? 'Select Start Date' : 'Select Time Slot') :
-              plan ? 'Proceed to Payment' :
-              totalAmount === 0 ? 'Confirm Booking (Free)' :
-              paymentMethod === 'online' ? 'Pay Now' :
-              bookingType === 'instant' ? 'Find nearby vendors now' : 'Find nearby vendors'}
+                (bookingType === 'scheduled' && (!selectedDate || (rentalType === 'hourly' && !selectedTime))) ?
+                  (rentalType === 'monthly' ? 'Select Start Date' : 'Select Time Slot') :
+                  plan ? 'Proceed to Payment' :
+                    totalAmount === 0 ? 'Confirm Booking (Free)' :
+                      paymentMethod === 'online' ? 'Pay Now' :
+                        bookingType === 'instant' ? 'Find nearby vendors now' : 'Find nearby vendors'}
           </button>
         </div>
       </div>
@@ -2377,26 +2372,23 @@ const Checkout = () => {
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('online')}
-                  className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left ${
-                    paymentMethod === 'online'
-                      ? 'border-teal-500 bg-teal-50/30 shadow-sm shadow-teal-100'
-                      : 'border-gray-100 hover:border-gray-200 bg-white'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left ${paymentMethod === 'online'
+                    ? 'border-teal-500 bg-teal-50/30 shadow-sm shadow-teal-100'
+                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                      paymentMethod === 'online' ? 'bg-teal-500 text-white shadow-md shadow-teal-200' : 'bg-gray-100 text-gray-400'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${paymentMethod === 'online' ? 'bg-teal-500 text-white shadow-md shadow-teal-200' : 'bg-gray-100 text-gray-400'
+                      }`}>
                       <FiCreditCard className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className={`text-sm font-black block ${ paymentMethod === 'online' ? 'text-teal-800' : 'text-gray-700'}`}>Pay Online</span>
+                      <span className={`text-sm font-black block ${paymentMethod === 'online' ? 'text-teal-800' : 'text-gray-700'}`}>Pay Online</span>
                       <span className="text-[10px] font-medium text-gray-400">UPI · Cards · Netbanking</span>
                     </div>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                    paymentMethod === 'online' ? 'border-teal-500 bg-teal-500' : 'border-gray-200'
-                  }`}>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === 'online' ? 'border-teal-500 bg-teal-500' : 'border-gray-200'
+                    }`}>
                     {paymentMethod === 'online' && <div className="w-2 h-2 bg-white rounded-full" />}
                   </div>
                 </button>
@@ -2405,26 +2397,23 @@ const Checkout = () => {
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('pay_at_home')}
-                  className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left ${
-                    paymentMethod === 'pay_at_home'
-                      ? 'border-emerald-500 bg-emerald-50/30 shadow-sm shadow-emerald-100'
-                      : 'border-gray-100 hover:border-gray-200 bg-white'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left ${paymentMethod === 'pay_at_home'
+                    ? 'border-emerald-500 bg-emerald-50/30 shadow-sm shadow-emerald-100'
+                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                      paymentMethod === 'pay_at_home' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-gray-100 text-gray-400'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${paymentMethod === 'pay_at_home' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-gray-100 text-gray-400'
+                      }`}>
                       <FiDollarSign className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className={`text-sm font-black block ${ paymentMethod === 'pay_at_home' ? 'text-emerald-800' : 'text-gray-700'}`}>Pay After Work (Cash)</span>
+                      <span className={`text-sm font-black block ${paymentMethod === 'pay_at_home' ? 'text-emerald-800' : 'text-gray-700'}`}>Pay After Work (Cash)</span>
                       <span className="text-[10px] font-medium text-gray-400">Pay cash directly to professional</span>
                     </div>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                    paymentMethod === 'pay_at_home' ? 'border-emerald-500 bg-emerald-500' : 'border-gray-200'
-                  }`}>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === 'pay_at_home' ? 'border-emerald-500 bg-emerald-500' : 'border-gray-200'
+                    }`}>
                     {paymentMethod === 'pay_at_home' && <div className="w-2 h-2 bg-white rounded-full" />}
                   </div>
                 </button>

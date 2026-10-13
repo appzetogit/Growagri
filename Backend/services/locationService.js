@@ -85,10 +85,54 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
     // Extract custom options from filters
     const checkCashLimit = filters.checkCashLimit;
     const serviceCategory = filters.service; // Category title to match against vendor's categories array
+    const categoryId = filters.categoryId;
     // Clone filters to avoid modifying original or polluting query
     const queryFilters = { ...filters };
     delete queryFilters.checkCashLimit;
     delete queryFilters.service; // Remove raw service filter — we handle it manually below
+    delete queryFilters.categoryId;
+
+    // Find vendors who have listed this machinery equipment in VendorEquipment
+    let equipmentVendorIds = [];
+    if (categoryId || serviceCategory) {
+      try {
+        const VendorEquipment = require('../models/VendorEquipment');
+        const eqConditions = [];
+
+        if (categoryId) {
+          eqConditions.push(
+            { categoryId: categoryId },
+            { 'implements.subCategoryId': categoryId },
+            { subCategoryIds: categoryId }
+          );
+        }
+
+        if (serviceCategory) {
+          const catRegex = new RegExp(serviceCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          eqConditions.push(
+            { requestedCategoryName: catRegex },
+            { name: catRegex }
+          );
+        }
+
+        if (eqConditions.length > 0) {
+          const matchingEquipments = await VendorEquipment.find({
+            $or: eqConditions,
+            status: { $ne: 'maintenance' }
+          }).select('vendorId').lean();
+
+          equipmentVendorIds = matchingEquipments
+            .map(e => e.vendorId ? e.vendorId.toString() : null)
+            .filter(Boolean);
+
+          if (equipmentVendorIds.length > 0) {
+            console.log(`[LocationService] Found ${equipmentVendorIds.length} vendor equipment matches for category: "${serviceCategory || categoryId}"`);
+          }
+        }
+      } catch (eqErr) {
+        console.error('[LocationService] Error searching VendorEquipment:', eqErr);
+      }
+    }
 
     // Build base query
     const baseQuery = {
@@ -98,15 +142,26 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
       ...queryFilters
     };
 
-    // Filter by vendor's selected categories (what they set in their profile) or fallback to their service list
-    // Use case-insensitive regex to handle mismatches like "Tractor" vs "tractor"
-    if (serviceCategory) {
-      const categoryRegex = new RegExp(`^${serviceCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-      baseQuery.$or = [
-        { categories: { $in: [categoryRegex] } },
-        { service: { $in: [categoryRegex] } }
-      ];
-      console.log(`[LocationService] Filtering vendors by category/service (case-insensitive): "${serviceCategory}"`);
+    // Filter by vendor's selected categories or by owned equipment in VendorEquipment
+    if (serviceCategory || equipmentVendorIds.length > 0) {
+      const orConditions = [];
+
+      if (serviceCategory) {
+        const categoryRegex = new RegExp(`^${serviceCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        orConditions.push(
+          { categories: { $in: [categoryRegex] } },
+          { service: { $in: [categoryRegex] } }
+        );
+      }
+
+      if (equipmentVendorIds.length > 0) {
+        orConditions.push({ _id: { $in: equipmentVendorIds } });
+      }
+
+      if (orConditions.length > 0) {
+        baseQuery.$or = orConditions;
+      }
+      console.log(`[LocationService] Filtering vendors by category/service "${serviceCategory}" and ${equipmentVendorIds.length} machinery equipment owners`);
     }
 
     // Apply Cash Limit Check if requested

@@ -33,7 +33,11 @@ const createCategoryValidation = [
   body('status')
     .optional()
     .isIn(['active', 'inactive', 'deleted'])
-    .withMessage('Status must be active, inactive, or deleted')
+    .withMessage('Status must be active, inactive, or deleted'),
+  body('hourlyPrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Hourly price must be a number')
 ];
 
 const updateCategoryValidation = [
@@ -57,7 +61,11 @@ const updateCategoryValidation = [
   body('status')
     .optional()
     .isIn(['active', 'inactive', 'deleted'])
-    .withMessage('Status must be active, inactive, or deleted')
+    .withMessage('Status must be active, inactive, or deleted'),
+  body('hourlyPrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Hourly price must be a number')
 ];
 
 // Routes

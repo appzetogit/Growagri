@@ -13,17 +13,21 @@ import {
     FiCheck,
     FiX,
     FiClock,
-    FiTruck
+    FiTruck,
+    FiEye,
+    FiPercent
 } from 'react-icons/fi';
 import adminProductService from '../../../../services/adminProductService';
 import adminEquipmentService from '../../../../services/adminEquipmentService';
 import { publicCatalogService, serviceService, homeContentService, categoryService } from '../../../../services/catalogService';
 import { cityService } from '../../services/cityService';
-import { getSettings } from '../../services/settingsService';
+import { getSettings, updateSettings } from '../../services/settingsService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 
 const ManageProducts = () => {
+    const [searchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [pendingProducts, setPendingProducts] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -33,8 +37,23 @@ const ManageProducts = () => {
     const [showModal, setShowModal] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [currentProduct, setCurrentProduct] = useState(null);
-    const [activeTab, setActiveTab] = useState('marketplace');
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'pending' ? 'pending' : 'marketplace');
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'pending' || tab === 'marketplace') {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
     const [rentalGst, setRentalGst] = useState(5); // Default 5% for Agriculture
+    const [rentalGstInput, setRentalGstInput] = useState('5');
+    const [savingRentalGst, setSavingRentalGst] = useState(false);
+    const [adminCommission, setAdminCommission] = useState(10); // Default 10% Platform Commission
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [approveTarget, setApproveTarget] = useState(null);
+    const [commissionInput, setCommissionInput] = useState('');
+    const [commissionModalMode, setCommissionModalMode] = useState('approve'); // 'approve' | 'edit'
+    const [approving, setApproving] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
@@ -47,6 +66,7 @@ const ManageProducts = () => {
     const [savingTab, setSavingTab] = useState(false);
     const [viewEquipment, setViewEquipment] = useState(null);
     const [activeMenuId, setActiveMenuId] = useState(null);
+    const [selectedProductIds, setSelectedProductIds] = useState([]);
 
     const [showCatalogModal, setShowCatalogModal] = useState(false);
     const [catalogFormData, setCatalogFormData] = useState({
@@ -96,10 +116,14 @@ const ManageProducts = () => {
 
     useEffect(() => {
         fetchData();
-        // Load rental GST from admin settings
+        // Load rental GST and Commission from admin settings
         getSettings().then(res => {
             if (res?.settings?.rentalGstPercentage !== undefined) {
                 setRentalGst(res.settings.rentalGstPercentage);
+                setRentalGstInput(String(res.settings.rentalGstPercentage));
+            }
+            if (res?.settings?.bookingCommissionPercentage !== undefined) {
+                setAdminCommission(res.settings.bookingCommissionPercentage);
             }
         }).catch(() => {});
     }, []);
@@ -210,24 +234,109 @@ const ManageProducts = () => {
         }
     };
 
-    const handleApprove = async (item) => {
-        if (!window.confirm("Approve this machinery/equipment? It will go LIVE for farmers.")) return;
+    const handleSaveRentalGst = async () => {
+        if (rentalGstInput === '' || isNaN(Number(rentalGstInput))) {
+            toast.error('Please enter a valid GST percentage');
+            return;
+        }
+        const val = Number(rentalGstInput);
+        if (val < 0 || val > 100) {
+            toast.error('GST must be between 0% and 100%');
+            return;
+        }
+
         try {
-            let res;
-            if (item._source === 'vendorEquipment') {
-                // VendorEquipment flow — use adminEquipmentService
-                res = await adminEquipmentService.updateStatus(item._id, { status: 'approved' });
-            } else {
-                // Product model flow
-                res = await adminProductService.approveProduct(item._id, { commissionPercentage: 10, gstPercentage: rentalGst });
-            }
+            setSavingRentalGst(true);
+            const res = await updateSettings({ rentalGstPercentage: val });
             if (res.success) {
-                toast.success(`✅ Machinery Approved!`);
-                fetchData();
-                setShowModal(false);
+                setRentalGst(val);
+                setRentalGstInput(String(val));
+                toast.success(`✅ Machinery Rental GST updated to ${val}%!`);
+            } else {
+                toast.error(res.message || 'Failed to update GST');
             }
         } catch (err) {
-            toast.error("Approval failed");
+            toast.error('Failed to update GST');
+        } finally {
+            setSavingRentalGst(false);
+        }
+    };
+
+    const openApproveModal = (item) => {
+        setApproveTarget(item);
+        setCommissionModalMode('approve');
+        setCommissionInput(item.commissionPercentage !== undefined && item.commissionPercentage !== null ? String(item.commissionPercentage) : '');
+        setShowApproveModal(true);
+    };
+
+    const openEditCommissionModal = (item) => {
+        setApproveTarget(item);
+        setCommissionModalMode('edit');
+        setCommissionInput(item.commissionPercentage !== undefined && item.commissionPercentage !== null ? String(item.commissionPercentage) : '');
+        setShowApproveModal(true);
+    };
+
+    const handleApproveConfirm = async () => {
+        if (!approveTarget) return;
+        if (commissionInput === '' || commissionInput === null || isNaN(Number(commissionInput))) {
+            toast.error('Please enter a commission percentage');
+            return;
+        }
+        const commissionVal = Number(commissionInput);
+        if (commissionVal < 0 || commissionVal > 100) {
+            toast.error('Commission percentage must be between 0 and 100');
+            return;
+        }
+
+        try {
+            setApproving(true);
+            if (commissionModalMode === 'edit') {
+                let res;
+                if (approveTarget._source === 'vendorEquipment') {
+                    res = await adminEquipmentService.update(approveTarget._id, {
+                        commissionPercentage: commissionVal
+                    });
+                } else {
+                    res = await adminProductService.update(approveTarget._id, {
+                        commissionPercentage: commissionVal
+                    });
+                }
+
+                if (res && res.success) {
+                    toast.success(`✅ Commission updated to ${commissionVal}%!`);
+                    setShowApproveModal(false);
+                    setApproveTarget(null);
+                    fetchData();
+                } else {
+                    toast.error(res?.message || 'Failed to update commission');
+                }
+            } else {
+                let res;
+                if (approveTarget._source === 'vendorEquipment') {
+                    res = await adminEquipmentService.updateStatus(approveTarget._id, {
+                        status: 'approved',
+                        commissionPercentage: commissionVal
+                    });
+                } else {
+                    res = await adminProductService.approveProduct(approveTarget._id, {
+                        commissionPercentage: commissionVal,
+                        gstPercentage: rentalGst
+                    });
+                }
+
+                if (res && res.success) {
+                    toast.success(`✅ Machinery Approved with ${commissionVal}% Commission!`);
+                    setShowApproveModal(false);
+                    setApproveTarget(null);
+                    fetchData();
+                } else {
+                    toast.error(res?.message || 'Approval failed');
+                }
+            }
+        } catch (err) {
+            toast.error(commissionModalMode === 'edit' ? 'Failed to update commission' : 'Approval failed');
+        } finally {
+            setApproving(false);
         }
     };
 
@@ -505,30 +614,169 @@ const ManageProducts = () => {
                (p.vendorId?.name?.toLowerCase().includes(trimmedSearch));
     });
 
+    const handleSelectAllProducts = (e) => {
+        if (e.target.checked) {
+            setSelectedProductIds(filteredProducts.map(p => p._id).filter(Boolean));
+        } else {
+            setSelectedProductIds([]);
+        }
+    };
+
+    const toggleSelectProduct = (id) => {
+        setSelectedProductIds(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const handleDeleteProduct = async (item) => {
+        if (!window.confirm(`Are you sure you want to delete "${item.name || item.title || 'this machine'}"?`)) return;
+        try {
+            setLoading(true);
+            if (item._source === 'vendorEquipment') {
+                await adminEquipmentService.delete(item._id);
+            } else {
+                await adminProductService.delete(item._id);
+            }
+            toast.success("Machinery deleted successfully");
+            setSelectedProductIds(prev => prev.filter(id => id !== item._id));
+            await fetchData();
+        } catch (err) {
+            toast.error("Failed to delete machinery");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkDeleteProducts = async () => {
+        if (selectedProductIds.length === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedProductIds.length} selected machinery?`)) return;
+
+        try {
+            setLoading(true);
+            const selectedItems = filteredProducts.filter(p => selectedProductIds.includes(p._id));
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const item of selectedItems) {
+                try {
+                    if (item._source === 'vendorEquipment') {
+                        await adminEquipmentService.delete(item._id);
+                    } else {
+                        await adminProductService.delete(item._id);
+                    }
+                    successCount++;
+                } catch (err) {
+                    failCount++;
+                }
+            }
+
+            if (successCount > 0) {
+                toast.success(`${successCount} machinery deleted successfully`);
+                setSelectedProductIds([]);
+                await fetchData();
+            }
+            if (failCount > 0) {
+                toast.error(`Failed to delete ${failCount} item${failCount === 1 ? '' : 's'}`);
+            }
+        } catch (err) {
+            toast.error("Bulk delete failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="py-6 bg-slate-50 min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 px-6">
-                <div>
-                    <h1 className="text-2xl font-black text-slate-800">Machinery Management</h1>
-                    <p className="text-sm text-slate-500 font-medium">Manage Equipment & Heavy Machinery Approvals</p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-800">Machinery Management</h1>
+                        <p className="text-sm text-slate-500 font-medium">Manage Equipment & Heavy Machinery Approvals</p>
+                    </div>
+
+                    {/* Dynamic Rental GST Field */}
+                    <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-2xl border border-slate-200 shadow-xs self-start sm:self-auto">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+                            <FiPercent className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                            <span>Rental GST:</span>
+                        </div>
+                        <div className="relative flex items-center">
+                            <input 
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={rentalGstInput}
+                                onChange={(e) => setRentalGstInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveRentalGst();
+                                    }
+                                }}
+                                className="w-16 px-2.5 py-1 text-xs font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-center transition-all"
+                                placeholder="GST %"
+                            />
+                            <span className="text-xs font-black text-slate-400 ml-1">%</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSaveRentalGst}
+                            disabled={savingRentalGst || Number(rentalGstInput) === Number(rentalGst)}
+                            className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                                Number(rentalGstInput) !== Number(rentalGst)
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 active:scale-95 cursor-pointer'
+                                    : 'bg-slate-100 text-slate-400 cursor-default'
+                            }`}
+                            title="Save GST Percentage"
+                        >
+                            {savingRentalGst ? 'Saving...' : Number(rentalGstInput) !== Number(rentalGst) ? 'Save' : 'Saved'}
+                        </button>
+                    </div>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setShowModal(true); }}
-                    className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-all"
-                >
-                    + Add Machinery
-                </button>
+                <div className="flex items-center gap-3">
+                    {selectedProductIds.length > 0 && (
+                        <button
+                            onClick={handleBulkDeleteProducts}
+                            disabled={loading}
+                            className="bg-rose-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg hover:bg-rose-700 transition-all flex items-center gap-2 animate-in fade-in duration-150"
+                        >
+                            <FiTrash2 className="w-4 h-4" />
+                            Delete Selected ({selectedProductIds.length})
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <div className="flex gap-4 mb-6 border-b border-slate-200 px-6">
-                <button onClick={() => setActiveTab('marketplace')} className={`pb-4 px-2 font-black text-sm uppercase tracking-wider relative ${activeTab === 'marketplace' ? 'text-slate-800' : 'text-slate-400'}`}>
-                    Live Fleet ({products.length})
-                    {activeTab === 'marketplace' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800 rounded-t-full" />}
-                </button>
-                <button onClick={() => setActiveTab('pending')} className={`pb-4 px-2 font-black text-sm uppercase tracking-wider relative ${activeTab === 'pending' ? 'text-orange-600' : 'text-slate-400'}`}>
-                    New Approvals ({pendingProducts.length})
-                    {activeTab === 'pending' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600 rounded-t-full" />}
-                </button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-200 px-6">
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => { setActiveTab('marketplace'); setSelectedProductIds([]); }} 
+                        className={`pb-4 px-2 font-black text-sm uppercase tracking-wider relative ${activeTab === 'marketplace' ? 'text-slate-800' : 'text-slate-400'}`}
+                    >
+                        Live Fleet ({products.length})
+                        {activeTab === 'marketplace' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800 rounded-t-full" />}
+                    </button>
+                    <button 
+                        onClick={() => { setActiveTab('pending'); setSelectedProductIds([]); }} 
+                        className={`pb-4 px-2 font-black text-sm uppercase tracking-wider relative ${activeTab === 'pending' ? 'text-orange-600' : 'text-slate-400'}`}
+                    >
+                        New Approvals ({pendingProducts.length})
+                        {activeTab === 'pending' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600 rounded-t-full" />}
+                    </button>
+                </div>
+                <div className="flex items-center gap-3 pb-3 sm:pb-0">
+                    <div className="relative">
+                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input
+                            type="text"
+                            placeholder="Search machinery..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-800 placeholder:text-slate-400 outline-none focus:border-slate-400 transition-all"
+                        />
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white border-t border-slate-100 shadow-sm overflow-hidden">
@@ -536,19 +784,26 @@ const ManageProducts = () => {
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
+                            <th className="px-4 py-4 w-12 text-center">
+                                <input 
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded text-slate-800 focus:ring-slate-800 border-slate-300 cursor-pointer"
+                                    checked={filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p._id))}
+                                    onChange={handleSelectAllProducts}
+                                />
+                            </th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Machine</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Owner / Shop</th>
-                            {activeTab === 'pending' && <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rental Type</th>}
-                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Commission</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {loading ? (
-                            <tr><td colSpan="6" className="text-center py-20 text-slate-400 font-bold">Loading...</td></tr>
+                            <tr><td colSpan={6} className="text-center py-20 text-slate-400 font-bold">Loading...</td></tr>
                         ) : filteredProducts.length === 0 ? (
-                            <tr><td colSpan="6" className="text-center py-20 text-slate-400 font-bold">
+                            <tr><td colSpan={6} className="text-center py-20 text-slate-400 font-bold">
                                 {activeTab === 'pending' ? '🎉 No pending approvals! All clear.' : 'No machinery found'}
                             </td></tr>
                         ) : filteredProducts.map(p => {
@@ -557,12 +812,20 @@ const ManageProducts = () => {
                             const displayName = isVendorEq ? p.name : p.title;
                             const displaySubtitle = isVendorEq ? (p.modelNumber || p.year || 'Standard') : p.brandName;
                             const displayImage = isVendorEq ? p.images?.[0] : p.imageUrl;
-                            const displayCategory = p.categoryId?.title || p.requestedCategoryName || 'Machine';
-                            const vendorName = p.vendorId?.businessName || p.vendorId?.name || 'Vendor';
+                            const vendorName = p.vendorId?.name || p.vendorId?.businessName || 'Owner';
                             const vendorPhone = p.vendorId?.phone || '';
+                            const isSelected = selectedProductIds.includes(p._id);
 
                             return (
-                            <tr key={p._id} className="hover:bg-slate-50 transition-colors">
+                            <tr key={p._id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                                <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input 
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded text-slate-800 focus:ring-slate-800 border-slate-300 cursor-pointer"
+                                        checked={isSelected}
+                                        onChange={() => toggleSelectProduct(p._id)}
+                                    />
+                                </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-12 h-12 rounded-2xl bg-slate-100 overflow-hidden flex items-center justify-center">
@@ -572,12 +835,7 @@ const ManageProducts = () => {
                                             }
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="font-black text-slate-800 text-sm">{displayName}</p>
-                                                {isVendorEq && (
-                                                    <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[8px] font-black uppercase">Vendor Listed</span>
-                                                )}
-                                            </div>
+                                            <p className="font-black text-slate-800 text-sm">{displayName}</p>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase">{displaySubtitle}</p>
                                         </div>
                                     </div>
@@ -596,13 +854,15 @@ const ManageProducts = () => {
                                 <td className="px-6 py-4">
                                     {p.vendorId ? (
                                         <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                                                <FiUser className="w-3 h-3 text-orange-600" />
+                                            <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                                <FiUser className="w-3.5 h-3.5 text-orange-600" />
                                             </div>
                                             <div>
-                                                <p className="font-black text-slate-700 text-xs leading-tight">{vendorName}</p>
-                                                <div className="flex items-center gap-1 mt-0.5">
-                                                    <p className="text-[9px] text-orange-600 font-bold">{vendorPhone}</p>
+                                                <p className="font-black text-slate-800 text-xs leading-tight">{vendorName}</p>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    {vendorPhone && (
+                                                        <p className="text-[10px] text-orange-600 font-bold">{vendorPhone}</p>
+                                                    )}
                                                     {p.requestedCityName ? (
                                                         <span className="whitespace-nowrap inline-block text-[8px] px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 font-black uppercase rounded" title="Requested New City">
                                                             New City: {p.requestedCityName}
@@ -619,124 +879,105 @@ const ManageProducts = () => {
                                         <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase">Admin</span>
                                     )}
                                 </td>
-                                {activeTab === 'pending' && (
-                                    <td className="px-6 py-4">
-                                        {isVendorEq ? (
-                                            <span className="whitespace-nowrap inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[9px] font-black uppercase">
-                                                🚜 <span>{p.listingType || 'service'}</span>
-                                            </span>
-                                        ) : (
-                                            <span className={`whitespace-nowrap inline-block px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
-                                                p.rental_type === 'land_based' ? 'bg-green-50 text-green-700' :
-                                                p.rental_type === 'monthly' ? 'bg-purple-50 text-purple-700' :
-                                                'bg-blue-50 text-blue-700'
-                                            }`}>
-                                                {p.rental_type === 'land_based' ? '🌾 Acre-based' :
-                                                 p.rental_type === 'monthly' ? '📅 Monthly' : '⏱ Hourly'}
-                                            </span>
-                                        )}
-                                    </td>
-                                )}
                                 <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1">
-                                        {isVendorEq ? (
-                                            Object.entries(p.pricing || {}).filter(([, v]) => v?.isEnabled).map(([k, v]) => {
-                                                const label = k === 'land_based' ? 'acre' : k === 'hourly' ? 'hr' : 'day';
-                                                return (
-                                                    <span key={k} className="inline-block text-[11px] font-extrabold text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-0.5 whitespace-nowrap w-fit">
-                                                        ₹{v.price}/{label}
-                                                    </span>
-                                                );
-                                            })
-                                        ) : (
-                                            <span className="inline-block text-[11px] font-extrabold text-slate-700 bg-slate-50 border border-slate-100 rounded px-2 py-0.5 whitespace-nowrap w-fit">
-                                                ₹{p.price}/{p.unit}
-                                            </span>
-                                        )}
-                                    </div>
+                                    {p.commissionPercentage !== undefined && p.commissionPercentage !== null && p.commissionPercentage !== '' ? (
+                                        <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-black">
+                                            {p.commissionPercentage}%
+                                        </span>
+                                    ) : (
+                                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                            Pending
+                                        </span>
+                                    )}
                                 </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1.5">
                                         <button 
-                                            onClick={() => setActiveMenuId(activeMenuId === p._id ? null : p._id)}
-                                            className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-500 hover:text-slate-800"
+                                            onClick={() => setViewEquipment(p)}
+                                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                            title="View Details"
                                         >
-                                            <FiMoreVertical className="w-5 h-5" />
+                                            <FiEye className="w-4 h-4" />
                                         </button>
-                                        {activeMenuId === p._id && (
-                                            <div className="absolute right-0 mt-2 w-44 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 text-left animate-in fade-in slide-in-from-top-2 duration-150">
+                                        
+                                        {activeTab === 'pending' ? (
+                                            <>
                                                 <button 
-                                                    onClick={() => { setViewEquipment(p); setActiveMenuId(null); }}
-                                                    className="w-full text-left px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all flex items-center gap-2"
+                                                    onClick={() => openApproveModal(p)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                                                    title="Approve"
                                                 >
-                                                    <FiSearch className="w-3.5 h-3.5 text-slate-400" />
-                                                    View Details
+                                                    <FiCheck className="w-3.5 h-3.5 stroke-[3]" />
+                                                    <span>Approve</span>
                                                 </button>
-                                                
-                                                {activeTab === 'pending' ? (
-                                                    <>
-                                                        <button 
-                                                            onClick={() => { handleApprove(p); setActiveMenuId(null); }}
-                                                            className="w-full text-left px-3.5 py-2 text-xs font-black text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all flex items-center gap-2"
-                                                        >
-                                                            <FiCheck className="w-3.5 h-3.5" />
-                                                            Approve
-                                                        </button>
-                                                        {isVendorEq && p.requestedCategoryName && (
-                                                            <button 
-                                                                onClick={() => { 
-                                                                    if (p.requestedCityName) {
-                                                                        toast.error("Please process the New City request first before adding to catalog!");
-                                                                        return;
-                                                                    }
-                                                                    openCatalogModal(p); 
-                                                                    setActiveMenuId(null); 
-                                                                }}
-                                                                className={`w-full text-left px-3.5 py-2 text-xs font-black rounded-xl transition-all flex items-center gap-2 ${p.requestedCityName ? 'text-slate-400 bg-slate-50 cursor-not-allowed opacity-60' : 'text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700'}`}
-                                                                title={p.requestedCityName ? "Please process the New City request first" : ""}
-                                                            >
-                                                                <FiPlus className="w-3.5 h-3.5" />
-                                                                Add to Catalog
-                                                            </button>
-                                                        )}
-                                                        {isVendorEq && p.requestedCityName && (
-                                                            <button 
-                                                                onClick={() => { openCityModal(p); setActiveMenuId(null); }}
-                                                                className="w-full text-left px-3.5 py-2 text-xs font-black text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all flex items-center gap-2"
-                                                            >
-                                                                <FiPlus className="w-3.5 h-3.5" />
-                                                                Add New City
-                                                            </button>
-                                                        )}
-                                                        <button 
-                                                            onClick={() => { openRejectModal(p); setActiveMenuId(null); }}
-                                                            className="w-full text-left px-3.5 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-all flex items-center gap-2"
-                                                        >
-                                                            <FiX className="w-3.5 h-3.5" />
-                                                            Reject
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {!p.vendorId && (
-                                                            <button 
-                                                                onClick={() => { openEdit(p); setActiveMenuId(null); }}
-                                                                className="w-full text-left px-3.5 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all flex items-center gap-2"
-                                                            >
-                                                                <FiEdit2 className="w-3.5 h-3.5 text-slate-400" />
-                                                                Edit
-                                                            </button>
-                                                        )}
-                                                        <button 
-                                                            onClick={() => { adminProductService.delete(p._id).then(fetchData); setActiveMenuId(null); }}
-                                                            className="w-full text-left px-3.5 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-all flex items-center gap-2"
-                                                        >
-                                                            <FiTrash2 className="w-3.5 h-3.5" />
-                                                            Delete
-                                                        </button>
-                                                    </>
+                                                {isVendorEq && p.requestedCategoryName && (
+                                                    <button 
+                                                        onClick={() => { 
+                                                            if (p.requestedCityName) {
+                                                                toast.error("Please process the New City request first before adding to catalog!");
+                                                                return;
+                                                            }
+                                                            openCatalogModal(p); 
+                                                        }}
+                                                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-black transition-all ${p.requestedCityName ? 'text-slate-400 bg-slate-100 opacity-60 cursor-not-allowed' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200'}`}
+                                                        title={p.requestedCityName ? "Please process the New City request first" : "Add to Catalog"}
+                                                    >
+                                                        <FiPlus className="w-3.5 h-3.5" />
+                                                        <span>Catalog</span>
+                                                    </button>
                                                 )}
-                                            </div>
+                                                {isVendorEq && p.requestedCityName && (
+                                                    <button 
+                                                        onClick={() => openCityModal(p)}
+                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-600 border border-teal-200 rounded-xl text-xs font-black transition-all"
+                                                        title="Add New City"
+                                                    >
+                                                        <FiPlus className="w-3.5 h-3.5" />
+                                                        <span>City</span>
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => openRejectModal(p)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-black active:scale-95 transition-all"
+                                                    title="Reject"
+                                                >
+                                                    <FiX className="w-3.5 h-3.5 stroke-[3]" />
+                                                    <span>Reject</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteProduct(p)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                                    title="Delete"
+                                                >
+                                                    <FiTrash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button 
+                                                    onClick={() => openEditCommissionModal(p)}
+                                                    className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                                                    title="Edit Commission (%)"
+                                                >
+                                                    <FiPercent className="w-4 h-4 stroke-[2.5]" />
+                                                </button>
+                                                {!p.vendorId && (
+                                                    <button 
+                                                        onClick={() => openEdit(p)}
+                                                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                        title="Edit Product"
+                                                    >
+                                                        <FiEdit2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button 
+                                                    onClick={() => handleDeleteProduct(p)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                                    title="Delete"
+                                                >
+                                                    <FiTrash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -840,6 +1081,104 @@ const ManageProducts = () => {
                     </div>
                 )}
 
+                {/* Approve & Set / Edit Commission Modal */}
+                {showApproveModal && approveTarget && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            onClick={() => !approving && setShowApproveModal(false)} 
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" 
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 20 }} 
+                            animate={{ scale: 1, y: 0 }} 
+                            className="relative bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden flex flex-col"
+                        >
+                            <div className={`p-6 border-b flex justify-between items-center ${commissionModalMode === 'edit' ? 'bg-blue-50/50' : 'bg-emerald-50/50'}`}>
+                                <h2 className={`text-lg font-black flex items-center gap-2 ${commissionModalMode === 'edit' ? 'text-blue-700' : 'text-emerald-700'}`}>
+                                    {commissionModalMode === 'edit' ? (
+                                        <>
+                                            <FiEdit2 className="w-5 h-5" /> Edit Platform Commission
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FiCheck className="w-5 h-5" /> Approve & Set Commission
+                                        </>
+                                    )}
+                                </h2>
+                                <button 
+                                    onClick={() => !approving && setShowApproveModal(false)} 
+                                    className={`p-2 rounded-full transition-colors text-slate-500 ${commissionModalMode === 'edit' ? 'hover:bg-blue-100' : 'hover:bg-emerald-100'}`}
+                                >
+                                    <FiX className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-1">
+                                    <p className="text-xs font-bold text-slate-500">
+                                        Equipment: <span className="font-black text-slate-800">{approveTarget._source === 'vendorEquipment' ? approveTarget.name : approveTarget.title}</span>
+                                    </p>
+                                    <p className="text-[11px] text-slate-400">
+                                        Owner: <span className="font-extrabold text-slate-700">{approveTarget.vendorId?.name || approveTarget.vendorId?.businessName || 'Owner'}</span>
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1.5 pt-1">
+                                    <label className="text-xs font-black text-slate-600 uppercase tracking-wide flex items-center justify-between">
+                                        <span>Platform Commission</span>
+                                        <span className={`text-[10px] font-bold ${commissionModalMode === 'edit' ? 'text-blue-600' : 'text-emerald-600'}`}>% (Percentage)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input 
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="0.5"
+                                            className={`w-full bg-slate-50 rounded-2xl px-4 py-3.5 pr-10 font-black text-slate-800 outline-none border border-slate-200 transition-all text-sm ${commissionModalMode === 'edit' ? 'focus:border-blue-500 focus:ring-4 focus:ring-blue-100' : 'focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'}`} 
+                                            placeholder="Enter commission % (e.g. 10)"
+                                            value={commissionInput} 
+                                            onChange={e => setCommissionInput(e.target.value)} 
+                                            autoFocus
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleApproveConfirm();
+                                                }
+                                            }}
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">%</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        {commissionModalMode === 'edit'
+                                            ? 'Changing this will update platform commission on future bookings for this equipment.'
+                                            : 'This commission percentage will apply on every booking of this equipment.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="p-6 bg-slate-50 border-t flex gap-3">
+                                <button 
+                                    type="button" 
+                                    disabled={approving}
+                                    onClick={() => setShowApproveModal(false)} 
+                                    className="flex-1 py-3.5 bg-white border border-slate-200 rounded-2xl font-black text-xs uppercase text-slate-600 hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    disabled={approving}
+                                    onClick={handleApproveConfirm} 
+                                    className={`flex-[2] py-3.5 text-white rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 ${commissionModalMode === 'edit' ? 'bg-blue-600 shadow-blue-200 hover:bg-blue-700' : 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700'}`}
+                                >
+                                    <FiCheck className="w-4 h-4 stroke-[3]" />
+                                    <span>{approving ? (commissionModalMode === 'edit' ? 'Saving...' : 'Approving...') : (commissionModalMode === 'edit' ? 'Save Commission' : 'Confirm & Approve')}</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 {/* View Equipment Details Modal */}
                 {viewEquipment && (
                     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -911,29 +1250,7 @@ const ManageProducts = () => {
                                     </div>
                                 </div>
 
-                                {/* Pricing Details */}
-                                <div className="space-y-2">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pricing Configuration</p>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        {viewEquipment._source === 'vendorEquipment' ? (
-                                            Object.entries(viewEquipment.pricing || {}).map(([key, val]) => {
-                                                if (!val?.isEnabled) return null;
-                                                const label = key === 'land_based' ? 'Acre-based' : key === 'hourly' ? 'Hourly' : 'Daily';
-                                                return (
-                                                    <div key={key} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 text-center">
-                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{label}</p>
-                                                        <p className="text-base font-black text-[#2E7D32] mt-1">₹{val.price}</p>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 text-center col-span-3">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Standard Price</p>
-                                                <p className="text-base font-black text-[#2E7D32] mt-1">₹{viewEquipment.price} / {viewEquipment.unit}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+
 
                                 {/* Operator / Driver details */}
                                 {viewEquipment.includesDriver && viewEquipment.driver && (
@@ -1075,7 +1392,7 @@ const ManageProducts = () => {
                                                 <option value="General">General (Default scrolling list)</option>
                                                 {premiumOfferings.filter(o => o.actionPayload || o.title).map((o, idx) => {
                                                     const sectionName = o.actionPayload || o.title;
-                                                    return <option key={o._id || o.id || idx} value={sectionName}>{o.title} - ({sectionName})</option>
+                                                    return <option key={o._id || o.id || idx} value={sectionName}>{o.title}</option>
                                                 })}
                                             </select>
                                         </div>
@@ -1361,17 +1678,6 @@ const ManageProducts = () => {
                                                 onChange={(e) => setTabFormData({ ...tabFormData, colorCode: e.target.value })}
                                                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
                                             />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Action Type</label>
-                                            <select
-                                                value={tabFormData.actionType}
-                                                onChange={(e) => setTabFormData({ ...tabFormData, actionType: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                                            >
-                                                <option value="navigate">Navigate to Route</option>
-                                                <option value="link">External Link</option>
-                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Route</label>

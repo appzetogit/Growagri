@@ -1,59 +1,117 @@
-import React, { memo, useRef } from 'react';
+import React, { memo, useRef, useEffect } from 'react';
 import { themeColors } from '../../../../theme';
 import OptimizedImage from '../../../../components/common/OptimizedImage';
 import OptimizedVideo from '../../../../components/common/OptimizedVideo';
+import { getYouTubeVideoId, isDirectVideoUrl } from '../../../../utils/videoUtils';
 
 const ServiceCard = memo(({ image, title, onClick, gif, youtubeUrl }) => {
   const cardRef = useRef(null);
+  const iframeRef = useRef(null);
 
-  const getYouTubeVideoId = (url) => {
-    if (!url) return null;
-    const cleanUrl = url.trim();
-    const shortsMatch = cleanUrl.match(/youtube\.com\/shorts\/([^?&]+)/);
-    if (shortsMatch) return shortsMatch[1];
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = cleanUrl.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
+  // Check if either youtubeUrl or gif contains a YouTube link
+  const ytCandidate = youtubeUrl || (typeof gif === 'string' && (gif.includes('youtube') || gif.includes('youtu.be')) ? gif : null);
+  const videoId = getYouTubeVideoId(ytCandidate);
 
-  const videoId = youtubeUrl ? getYouTubeVideoId(youtubeUrl) : null;
+  // Note: Omit &playlist to avoid playlist next/prev buttons (|<<, >>|)
   const embedUrl = videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1`
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1`
     : null;
 
-  const isCloudinaryVideo = (url) => {
-    if (!url) return false;
-    return url.includes('video/upload') || url.match(/\.(mp4|webm|ogg|mov)$|^https:\/\/res\.cloudinary\.com.*\/video\//i);
+  // Auto-loop seamlessly using postMessage API without playlist UI
+  useEffect(() => {
+    if (!videoId) return;
+
+    const handleMessage = (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && data.event === 'onStateChange' && data.info === 0) {
+          if (iframeRef.current && iframeRef.current.contentWindow) {
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'seekTo', args: [0, true] }),
+              '*'
+            );
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'playVideo', args: '' }),
+              '*'
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore non-JSON postMessage
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [videoId]);
+
+  const onIframeLoad = () => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'listening' }),
+          '*'
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'mute', args: '' }),
+          '*'
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'playVideo', args: '' }),
+          '*'
+        );
+      }
+    } catch (e) {}
   };
 
   const renderMedia = () => {
-    if (youtubeUrl && embedUrl) {
+    if (videoId && embedUrl) {
+      const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       return (
-        <div className="relative w-full h-full">
-          <iframe
-            src={embedUrl}
-            className="w-full h-full object-cover pointer-events-none"
-            frameBorder="0"
-            allow="autoplay; encrypted-media"
-            allowFullScreen
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
+        <div className="relative w-full h-full bg-black overflow-hidden">
+          {/* Instant poster image so preview is immediately visible */}
+          <img
+            src={thumbnailUrl}
+            alt={title}
+            className="w-full h-full object-cover absolute inset-0"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.src = `https://img.youtube.com/vi/${videoId}/0.jpg`;
             }}
+          />
+          {/* Scaled iframe: hides YouTube channel header & bottom watermark outside overflow */}
+          <iframe
+            ref={iframeRef}
+            src={embedUrl}
+            onLoad={onIframeLoad}
+            className="absolute pointer-events-none select-none"
+            style={{
+              width: '124%',
+              height: '124%',
+              top: '-12%',
+              left: '-12%',
+              border: 0,
+            }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
             title={title}
           />
+          {/* Full-coverage transparent overlay: intercepts all touch/click events so YouTube iframe never pauses or displays buttons */}
+          <div className="absolute inset-0 z-10 w-full h-full" />
         </div>
       );
     }
 
     const mediaUrl = gif || image;
-    if (isCloudinaryVideo(mediaUrl)) {
+    const directVideo = isDirectVideoUrl(mediaUrl) ? mediaUrl : (isDirectVideoUrl(youtubeUrl) ? youtubeUrl : null);
+
+    if (directVideo) {
       return (
         <OptimizedVideo
-          src={mediaUrl}
+          src={directVideo}
           className="w-full h-full object-cover"
           autoPlay
           loop
@@ -96,7 +154,7 @@ const ServiceCard = memo(({ image, title, onClick, gif, youtubeUrl }) => {
   return (
     <div
       ref={cardRef}
-      className="relative min-w-[200px] md:min-w-[240px] h-[350px] md:h-[420px] rounded-2xl overflow-hidden cursor-pointer transition-transform duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 active:scale-[0.98]"
+      className="relative min-w-[200px] md:min-w-[240px] h-[350px] md:h-[420px] rounded-2xl overflow-hidden cursor-pointer transition-transform duration-300 ease-out hover:scale-[1.02] hover:-translate-y-1 active:scale-[0.98] select-none"
       style={{
         boxShadow: themeColors.cardShadow,
         border: themeColors.cardBorder,
@@ -107,8 +165,8 @@ const ServiceCard = memo(({ image, title, onClick, gif, youtubeUrl }) => {
       onClick={onClick}
     >
       {renderMedia()}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-        <h3 className="text-white font-semibold text-base">{title}</h3>
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 z-20 pointer-events-none">
+        <h3 className="text-white font-semibold text-base line-clamp-2">{title}</h3>
       </div>
     </div>
   );

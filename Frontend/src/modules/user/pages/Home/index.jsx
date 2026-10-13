@@ -12,7 +12,7 @@ import { useSocket } from '../../../../context/SocketContext';
 import { toast } from 'react-hot-toast';
 import { registerFCMToken } from '../../../../services/pushNotificationService';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiX } from 'react-icons/fi';
+import { FiArrowLeft, FiX, FiPlus } from 'react-icons/fi';
 
 import { userAuthService } from '../../../../services/authService';
 // Lazy load heavy components for better initial load performance
@@ -35,7 +35,7 @@ import AddressSelectionModal from '../Checkout/components/AddressSelectionModal'
 const toAssetUrl = (url, options = {}) => {
   if (!url) return '';
   let clean = url.replace('/api/upload', '/upload');
-  if (clean.includes('res.cloudinary.com') && clean.includes('/upload/') && !clean.includes('f_auto')) {
+  if (clean.includes('res.cloudinary.com') && clean.includes('/upload/') && !clean.includes('f_auto') && !clean.includes('/video/')) {
     const width = options.width ? `,w_${options.width}` : '';
     const height = options.height ? `,h_${options.height}` : '';
     const crop = options.crop ? `,c_${options.crop}` : '';
@@ -311,11 +311,12 @@ const Home = () => {
             id: cat.id,
             title: cat.title,
             slug: cat.slug,
-            icon: toAssetUrl(cat.icon, { width: 120, height: 120, crop: 'fill' }),
+            icon: toAssetUrl(cat.icon),
             hasSaleBadge: cat.hasSaleBadge,
             badge: cat.badge,
             requiresDriver: cat.requiresDriver,
             sectionType: cat.sectionType || 'General',
+            hourlyPrice: Number(cat.hourlyPrice) || 0,
             showOnHome: cat.showOnHome ?? true
           }));
           setCategories(mappedCategories);
@@ -377,11 +378,12 @@ const Home = () => {
             id: cat.id,
             title: cat.title,
             slug: cat.slug,
-            icon: toAssetUrl(cat.icon, { width: 120, height: 120, crop: 'fill' }),
+            icon: toAssetUrl(cat.icon),
             hasSaleBadge: cat.hasSaleBadge,
             badge: cat.badge,
             requiresDriver: cat.requiresDriver,
             sectionType: cat.sectionType || 'General',
+            hourlyPrice: Number(cat.hourlyPrice) || 0,
             showOnHome: cat.showOnHome ?? true
           }));
           setCategories(mappedCategories);
@@ -458,6 +460,48 @@ const Home = () => {
     }
     setSelectedCategory(category);
     setIsCategoryModalOpen(true);
+  };
+
+  const handleQuickAddAndCheckout = async (cat) => {
+    try {
+      setActiveSectionTab(null);
+      const categoryName = cat.title || 'Agriculture';
+      const itemPrice = Number(cat.hourlyPrice) || Number(cat.hourly_price) || Number(cat.basePrice) || 0;
+      const itemIcon = toAssetUrl(cat.icon || cat.image || '');
+
+      await addToCart({
+        serviceId: cat.id || cat._id,
+        categoryId: cat.id || cat._id,
+        title: cat.title,
+        description: cat.description || 'Verified equipment service',
+        icon: itemIcon,
+        price: itemPrice,
+        unitPrice: itemPrice,
+        hourly_price: itemPrice,
+        land_price: cat.land_price || 0,
+        land_unit: cat.land_unit || 'Acre',
+        daily_price: cat.daily_price || 0,
+        categoryTitle: categoryName,
+        category: categoryName,
+        vendorId: null,
+        equipmentId: null,
+        isVendorEquipment: false
+      });
+
+      navigate('/user/checkout', {
+        state: {
+          category: categoryName,
+          rentalType: 'hourly'
+        }
+      });
+    } catch (err) {
+      console.error('Failed to add machinery to cart and proceed:', err);
+      if (err.response?.status === 401) {
+        navigate('/user/login', { state: { from: '/user/checkout' } });
+        return;
+      }
+      toast.error('Unable to proceed to checkout. Please try again.');
+    }
   };
 
   const handlePromoClick = (promo) => {
@@ -806,8 +850,10 @@ const Home = () => {
                       id: item.id || item._id,
                       title: item.title,
                       gif: toAssetUrl(item.gifUrl),
+                      youtubeUrl: item.youtubeUrl || '',
                       slug: item.slug,
-                      targetCategoryId: item.targetCategoryId
+                      targetCategoryId: item.targetCategoryId,
+                      targetServiceId: item.targetServiceId
                     }))}
                     onServiceClick={handleServiceClick}
                   />
@@ -911,7 +957,7 @@ const Home = () => {
             </div>
 
             {/* Scrollable Full-Page Body */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+            <div className="flex-1 overflow-y-auto px-4 py-5 pb-28">
               {(() => {
                 const sectionCategories = categories.filter(
                   c => (c.sectionType || '').trim().toLowerCase() === (activeSectionTab || '').trim().toLowerCase()
@@ -919,16 +965,68 @@ const Home = () => {
 
                 if (sectionCategories.length > 0) {
                   return (
-                    <div className="max-w-2xl mx-auto space-y-6">
-                      <ServiceCategories
-                        showHeader={false}
-                        categories={sectionCategories}
-                        onCategoryClick={(cat) => {
-                          setActiveSectionTab(null);
-                          handleCategoryClick(cat);
-                        }}
-                        onSeeAllClick={() => { }}
-                      />
+                    <div className="max-w-xl mx-auto">
+                      <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
+                        {sectionCategories.map((cat, idx) => {
+                          const iconSrc = toAssetUrl(cat.icon || cat.image);
+                          return (
+                            <div
+                              key={cat.id || cat._id || idx}
+                              onClick={() => handleQuickAddAndCheckout(cat)}
+                              className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group cursor-pointer active:scale-[0.98]"
+                            >
+                              {/* Machinery Image Header */}
+                              <div className="w-full h-36 sm:h-40 bg-slate-50 relative overflow-hidden flex items-center justify-center p-2.5">
+                                {iconSrc ? (
+                                  <img
+                                    src={iconSrc}
+                                    alt={cat.title}
+                                    className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                                    loading="lazy"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-emerald-50 text-emerald-600 font-black text-2xl">
+                                    {cat.title?.charAt(0) || 'M'}
+                                  </div>
+                                )}
+                                <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  Rental
+                                </div>
+                              </div>
+
+                              {/* Details & + Add Action */}
+                              <div className="p-3.5 flex flex-col justify-between flex-1 gap-2.5">
+                                <div>
+                                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug line-clamp-2">
+                                    {cat.title}
+                                  </h3>
+                                  <p className="text-[11px] font-medium text-slate-400 mt-0.5 line-clamp-1">
+                                    Verified equipment service
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1 border-t border-slate-50 mt-auto">
+                                  <span className="text-xs font-black text-emerald-700">
+                                    {cat.hourlyPrice ? `₹${cat.hourlyPrice}/hr` : 'Hourly'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickAddAndCheckout(cat);
+                                    }}
+                                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black flex items-center gap-1 transition-all shadow-sm shadow-emerald-600/20"
+                                  >
+                                    <FiPlus className="w-3.5 h-3.5" />
+                                    Add
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 }

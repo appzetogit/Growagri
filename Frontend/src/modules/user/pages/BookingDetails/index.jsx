@@ -116,14 +116,12 @@ const RentalTimer = ({ booking }) => {
   };
 
   return (
-    <div className={`p-4 rounded-2xl border flex items-center gap-3.5 shadow-sm transition-all duration-300 ${
-      isExpired
-        ? 'bg-orange-50 border-orange-200 text-orange-700 animate-pulse'
-        : 'bg-teal-50 border-teal-100 text-teal-700'
-    }`}>
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-        isExpired ? 'bg-orange-500 text-white' : 'bg-teal-500 text-white'
+    <div className={`p-4 rounded-2xl border flex items-center gap-3.5 shadow-sm transition-all duration-300 ${isExpired
+      ? 'bg-orange-50 border-orange-200 text-orange-700 animate-pulse'
+      : 'bg-teal-50 border-teal-100 text-teal-700'
       }`}>
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isExpired ? 'bg-orange-500 text-white' : 'bg-teal-500 text-white'
+        }`}>
         <FiClock className="w-5 h-5 animate-spin" style={{ animationDuration: isExpired ? '1.5s' : '8s' }} />
       </div>
       <div className="flex-1">
@@ -633,8 +631,8 @@ const BookingDetails = () => {
 
   // Base Logic (Services)
   // Use bill.originalServiceBase if available, else fallback to totalServiceBase (for older bookings), else booking.basePrice
-  const originalBase = bill 
-    ? (bill.originalServiceBase || bill.totalServiceBase || 0) 
+  const originalBase = bill
+    ? (bill.originalServiceBase || bill.totalServiceBase || 0)
     : (parseFloat(booking.basePrice) || 0);
 
   // Extra Services & Parts from vendor bill (if available)
@@ -757,8 +755,7 @@ const BookingDetails = () => {
 
                 {/* Step 2: Assigned / Handover Prep */}
                 <div className="flex flex-col items-center gap-2 w-1/4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                    ['assigned', 'journey_started', 'visited', 'in_progress', 'work_done', 'completed'].includes(booking.status?.toLowerCase()) ||
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${['assigned', 'journey_started', 'visited', 'in_progress', 'work_done', 'completed'].includes(booking.status?.toLowerCase()) ||
                     ((booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) && ['confirmed', 'accepted'].includes(booking.status?.toLowerCase())) ||
                     (['confirmed', 'accepted'].includes(booking.status?.toLowerCase()) && (booking.serviceCategory?.toLowerCase() === 'machinery' || booking.categoryTitle?.toLowerCase() === 'machinery'))
                     ? 'bg-teal-600 text-white shadow-lg shadow-teal-200' : 'bg-gray-100 text-gray-400'
@@ -924,7 +921,7 @@ const BookingDetails = () => {
                 {(() => {
                   const isAgri = ['agriculture', 'agri', 'equipment', 'machinery', 'tractor'].includes(booking.serviceCategory?.toLowerCase()) ||
                     ['agriculture', 'agri', 'equipment', 'machinery', 'tractor'].includes(booking.categoryTitle?.toLowerCase());
-                  
+
                   // Logic to prioritize correct OTP
                   let otpValue = null;
                   let otpTitle = '';
@@ -984,8 +981,8 @@ const BookingDetails = () => {
                         <div className="flex items-center justify-center gap-2 text-white text-sm">
                           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
                           <p className="font-medium">
-                            {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) 
-                              ? 'Ready for equipment handover' 
+                            {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
+                              ? 'Ready for equipment handover'
                               : (isAgri ? 'Waiting for equipment to reach your farm' : 'Waiting for professional to reach your location')}
                           </p>
                         </div>
@@ -1114,7 +1111,7 @@ const BookingDetails = () => {
                       <FiChevronRight className="w-4 h-4" />
                     </button>
 
-                    { booking.status?.toLowerCase() !== 'completed' && (booking.customerConfirmationOTP || booking.paymentOtp) && (
+                    {booking.status?.toLowerCase() !== 'completed' && (booking.customerConfirmationOTP || booking.paymentOtp) && (
                       <div className="flex flex-col items-center mb-6">
                         <p className="text-[10px] font-bold text-orange-100 uppercase tracking-[0.2em] mb-3 opacity-90">Verification Code</p>
                         <div className="flex justify-center gap-2">
@@ -1215,7 +1212,7 @@ const BookingDetails = () => {
                 <div className="bg-teal-50 rounded-xl p-3 flex items-center gap-3">
                   <FiCheckSquare className="text-teal-600 w-5 h-5 shrink-0" />
                   <p className="text-[11px] font-medium text-teal-800">
-                    {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) 
+                    {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
                       ? "The equipment's handover and return have been documented with photos. Please verify the condition."
                       : "The equipment's usage has been verified via KM photos. You can raise a dispute if you notice any discrepancy."
                     }
@@ -1444,33 +1441,33 @@ const BookingDetails = () => {
                         </div>
                         {item.card?.subtitle && <p className="text-xs text-gray-400 mt-0.5 ml-8 line-clamp-1">{item.card.subtitle}</p>}
                         {item.card?.duration && <p className="text-xs text-gray-400 mt-0.5 ml-8">⏱ {item.card.duration}</p>}
-                        
+
                         {/* Dynamic Agri & Rental Info */}
                         {booking.rental_type && (
                           <div className="ml-8 mt-2 space-y-1">
                             <span className="text-[10px] font-black tracking-widest uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 inline-block mb-1">
                               {booking.rental_type.replace('_', ' ')}
                             </span>
-                            
+
                             {booking.rental_type === 'land_based' && booking.landSize && (
                               <p className="text-xs text-gray-500 font-medium">Area: <span className="text-gray-900 font-bold">{booking.landSize}{typeof booking.landSize === 'string' && booking.landSize.match(/[a-zA-Z]/) ? '' : ' Acres'}</span></p>
                             )}
-                            
+
                             {booking.rental_type === 'hourly' && booking.estimatedDuration && (
                               <p className="text-xs text-gray-500 font-medium">Duration: <span className="text-gray-900 font-bold">{booking.estimatedDuration} Hours</span></p>
                             )}
-                            
+
                             {/* Days parameter is sometimes mapped to estimatedDuration logic based on the rentalt type */}
                             {['daily', 'monthly'].includes(booking.rental_type) && booking.estimatedDuration && (
                               <p className="text-xs text-gray-500 font-medium">Duration: <span className="text-gray-900 font-bold">{booking.estimatedDuration} Days</span></p>
                             )}
-                            
+
                             {booking.cropType && (
                               <p className="text-xs text-gray-500 font-medium">Crop: <span className="text-gray-900">{booking.cropType}</span></p>
                             )}
                           </div>
                         )}
-                        
+
                       </div>
                       <span className="text-sm font-bold text-gray-900 ml-3 shrink-0">₹{((item.card?.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}</span>
                     </div>
@@ -1631,8 +1628,8 @@ const BookingDetails = () => {
                     {(booking.tax > 0 || booking.paymentMethod === 'plan_benefit') && (
                       <div className="flex justify-between items-center text-gray-600">
                         <span>
-                          GST ({booking.basePrice - booking.discount > 0 
-                            ? Math.round((booking.tax * 100) / (booking.basePrice - booking.discount)) 
+                          GST ({booking.basePrice - booking.discount > 0
+                            ? Math.round((booking.tax * 100) / (booking.basePrice - booking.discount))
                             : 18}%)
                         </span>
                         {booking.paymentMethod === 'plan_benefit' ? (
@@ -1655,8 +1652,8 @@ const BookingDetails = () => {
                         </div>
                       ) : (
                         <span className={`font-medium ${(booking.visitingCharges || booking.visitationFee || 0) === 0 ? 'text-gray-400 font-normal italic' : 'text-gray-900'}`}>
-                          {(booking.visitingCharges || booking.visitationFee || 0) === 0 
-                            ? 'Not Added' 
+                          {(booking.visitingCharges || booking.visitationFee || 0) === 0
+                            ? 'Not Added'
                             : `₹${(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}`}
                         </span>
                       )}

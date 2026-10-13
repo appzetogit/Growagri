@@ -42,9 +42,37 @@ const createOrUpdateBill = async (req, res) => {
     // ── Fetch Settings (frozen snapshot) ──
     const settings = await Settings.findOne({ type: 'global' });
     
-    const serviceSplitPct = require('../../utils/constants').serviceSplitPct(settings);
+    const isRentalBooking = !!(
+      booking.rental_type ||
+      booking.equipmentId ||
+      booking.landSize ||
+      (booking.serviceCategory && (
+        booking.serviceCategory.toLowerCase().includes('machinery') ||
+        booking.serviceCategory.toLowerCase().includes('tractor') ||
+        booking.serviceCategory.toLowerCase().includes('equipment') ||
+        booking.serviceCategory.toLowerCase().includes('agriculture')
+      ))
+    );
+
+    const serviceSplitPct = isRentalBooking
+      ? (settings?.rentalPayoutPercentage ?? 90)
+      : require('../../utils/constants').serviceSplitPct(settings);
     const partsSplitPct = settings?.partsPayoutPercentage ?? 10;
-    const serviceGstPct = settings?.serviceGstPercentage ?? 18;
+
+    let serviceGstPct = isRentalBooking
+      ? (settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
+          ? Number(settings.rentalGstPercentage)
+          : (Number(settings?.serviceGstPercentage) || 18))
+      : (settings?.serviceGstPercentage !== undefined && settings?.serviceGstPercentage !== null
+          ? Number(settings.serviceGstPercentage)
+          : 18);
+
+    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
+      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
+      if (bookingGstPct > 0) {
+        serviceGstPct = bookingGstPct;
+      }
+    }
     const partsGstPct = settings?.partsGstPercentage ?? 18;
 
     // ═══════════════════════════════════════
@@ -53,7 +81,11 @@ const createOrUpdateBill = async (req, res) => {
     const isPlanBooking = booking.paymentMethod === 'plan_benefit';
     const originalServiceBaseForBill = isPlanBooking ? 0 : (booking.basePrice || 0);
     const originalServiceBaseForEarnings = booking.basePrice || 0;
-    const originalGST = isPlanBooking ? 0 : parseFloat(((originalServiceBaseForBill * serviceGstPct) / 100).toFixed(2));
+    const originalGST = isPlanBooking 
+      ? 0 
+      : (booking.tax && booking.tax > 0)
+        ? Number(booking.tax)
+        : parseFloat(((originalServiceBaseForBill * serviceGstPct) / 100).toFixed(2));
     const visitingCharges = Number(booking.visitingCharges) || 0;
 
     // ═══════════════════════════════════════

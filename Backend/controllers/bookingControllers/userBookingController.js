@@ -137,8 +137,54 @@ const createBooking = async (req, res) => {
             rental_type: rental_type || 'hourly',
             isProductMachinery: true
           };
+        } else {
+          // Fallback to Category collection (when services/equipment are listed under categories)
+          const catDoc = await Category.findById(serviceId);
+          if (catDoc) {
+            const hRate = catDoc.hourlyPrice || 0;
+            const lRate = catDoc.landPrice || 0;
+            const dRate = catDoc.dailyPrice || 0;
+            const bRate = hRate || lRate || dRate || catDoc.price || 500;
+
+            service = {
+              _id: catDoc._id,
+              title: catDoc.title,
+              category: catDoc.title,
+              categoryId: catDoc._id,
+              basePrice: bRate,
+              hourly_price: hRate,
+              land_price: lRate,
+              land_unit: catDoc.landUnit || 'acre',
+              daily_price: dRate,
+              iconUrl: catDoc.homeIconUrl || catDoc.imageUrl || '',
+              images: catDoc.imageUrl ? [catDoc.imageUrl] : [],
+              rental_type: rental_type || 'hourly',
+              isCategoryService: true
+            };
+          }
         }
       }
+    }
+
+    // Safety fallback: if not found in collections, synthesize from bookedItems or request metadata
+    if (!service && (reqServiceCategory || (Array.isArray(bookedItems) && bookedItems.length > 0))) {
+      const fallbackItem = (Array.isArray(bookedItems) && bookedItems.length > 0) ? bookedItems[0] : null;
+      const bPrice = fallbackItem?.price || fallbackItem?.unitPrice || 500;
+      service = {
+        _id: serviceId,
+        title: fallbackItem?.title || reqServiceCategory || 'Agricultural Service',
+        category: reqServiceCategory || fallbackItem?.category || 'Agriculture',
+        categoryId: serviceId,
+        basePrice: bPrice,
+        hourly_price: fallbackItem?.hourly_price || bPrice,
+        land_price: fallbackItem?.land_price || 0,
+        land_unit: fallbackItem?.land_unit || 'acre',
+        daily_price: fallbackItem?.daily_price || 0,
+        iconUrl: reqCategoryIcon || fallbackItem?.icon || '',
+        images: [],
+        rental_type: rental_type || 'hourly',
+        isVirtualService: true
+      };
     }
 
     if (!service) {
@@ -153,7 +199,7 @@ const createBooking = async (req, res) => {
     const category = categoryId ? await Category.findById(categoryId) : null;
 
     // Calculate total value from booked items or fallback to service base price immediately after service load
-    const isAgriService = service.category === 'Agriculture' || (category && category.title === 'Agriculture') || reqServiceCategory === 'Agriculture' || isVendorEquipmentBooking;
+    const isAgriService = service.category === 'Agriculture' || (category && category.title === 'Agriculture') || reqServiceCategory === 'Agriculture' || isVendorEquipmentBooking || service.isCategoryService || service.isVirtualService;
 
     if (isAgriService) {
       // ── Agriculture Dynamic Multiplier Logic ──
@@ -254,7 +300,8 @@ const createBooking = async (req, res) => {
     // Find vendors within dynamic radius (2km -> 5km -> 8km -> 10km -> 15km -> 20km -> 30km)
     // CUSTOM - Check Cash Limit only if payment method is CASH
     const vendorFilters = {
-      ...(category ? { service: category.title } : {}),
+      ...(category ? { service: category.title, categoryId: category._id } : (service?.category ? { service: service.category } : {})),
+      ...(service?.categoryId && !category ? { categoryId: service.categoryId } : {}),
       checkCashLimit: ['cash', 'pay_at_home'].includes(paymentMethod)
     };
 
@@ -512,10 +559,10 @@ const createBooking = async (req, res) => {
     const booking = await Booking.create({
       bookingNumber,
       userId,
-      vendorId: (isVendorEquipmentBooking && vendorEquipmentDoc?.vendorId) 
+      vendorId: (isVendorEquipmentBooking && vendorEquipmentDoc?.vendorId && req.body.isDirectVendorBooking) 
         ? (vendorEquipmentDoc.vendorId._id || vendorEquipmentDoc.vendorId) 
         : null,
-      equipmentId: isVendorEquipmentBooking ? vendorEquipmentDoc._id : null,
+      equipmentId: (isVendorEquipmentBooking && req.body.isDirectVendorBooking) ? vendorEquipmentDoc._id : null,
       serviceId,
       categoryId: finalCategory?._id || categoryId,
       serviceName: service.title,

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  FiChevronLeft, FiPlus, FiTrash2, FiUpload, 
+import {
+  FiChevronLeft, FiPlus, FiTrash2, FiUpload,
   FiSettings, FiCheckCircle, FiInfo, FiUser,
-  FiZap, FiMapPin, FiClock, FiCalendar, FiSmartphone, FiCreditCard, FiChevronDown, FiActivity
+  FiZap, FiMapPin, FiClock, FiCalendar, FiSmartphone, FiChevronDown, FiActivity
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,9 +44,9 @@ const AddEquipment = () => {
     description: '',
     images: [],
     pricing: {
-      hourly:     { price: 0, isEnabled: true },
+      hourly: { price: 0, isEnabled: true },
       land_based: { price: 0, isEnabled: false },
-      daily:      { price: 0, isEnabled: false }
+      daily: { price: 0, isEnabled: false }
     },
     includesDriver: true,
     driver: {
@@ -142,9 +142,9 @@ const AddEquipment = () => {
         const allTypes = res.success ? res.data : [];
         const selected = allTypes.find(t => t.id === activeCategoryId);
         if (selected) {
-          setCategoryMeta({ 
-            trackingType: selected.trackingType || 'none', 
-            requiresDriver: selected.requiresDriver || false 
+          setCategoryMeta({
+            trackingType: selected.trackingType || 'none',
+            requiresDriver: selected.requiresDriver || false
           });
         }
       }
@@ -230,7 +230,7 @@ const AddEquipment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // 1. Basic Identity Validation
     const submissionData = { ...form };
     if (!isRequestingCategory && !submissionData.categoryId) {
@@ -246,18 +246,8 @@ const AddEquipment = () => {
     }
 
     if (!submissionData.name || submissionData.name.length < 3) return toast.error('Please enter a valid machine name');
-    
-    // 2. Pricing Validation
-    const enabledModes = Object.keys(form.pricing).filter(k => form.pricing[k].isEnabled);
-    if (enabledModes.length === 0) return toast.error('Please enable at least one pricing mode (Hourly, Acre or Daily)');
-    
-    for (const mode of enabledModes) {
-      if (form.pricing[mode].price <= 0) {
-        return toast.error(`Please set a valid price for ${mode.replace('_', ' ')} mode`);
-      }
-    }
 
-    // 3. Driver/Operator Validation - only for 'service' type (Tractor/Harvester)
+    // 2. Driver/Operator Validation - only for 'service' type (Tractor/Harvester)
     if (form.listingType === 'service' && form.includesDriver) {
       if (!form.driver.name) return toast.error('Operator name is required');
       if (!form.driver.phone || !/^[6-9]\d{9}$/.test(form.driver.phone)) {
@@ -311,13 +301,13 @@ const AddEquipment = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        
+
         {/* Centralized Form Container */}
         <FormContainer>
-          
+
           {/* Main Configuration Section */}
-          <FormSection 
-            subtitle="Main Configuration" 
+          <FormSection
+            subtitle="Main Configuration"
             title={form.name || 'Untitled Machine'}
             titleClassName="text-slate-800 text-xl font-black tracking-tight mt-0.5"
           >
@@ -326,33 +316,22 @@ const AddEquipment = () => {
                 <div className="space-y-2">
                   <div className="relative">
                     <label className="absolute left-4 top-2 text-[9px] font-bold text-slate-400 uppercase">Machine Category</label>
-                    <select 
+                    <select
                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pt-6 text-sm font-black text-slate-800 outline-none appearance-none"
                       value={form.categoryId}
                       onChange={(e) => handleCategoryChange(e.target.value)}
                     >
-                      <option value="" className="text-slate-800">Select Type (Tractor etc)</option>
+                      <option value="" className="text-slate-800">Select Type</option>
                       {machineTypes.map(t => <option key={t.id} value={t.id} className="text-slate-800">{t.title}</option>)}
                     </select>
                     <FiChevronDown className="absolute right-5 bottom-4 text-slate-400 pointer-events-none" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRequestingCategory(true);
-                      setForm(p => ({ ...p, categoryId: '', implements: [], subCategoryIds: [] }));
-                    }}
-                    className="text-[10px] text-slate-400 hover:text-blue-600 font-bold transition-colors flex flex-wrap items-center gap-x-1.5 gap-y-1 ml-1"
-                  >
-                    <span>Can't find your machine type?</span>
-                    <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-blue-100 shadow-sm">Request one</span>
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="relative">
                     <label className="absolute left-4 top-2 text-[9px] font-bold text-slate-400 uppercase">Request Machine Type</label>
-                    <input 
+                    <input
                       type="text"
                       placeholder="e.g. Sugarcane Planter"
                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pt-6 text-sm font-black text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500/20 focus:bg-slate-50/50 transition-all"
@@ -378,7 +357,7 @@ const AddEquipment = () => {
                   <div className="space-y-2">
                     <div className="relative">
                       <label className="absolute left-4 top-2 text-[9px] font-bold text-slate-400 uppercase">Operating Zone (City)</label>
-                      <select 
+                      <select
                         className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pt-6 text-sm font-black text-slate-800 outline-none appearance-none"
                         value={form.cityIds?.[0] || ''}
                         onChange={(e) => setForm(p => ({ ...p, cityIds: [e.target.value] }))}
@@ -388,23 +367,12 @@ const AddEquipment = () => {
                       </select>
                       <FiChevronDown className="absolute right-5 bottom-4 text-slate-400 pointer-events-none" />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsRequestingCity(true);
-                        setForm(p => ({ ...p, cityIds: [] }));
-                      }}
-                      className="text-[10px] text-slate-400 hover:text-blue-600 font-bold transition-colors flex flex-wrap items-center gap-x-1.5 gap-y-1 ml-1"
-                    >
-                      <span>Can't find your city?</span>
-                      <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-blue-100 shadow-sm">Request one</span>
-                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="relative">
                       <label className="absolute left-4 top-2 text-[9px] font-bold text-slate-400 uppercase">Request Operating Zone</label>
-                      <input 
+                      <input
                         type="text"
                         placeholder="e.g. Pune, Maharashtra"
                         className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pt-6 text-sm font-black text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500/20 focus:bg-slate-50/50 transition-all"
@@ -429,8 +397,8 @@ const AddEquipment = () => {
               <AnimatePresence>
                 {machineImplements.length > 0 && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3">
-                     <p className="text-slate-400 text-[9px] font-bold uppercase ml-1">Implements & Pricing</p>
-                     <div className="space-y-1">
+                    <p className="text-slate-400 text-[9px] font-bold uppercase ml-1">Implements & Pricing</p>
+                    <div className="space-y-1">
                       {machineImplements.map(impl => {
                         const selected = form.implements.find(i => i.subCategoryId === impl.id);
                         return (
@@ -450,9 +418,9 @@ const AddEquipment = () => {
                                       implements: [...p.implements, {
                                         subCategoryId: impl.id,
                                         pricing: {
-                                          hourly:     { price: 0, isEnabled: form.pricing.hourly.isEnabled },
+                                          hourly: { price: 0, isEnabled: form.pricing.hourly.isEnabled },
                                           land_based: { price: 0, isEnabled: form.pricing.land_based.isEnabled },
-                                          daily:      { price: 0, isEnabled: form.pricing.daily.isEnabled }
+                                          daily: { price: 0, isEnabled: form.pricing.daily.isEnabled }
                                         }
                                       }]
                                     }));
@@ -501,7 +469,7 @@ const AddEquipment = () => {
                           </div>
                         );
                       })}
-                     </div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -510,84 +478,44 @@ const AddEquipment = () => {
 
           {/* Details Section */}
           <FormSection subtitle="Specifications" title="Asset Details">
-             <div className="grid grid-cols-2 gap-4">
-               <div className="col-span-2 relative">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Full Title</label>
-                 <input 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 relative">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Full Title</label>
+                <input
                   className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500"
-                  placeholder="e.g. John Deere 5050D"
+                  placeholder="Enter the Equipment name"
                   value={form.name}
                   onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                 />
-               </div>
-               <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Model No</label>
-                  <input className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500" value={form.modelNumber} onChange={e => setForm(p => ({ ...p, modelNumber: e.target.value }))} />
-               </div>
-               <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Mfg Year</label>
-                  <input className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500" type="number" value={form.year} onChange={e => setForm(p => ({ ...p, year: e.target.value }))} />
-               </div>
-               <div className="col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Description / Special Terms</label>
-                  <textarea 
-                    rows="3" 
-                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black resize-none focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500" 
-                    placeholder="e.g. Fuel extra, comes with rotavator attachment..." 
-                    value={form.description} 
-                    onChange={e => setForm(p => ({ ...p, description: e.target.value }))} 
-                  />
-               </div>
-             </div>
-          </FormSection>
-
-          {/* Pricing Section */}
-          <FormSection subtitle="Pricing Model" title="Rate Strategy" icon={FiCreditCard}>
-            <div className="space-y-4">
-              {['hourly', 'land_based', 'daily'].map(key => {
-                const isEnabled = form.pricing[key].isEnabled;
-                return (
-                  <div key={key} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        type="button" 
-                        onClick={() => setForm(p => ({ ...p, pricing: { ...p.pricing, [key]: { ...p.pricing[key], isEnabled: !p.pricing[key].isEnabled } } }))}
-                        className={`w-10 h-5 rounded-full relative transition-all duration-200 ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
-                      >
-                        <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all duration-200 ${isEnabled ? 'right-1' : 'left-1'}`} />
-                      </button>
-                      <span className={`text-xs font-black uppercase tracking-wider ${isEnabled ? 'text-slate-800' : 'text-slate-400'}`}>
-                        {key === 'land_based' ? 'Per Acre' : key === 'hourly' ? 'Hourly' : 'Daily'}
-                      </span>
-                    </div>
-                    {isEnabled ? (
-                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 w-36 transition-all">
-                        <span className="text-slate-500 font-bold text-sm">₹</span>
-                        <input 
-                          className="w-full bg-transparent border-none p-0 text-sm font-black text-slate-800 outline-none text-right placeholder:text-slate-400"
-                          type="number"
-                          placeholder="0"
-                          onFocus={(e) => e.target.select()}
-                          value={form.pricing[key].price === 0 ? "" : form.pricing[key].price}
-                          onChange={e => setForm(p => ({ ...p, pricing: { ...p.pricing, [key]: { ...p.pricing[key], price: parseFloat(e.target.value) || 0 } } }))}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Disabled</span>
-                    )}
-                  </div>
-                );
-              })}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Model No</label>
+                <input className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500" placeholder="Enter Model" value={form.modelNumber} onChange={e => setForm(p => ({ ...p, modelNumber: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Mfg Year</label>
+                <input className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500" type="number" placeholder="Enter MFG Year" onChange={e => setForm(p => ({ ...p, year: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Description / Special Terms</label>
+                <textarea
+                  rows="3"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm font-black resize-none focus:bg-white focus:border-blue-500/20 outline-none transition-all placeholder:text-slate-500"
+                  placeholder="Enter Description like Fuel extra, comes with rotavator attachment..."
+                  value={form.description}
+                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                />
+              </div>
             </div>
           </FormSection>
 
           {/* Driver Section */}
-          <FormSection 
-            subtitle="Operator Module" 
+          <FormSection
+            subtitle="Operator Module"
             title="Driver Profile"
             headerRight={
               <div className="flex flex-col items-end">
-                <button 
+                <button
                   type="button"
                   onClick={() => {
                     if (!categoryMeta.requiresDriver) {
@@ -609,18 +537,18 @@ const AddEquipment = () => {
             <AnimatePresence>
               {form.includesDriver && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-4">
-                  
+
                   {/* Worker Link Toggle */}
                   {!isEdit && vendorWorkers.length > 0 && (
                     <div className="flex flex-col gap-2">
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setShowWorkerLink(!showWorkerLink)}
                         className="text-[10px] font-black text-slate-400 hover:text-purple-600 uppercase tracking-widest flex items-center gap-1 transition-colors"
                       >
                         {showWorkerLink ? "← Back to Manual Entry" : "🔗 Link from Registered Workers"}
                       </button>
-                      
+
                       {showWorkerLink && (
                         <div className="grid grid-cols-1 gap-2 mt-1">
                           {vendorWorkers.map(w => (
@@ -667,44 +595,44 @@ const AddEquipment = () => {
                       {form.driver.photo ? <img src={form.driver.photo} className="w-full h-full object-cover rounded-xl" /> : <FiUser className="text-slate-400" />}
                     </label>
                     <div className="flex-1 space-y-2">
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all" 
-                        placeholder="Driver Name" 
-                        value={form.driver.name} 
+                      <input
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all"
+                        placeholder="Enter Driver Name"
+                        value={form.driver.name}
                         onChange={e => {
                           const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
                           setForm(p => ({ ...p, driver: { ...p.driver, name: val } }));
-                        }} 
+                        }}
                       />
-                      <input 
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all" 
-                        type="tel" 
-                        maxLength="10" 
-                        placeholder="Phone Number" 
-                        value={form.driver.phone} 
-                        onChange={e => setForm(p => ({ ...p, driver: { ...p.driver, phone: e.target.value.replace(/\D/g, '') } }))} 
+                      <input
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all"
+                        type="tel"
+                        maxLength="10"
+                        placeholder="Enter Phone Number"
+                        value={form.driver.phone}
+                        onChange={e => setForm(p => ({ ...p, driver: { ...p.driver, phone: e.target.value.replace(/\D/g, '') } }))}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                     <input 
-                       className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[10px] font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all" 
-                       type="tel" 
-                       maxLength="12" 
-                       placeholder="Aadhar Card" 
-                       value={form.driver.aadharNumber} 
-                       onChange={e => setForm(p => ({ ...p, driver: { ...p.driver, aadharNumber: e.target.value.replace(/\D/g, '') } }))} 
-                     />
-                     <input 
-                       className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[10px] font-black text-slate-800 placeholder:text-slate-500 uppercase focus:bg-white focus:border-purple-200 outline-none transition-all" 
-                       maxLength={16} 
-                       placeholder="Driving License (Alphanumeric)" 
-                       value={form.driver.licenseNumber} 
-                       onChange={e => {
-                         const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                         setForm(p => ({ ...p, driver: { ...p.driver, licenseNumber: val } }));
-                       }} 
-                     />
+                    <input
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[10px] font-black text-slate-800 placeholder:text-slate-500 focus:bg-white focus:border-purple-200 outline-none transition-all"
+                      type="tel"
+                      maxLength="12"
+                      placeholder="Aadhar Card Number"
+                      value={form.driver.aadharNumber}
+                      onChange={e => setForm(p => ({ ...p, driver: { ...p.driver, aadharNumber: e.target.value.replace(/\D/g, '') } }))}
+                    />
+                    <input
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-[10px] font-black text-slate-800 placeholder:text-slate-500 uppercase focus:bg-white focus:border-purple-200 outline-none transition-all"
+                      maxLength={16}
+                      placeholder="Driving License No."
+                      value={form.driver.licenseNumber}
+                      onChange={e => {
+                        const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        setForm(p => ({ ...p, driver: { ...p.driver, licenseNumber: val } }));
+                      }}
+                    />
                   </div>
                 </motion.div>
               )}
@@ -712,8 +640,8 @@ const AddEquipment = () => {
           </FormSection>
 
           {/* Gallery Section */}
-          <FormSection 
-            subtitle="Gallery Images" 
+          <FormSection
+            subtitle="Gallery Images"
             title="Machine Photos"
             headerRight={
               <div className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
@@ -721,33 +649,33 @@ const AddEquipment = () => {
               </div>
             }
           >
-             <div className="grid grid-cols-4 gap-3">
-               {form.images.map((img, idx) => (
-                   <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm">
-                     <img src={img} className="w-full h-full object-cover" alt={`Machine photo ${idx + 1}`} />
-                     <button 
-                       type="button" 
-                       onClick={() => setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))} 
-                       className="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform z-10"
-                     >
-                       <FiTrash2 className="w-3 h-3" />
-                     </button>
-                   </div>
-                ))}
-               {form.images.length < 5 && (
-                  <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 hover:bg-slate-100/50 hover:border-slate-300 cursor-pointer active:scale-95 transition-all shadow-sm">
-                    <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => handleImageUpload(e)} disabled={uploading} />
-                    {uploading ? <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /> : <FiPlus className="text-slate-400 w-5 h-5" />}
-                  </label>
-               )}
-             </div>
+            <div className="grid grid-cols-4 gap-3">
+              {form.images.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm">
+                  <img src={img} className="w-full h-full object-cover" alt={`Machine photo ${idx + 1}`} />
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))}
+                    className="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform z-10"
+                  >
+                    <FiTrash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {form.images.length < 5 && (
+                <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 hover:bg-slate-100/50 hover:border-slate-300 cursor-pointer active:scale-95 transition-all shadow-sm">
+                  <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => handleImageUpload(e)} disabled={uploading} />
+                  {uploading ? <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /> : <FiPlus className="text-slate-400 w-5 h-5" />}
+                </label>
+              )}
+            </div>
           </FormSection>
 
         </FormContainer>
 
         {/* Large Launcher Button (Gradient) */}
         <div className="px-5">
-          <button 
+          <button
             type="submit"
             disabled={submitting}
             className="w-full py-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-[32px] shadow-lg shadow-blue-500/20 text-sm font-black uppercase tracking-[0.2em] active:scale-[0.98] transition-all flex items-center justify-center gap-3"

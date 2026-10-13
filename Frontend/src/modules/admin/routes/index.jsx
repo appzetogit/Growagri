@@ -78,7 +78,7 @@ const AdminRoutes = () => {
           <Route path="bookings/km-photos" element={<Navigate to="/admin/bookings" replace />} />
           <Route path="users/kyc" element={<KycVerification />} />
           <Route path="equipment-catalog/*" element={<UserCategories />} />
-          <Route path="equipment-approvals/*" element={<EquipmentApproval />} />
+          <Route path="equipment-approvals/*" element={<Navigate to="/admin/products?tab=pending" replace />} />
           <Route path="payments/*" element={<Payments />} />
           <Route path="reports/*" element={<Reports />} />
           <Route path="notifications/*" element={<Notifications />} />

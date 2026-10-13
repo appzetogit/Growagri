@@ -4,11 +4,14 @@ import maintenanceService from '../modules/vendor/services/maintenanceService';
 import { isWithinInterval, parseISO } from 'date-fns';
 import { registerFCMToken } from '../services/pushNotificationService';
 import { playAlertRing } from '../utils/notificationSound';
+import { getEarningsOverview } from '../modules/vendor/services/earningsService';
 
 const VendorDashboardContext = createContext(null);
 
 const DEFAULT_STATS = {
   todayEarnings: 0,
+  monthEarnings: 0,
+  monthlyEarnings: 0,
   activeJobs: 0,
   pendingAlerts: 0,
   totalEarnings: 0,
@@ -234,7 +237,9 @@ export const VendorDashboardProvider = ({ children }) => {
     // Update stats with cache persist
     setStats(prev => {
       const updatedStats = {
-        todayEarnings: apiStats?.vendorEarnings || 0,
+        todayEarnings: apiStats?.todayEarnings ?? apiStats?.vendorEarnings ?? 0,
+        monthEarnings: apiStats?.monthEarnings ?? 0,
+        monthlyEarnings: apiStats?.monthEarnings ?? 0,
         activeJobs: apiStats?.inProgressBookings || 0,
         pendingAlerts: mergedPending.length,
         totalEarnings: apiStats?.vendorEarnings || 0,
@@ -330,6 +335,22 @@ export const VendorDashboardProvider = ({ children }) => {
           return updatedStats;
         });
       }
+
+      // Fetch earnings summary in background to guarantee today and month earnings
+      getEarningsOverview().then(overview => {
+        if (overview && (overview.today !== undefined || overview.month !== undefined)) {
+          setStats(prev => {
+            const updated = {
+              ...prev,
+              todayEarnings: overview.today ?? prev.todayEarnings,
+              monthEarnings: overview.month ?? prev.monthEarnings,
+              monthlyEarnings: overview.month ?? prev.monthlyEarnings
+            };
+            localStorage.setItem('vendorDashboardStats', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      }).catch(() => {});
       
       hasLoadedOnceRef.current = true;
       setHasLoadedOnce(true);

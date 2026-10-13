@@ -149,6 +149,7 @@ export const ensureIds = (catalog) => {
         : [],
     },
     categories: (catalog.categories || []).map((c) => ({
+      ...c,
       id: c.id || `ucat-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       title: c.title || "",
       slug: c.slug || slugify(c.title),
@@ -169,7 +170,8 @@ export const ensureIds = (catalog) => {
       // Machinery Classification
       trackingType: c.trackingType || "none",
       requiresDriver: Boolean(c.requiresDriver),
-      sectionType: c.sectionType || "General",
+      sectionType: c.sectionType || "",
+      hourlyPrice: Number(c.hourlyPrice) || 0,
     })),
     services: (catalog.services || []).map((s) => ({
       id: s.id || `usvc-${Date.now()}-${Math.random().toString(16).slice(2)}`,

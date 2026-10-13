@@ -18,6 +18,10 @@ const getDashboardStats = async (req, res) => {
     const vendor = await require('../../models/Vendor').findById(vendorId);
     const vendorCategories = vendor?.service || [];
 
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     // Optimize by running all independent DB queries in parallel
     const [
       totalBookings,
@@ -27,7 +31,9 @@ const getDashboardStats = async (req, res) => {
       workersOnline,
       earningsResult,
       recentBookings,
-      ecommerceEarningsResult
+      ecommerceEarningsResult,
+      todayEarningsResult,
+      monthEarningsResult
     ] = await Promise.all([
       // Total bookings (excluding accepted but unpaid)
       Booking.countDocuments({
@@ -118,6 +124,16 @@ const getDashboardStats = async (req, res) => {
             totalEcommerceEarnings: { $sum: '$pricing.vendorBalance' }
           }
         }
+      ]),
+      // Today earnings from paid bills
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid', paidAt: { $gte: startOfToday } } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
+      ]),
+      // Month earnings from paid bills
+      VendorBill.aggregate([
+        { $match: { vendorId: vendorObjectId, status: 'paid', paidAt: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$vendorTotalEarning' } } }
       ])
     ]);
 
@@ -144,6 +160,8 @@ const getDashboardStats = async (req, res) => {
     const totalRevenue = earningsResult[0]?.totalRevenue || 0;
     const vendorEarnings = vendor?.wallet?.earnings || 0;
     const ecommerceEarnings = ecommerceEarningsResult[0]?.totalEcommerceEarnings || 0;
+    const todayEarnings = todayEarningsResult[0]?.total || 0;
+    const monthEarnings = monthEarningsResult[0]?.total || 0;
 
     // Compliance Alerts (New Agriculture Feature)
     const complianceAlerts = [];
@@ -176,6 +194,8 @@ const getDashboardStats = async (req, res) => {
           inProgressBookings,
           totalRevenue,
           vendorEarnings,
+          todayEarnings,
+          monthEarnings,
           ecommerceEarnings, // NEW
           workersOnline,
           rating,

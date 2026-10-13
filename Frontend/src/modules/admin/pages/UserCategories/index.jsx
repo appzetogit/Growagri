@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { ensureIds, loadCatalog } from "./utils";
 import HomePage from "./pages/HomePage";
 import CategoriesPage from "./pages/CategoriesPage";
-import ServicesPage from "./pages/ServicesPage";
 import BrandsPage from "./pages/BrandsPage";
 
 
@@ -63,36 +62,13 @@ const UserCategories = () => {
 
   return (
     <div className="space-y-4">
-      {/* Global City Filter Header - Visible only to Super Admin */}
-      {isAdminSuper && (
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 rounded-xl shadow-lg flex items-center justify-between text-white border border-slate-700">
-          <div>
-            <h2 className="text-lg font-bold text-white">Parameters</h2>
-            <p className="text-sm text-slate-300">Filter all catalog content by city</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-slate-200">Selected City:</label>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="px-4 py-2 bg-slate-700 text-white border border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-w-[200px]"
-            >
-              <option value="" className="font-bold text-yellow-300">Default (All India) - Fallback</option>
-              {cities.map(city => {
-                const cityId = city._id || city.id;
-                return <option key={cityId} value={cityId}>{city.name}</option>
-              })}
-            </select>
-          </div>
-        </div>
-      )}
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
         <Routes>
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home" element={<HomePage catalog={catalog} setCatalog={setCatalog} selectedCity={selectedCity} />} />
           <Route path="categories" element={<CategoriesPage catalog={catalog} setCatalog={setCatalog} selectedCity={selectedCity} />} />
-          <Route path="sections" element={<ServicesPage catalog={catalog} setCatalog={setCatalog} selectedCity={selectedCity} />} />
+          <Route path="sections" element={<Navigate to="categories" replace />} />
           <Route path="brands" element={<BrandsPage catalog={catalog} setCatalog={setCatalog} selectedCity={selectedCity} />} />
 
           <Route path="*" element={<Navigate to="home" replace />} />

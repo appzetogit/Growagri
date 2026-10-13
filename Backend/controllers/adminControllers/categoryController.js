@@ -50,6 +50,7 @@ const formatCategory = (cat) => ({
   trackingType: cat.trackingType || 'none',
   requiresDriver: cat.requiresDriver || false,
   sectionType: cat.sectionType || 'General',
+  hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
   metaTitle: cat.metaTitle,
   metaDescription: cat.metaDescription,
   createdAt: cat.createdAt,
@@ -178,7 +179,8 @@ const createCategory = async (req, res) => {
       isAlwaysMain,
       trackingType,
       requiresDriver,
-      sectionType
+      sectionType,
+      hourlyPrice
     } = req.body;
 
     console.log('Creating category with payload:', req.body);
@@ -232,6 +234,7 @@ const createCategory = async (req, res) => {
       trackingType: trackingType || 'none',
       requiresDriver: Boolean(requiresDriver),
       sectionType: sectionType || 'General',
+      hourlyPrice: Number(hourlyPrice) || 0,
       createdBy: req.user?._id || req.userId || null
     });
 
@@ -298,7 +301,8 @@ const updateCategory = async (req, res) => {
       isAlwaysMain,
       trackingType,
       requiresDriver,
-      sectionType
+      sectionType,
+      hourlyPrice
     } = req.body;
 
     const category = await Category.findById(id);
@@ -377,6 +381,7 @@ const updateCategory = async (req, res) => {
     if (trackingType !== undefined) category.trackingType = trackingType;
     if (requiresDriver !== undefined) category.requiresDriver = Boolean(requiresDriver);
     if (sectionType !== undefined) category.sectionType = sectionType;
+    if (hourlyPrice !== undefined) category.hourlyPrice = Number(hourlyPrice) || 0;
 
     if (updateCityIds !== undefined) {
       category.cityIds = updateCityIds;

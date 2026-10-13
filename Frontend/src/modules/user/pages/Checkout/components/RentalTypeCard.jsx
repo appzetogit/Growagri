@@ -59,15 +59,16 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
 
     // Check availability whenever date/time changes
     const checkAvailability = useCallback(async () => {
-        if (!serviceId || !selectedDate) return;
+        const dateToUse = selectedDate || new Date();
+        if (!serviceId || !dateToUse) return;
 
         try {
             setChecking(true);
             setAvailability(null);
 
-            const dateStr = selectedDate instanceof Date
-                ? selectedDate.toISOString().split('T')[0]
-                : selectedDate;
+            const dateStr = dateToUse instanceof Date
+                ? dateToUse.toISOString().split('T')[0]
+                : dateToUse;
 
             const res = await bookingService.checkEquipmentAvailability(serviceId, dateStr, selectedTime);
 
@@ -120,43 +121,49 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
     }, [pricing, selectedRental]);
 
 
+    // Format today's date (fixed, non-changeable current date)
+    const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
     return (
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
             {/* Header */}
-            <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-                    <span className="text-base">🚜</span>
+            <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
+                    <span className="text-sm">🚜</span>
                 </div>
                 <div>
-                    <p className="text-sm font-extrabold text-gray-900">Equipment Rental Type</p>
-                    <p className="text-[10px] text-gray-400 font-medium">Select how you want to rent this equipment</p>
+                    <p className="text-xs font-extrabold text-gray-900 leading-tight">Equipment Rental Type</p>
+                    <p className="text-[9px] text-gray-400 font-medium">Select how you want to rent this equipment</p>
                 </div>
             </div>
 
             {/* Rental Type Pills */}
-            <div className={`grid gap-2 mb-4`} style={{ gridTemplateColumns: `repeat(${displayOptions.length}, minmax(0, 1fr))` }}>
+            <div className={`grid gap-1.5 mb-2.5`} style={{ gridTemplateColumns: `repeat(${displayOptions.length}, minmax(0, 1fr))` }}>
                 {displayOptions.map((opt) => {
-                    const Icon = opt.icon;
+                    const isHourly = opt.value === 'hourly';
+                    const Icon = isHourly ? FiCalendar : opt.icon;
+                    const labelText = isHourly ? todayFormatted : opt.label;
                     const isSelected = selectedRental === opt.value;
                     return (
                         <button
                             key={opt.value}
+                            type="button"
                             onClick={() => handleSelect(opt.value)}
-                            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all active:scale-95"
+                            className="flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all active:scale-95"
                             style={{
                                 borderColor: isSelected ? opt.color : '#e5e7eb',
                                 background: isSelected ? opt.bg : '#fafafa',
                             }}
                         >
                             <Icon
-                                className="w-5 h-5"
+                                className="w-4 h-4"
                                 style={{ color: isSelected ? opt.color : '#9ca3af' }}
                             />
                             <span
-                                className="text-[11px] font-extrabold text-center leading-tight"
+                                className="text-[10px] font-black text-center leading-tight"
                                 style={{ color: isSelected ? opt.color : '#6b7280' }}
                             >
-                                {opt.label}
+                                {labelText}
                             </span>
                         </button>
                     );
@@ -164,10 +171,10 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
             </div>
 
             {/* Quantity Input based on Type */}
-            <div className="mb-4 pt-3 border-t border-gray-50">
-                <div className="flex items-center justify-between gap-4">
+            <div className="mb-2.5 pt-2 border-t border-gray-50">
+                <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">
                             {selectedRental === 'hourly' && 'Estimated Hours'}
                             {selectedRental === 'land_based' && `Total Area (${landUnit})`}
                             {selectedRental === 'monthly' && 'Duration (Months)'}
@@ -180,10 +187,10 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
                                 step="0.1"
                                 value={quantity}
                                 onChange={(e) => handleQuantityChange(e.target.value)}
-                                className="w-full pl-4 pr-12 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                                className="w-full pl-3 pr-10 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                                 placeholder={selectedRental === 'land_based' ? "e.g. 5" : "1"}
                             />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 uppercase">
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-400 uppercase">
                                 {selectedRental === 'hourly' && 'Hrs'}
                                 {selectedRental === 'land_based' && landUnit}
                                 {selectedRental === 'monthly' && 'Mo'}
@@ -192,45 +199,45 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
                         </div>
                     </div>
                 </div>
-                <p className="text-[9px] text-gray-400 mt-2 italic">
+                <p className="text-[8px] text-gray-400 mt-1 italic">
                     * Final amount will be calculated by vendor based on actual {selectedRental === 'land_based' ? landUnit : 'usage'}.
                 </p>
             </div>
 
             {/* Availability Status */}
-            {selectedDate ? (
-                <div className="rounded-xl border overflow-hidden">
+            {(selectedDate || selectedRental === 'hourly') ? (
+                <div className="rounded-lg border overflow-hidden">
                     {checking ? (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50">
-                            <FiLoader className="w-4 h-4 text-gray-400 animate-spin" />
-                            <p className="text-xs text-gray-500 font-medium">Checking equipment availability...</p>
+                        <div className="flex items-center gap-2 p-2 bg-gray-50">
+                            <FiLoader className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+                            <p className="text-[10px] text-gray-500 font-medium">Checking equipment availability...</p>
                         </div>
                     ) : availability ? (
                         availability.available ? (
-                            <div className="flex items-center gap-3 p-3 bg-green-50 border-green-200">
-                                <FiCheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <div className="flex items-center gap-2 p-2 bg-green-50 border-green-200">
+                                <FiCheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                                 <div>
-                                    <p className="text-xs font-bold text-green-800">✅ Equipment Available</p>
-                                    <p className="text-[10px] text-green-600">
+                                    <p className="text-[11px] font-bold text-green-800">✅ Equipment Available</p>
+                                    <p className="text-[9px] text-green-600">
                                         Available for your selected date & time slot.
                                     </p>
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-3 bg-red-50 border-red-200">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <FiAlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                    <p className="text-xs font-bold text-red-700">Equipment Already Booked</p>
+                            <div className="p-2 bg-red-50 border-red-200">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <FiAlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                                    <p className="text-[11px] font-bold text-red-700">Equipment Already Booked</p>
                                 </div>
-                                <p className="text-[10px] text-red-600 mb-2">
+                                <p className="text-[9px] text-red-600 mb-1.5">
                                     This slot is not available for the selected time.
                                 </p>
                                 {availability.nextAvailableSlot && (
-                                    <div className="bg-white border border-red-100 rounded-lg p-2.5 flex items-center gap-2">
-                                        <FiClock className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                                    <div className="bg-white border border-red-100 rounded-lg p-2 flex items-center gap-2">
+                                        <FiClock className="w-3 h-3 text-orange-500 flex-shrink-0" />
                                         <div>
-                                            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Next Available Slot</p>
-                                            <p className="text-xs font-extrabold text-orange-700">{availability.nextAvailableSlot}</p>
+                                            <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Next Available Slot</p>
+                                            <p className="text-[11px] font-extrabold text-orange-700">{availability.nextAvailableSlot}</p>
                                         </div>
                                     </div>
                                 )}
@@ -239,9 +246,9 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
                     ) : null}
                 </div>
             ) : (
-                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <FiAlertTriangle className="w-4 h-4 text-gray-400" />
-                    <p className="text-[11px] text-gray-500 font-medium">
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
+                    <FiAlertTriangle className="w-3.5 h-3.5 text-gray-400" />
+                    <p className="text-[10px] text-gray-500 font-medium">
                         {selectedRental === 'monthly' ? 'Select a start date to check availability' : 'Select a date & time to check availability'}
                     </p>
                 </div>
