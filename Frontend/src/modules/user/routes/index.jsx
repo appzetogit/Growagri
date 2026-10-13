@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import PageTransition from '../components/common/PageTransition';
 import BottomNav from '../components/layout/BottomNav';
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -57,7 +57,6 @@ const AboutGroo = lazyLoad(() => import('../pages/AboutHomster'));
 const HowToUse = lazyLoad(() => import('../pages/HowToUse'));
 const UpdateProfile = lazyLoad(() => import('../pages/UpdateProfile'));
 const Login = lazyLoad(() => import('../pages/login'));
-const Signup = lazyLoad(() => import('../pages/signup'));
 const Privacy = lazyLoad(() => import('../pages/Privacy'));
 
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
@@ -121,7 +120,7 @@ const UserRoutes = () => {
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<PublicRoute userType="user"><Login /></PublicRoute>} />
-              <Route path="/signup" element={<PublicRoute userType="user"><Signup /></PublicRoute>} />
+              <Route path="/signup" element={<Navigate to="/user/login" replace />} />
 
               {/* Protected routes (auth required) */}
               <Route path="/" element={<ProtectedRoute userType="user"><Home /></ProtectedRoute>} />

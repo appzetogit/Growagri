@@ -74,12 +74,13 @@
     "route": "/admin/settlements",
     "allowedRoles": [
       "super_admin"
-    ],
-    "children": [
-      "Pending",
-      "Withdrawals",
-      "Owners with Due",
-      "History"
+    ]
+  },
+  {
+    "title": "Vendor Withdraw",
+    "route": "/admin/settlements/withdrawals",
+    "allowedRoles": [
+      "super_admin"
     ]
   },
   {

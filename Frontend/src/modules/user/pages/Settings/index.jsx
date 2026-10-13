@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiBell, FiMail, FiPhone, FiMessageCircle, FiShield, FiChevronRight, FiLogOut, FiTrash2, FiGlobe } from 'react-icons/fi';
+import { FiArrowLeft, FiBell, FiMail, FiPhone, FiMessageCircle, FiShield, FiChevronRight, FiTrash2 } from 'react-icons/fi';
 import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
@@ -11,7 +11,7 @@ import BottomNav from '../../components/layout/BottomNav';
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { language, languages, t } = useLanguage();
+  const { t } = useLanguage();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -110,43 +110,6 @@ const Settings = () => {
       </header>
 
       <main className="px-4 py-4">
-        {/* Language Selection Section */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-black mb-3">{t('Language')}</h2>
-          <button
-            onClick={() => navigate('/user/language')}
-            className="w-full bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between hover:bg-gray-50 active:scale-[0.98] transition-all shadow-xs"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-700">
-                <FiGlobe className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <span className="text-sm font-bold text-black block">
-                  {languages[language]?.nativeLabel || language}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {languages[language]?.label || 'Change language'}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                {languages[language]?.nativeLabel || language}
-              </span>
-              <FiChevronRight className="w-5 h-5 text-gray-400" />
-            </div>
-          </button>
-        </div>
-
-        {/* Order Related Messages Section */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-black mb-2">{t('Order related messages')}</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            {t("Order related messages can't be turned off as they are important for service experience.")}
-          </p>
-        </div>
-
         {/* Notifications & Reminders Section */}
         <div className="mb-6">
           <h2 className="text-base font-bold text-black mb-4">{t('Notifications & reminders')}</h2>
@@ -200,23 +163,6 @@ const Settings = () => {
         <div className="mb-6">
           <h2 className="text-base font-bold text-black mb-4">{t('Account')}</h2>
           <div className="space-y-3">
-            <button
-              onClick={async () => {
-                const confirmed = window.confirm('Are you sure you want to log out?');
-                if (confirmed) {
-                  await userAuthService.logout();
-                  navigate('/user/login');
-                  toast.success('Logged out successfully');
-                }
-              }}
-              className="w-full bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3 hover:bg-gray-50 active:scale-[0.98] transition-all"
-            >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-50">
-                <FiLogOut className="w-5 h-5 text-red-500" />
-              </div>
-              <span className="text-sm font-medium text-red-600">{t('Log Out')}</span>
-            </button>
-
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="w-full bg-white rounded-xl border border-red-200 p-4 flex items-center gap-3 hover:bg-red-50 active:scale-[0.98] transition-all"
@@ -295,62 +241,6 @@ const Settings = () => {
               <span className="text-sm font-medium text-black">{t('Privacy & data')}</span>
             </div>
             <FiChevronRight className="w-5 h-5 text-gray-400" />
-          </button>
-
-          {/* Diagnostic Test Button */}
-          <button
-            onClick={async () => {
-              try {
-                const { registerFCMToken, isFlutterWebView } = await import('../../../../services/pushNotificationService');
-                const toastId = toast.loading('Attempting to register for notifications...');
-                const inWebView = isFlutterWebView();
-
-                // 1. Register Token (Optional inside WebView)
-                let token = null;
-                try {
-                  token = await registerFCMToken('user', true);
-                } catch (e) {
-                  console.warn('FCM registration skipped or failed:', e);
-                }
-
-                if (!token && !inWebView) {
-                  toast.error('Could not register. Check browser permissions.', { id: toastId });
-                  return;
-                }
-
-                // 2. Send Test Notification from Backend
-                toast.loading('Sending test notification...', { id: toastId });
-
-                const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/users/fcm-tokens/test`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                  }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                  toast.success(`Sent! Success: ${data.successCount}`, { id: toastId });
-                } else {
-                  toast.error(`Failed to send: ${data.message || 'Unknown error'}`, { id: toastId });
-                }
-
-              } catch (err) {
-                toast.error('Test failed. See console.', { id: toastId });
-                console.error(err);
-              }
-            }}
-            className="w-full bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3 hover:bg-gray-50 active:scale-[0.98] transition-all"
-          >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 166, 166, 0.1)' }}>
-              <FiBell className="w-5 h-5" style={{ color: themeColors.button }} />
-            </div>
-            <div className="text-left">
-              <span className="text-sm font-medium text-black block">Test Push Notifications</span>
-              <span className="text-xs text-gray-500">Tap to register & simulate alert</span>
-            </div>
           </button>
         </div>
       </main>

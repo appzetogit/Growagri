@@ -92,6 +92,13 @@ const createBooking = async (req, res) => {
       const VendorEquipment = require('../../models/VendorEquipment');
       vendorEquipmentDoc = await VendorEquipment.findById(serviceId).populate('vendorId').populate('categoryId');
       if (vendorEquipmentDoc) {
+        // Vendor has switched this machine off
+        if (vendorEquipmentDoc.isAvailable === false) {
+          return res.status(400).json({
+            success: false,
+            message: 'This equipment is currently not available for booking.'
+          });
+        }
         isVendorEquipmentBooking = true;
         const getRate = (p) => {
           if (!p || p.isEnabled === false) return 0;

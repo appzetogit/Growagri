@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiBell, FiVolume2, FiGlobe, FiInfo, FiLogOut, FiTrash2, FiMapPin } from 'react-icons/fi';
+import { FiBell, FiVolume2, FiInfo, FiTrash2, FiMapPin } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
 import { vendorAuthService } from '../../../../services/authService';
@@ -113,27 +113,6 @@ const Settings = () => {
     }
   };
 
-  const handleLanguageChange = (lang) => {
-    const updated = { ...settings, language: lang };
-    setSettings(updated);
-    localStorage.setItem('vendorSettings', JSON.stringify(updated));
-  };
-
-  const handleLogout = async () => {
-    try {
-      await vendorAuthService.logout();
-      toast.success('Logged out successfully');
-      navigate('/vendor/login');
-    } catch (error) {
-      // Even if API call fails, clear local storage
-      localStorage.removeItem('vendorAccessToken');
-      localStorage.removeItem('vendorRefreshToken');
-      localStorage.removeItem('vendorData');
-      toast.success('Logged out successfully');
-      navigate('/vendor/login');
-    }
-  };
-
   const handleDeleteAccount = () => {
     setShowDeleteConfirm(true);
   };
@@ -234,45 +213,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Language Settings */}
-        <div
-          className="bg-white rounded-xl p-4 mb-6 shadow-md"
-          style={{
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <FiGlobe className="w-5 h-5" style={{ color: themeColors.icon }} />
-            <h3 className="font-bold text-gray-800">Language</h3>
-          </div>
-
-          <div className="space-y-2">
-            {[
-              { code: 'en', name: 'English' },
-              { code: 'hi', name: 'हिंदी' },
-            ].map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => handleLanguageChange(lang.code)}
-                className={`w-full py-3 px-4 rounded-lg text-left transition-all ${settings.language === lang.code
-                  ? 'text-white'
-                  : 'bg-gray-50 text-gray-700'
-                  }`}
-                style={
-                  settings.language === lang.code
-                    ? {
-                      background: themeColors.button,
-                      boxShadow: `0 2px 8px ${themeColors.button}40`,
-                    }
-                    : {}
-                }
-              >
-                {lang.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* About */}
         <div
           className="bg-white rounded-xl p-4 mb-6 shadow-md"
@@ -290,25 +230,6 @@ const Settings = () => {
             <p className="text-sm text-gray-600">Equipment Owner App</p>
           </div>
         </div>
-
-        {/* Logout */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleLogout();
-          }}
-          className="w-full py-4 rounded-xl font-semibold text-white mb-4 flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={{
-            background: themeColors.button,
-            boxShadow: `0 4px 12px ${themeColors.button}40`,
-            cursor: 'pointer'
-          }}
-        >
-          <FiLogOut className="w-5 h-5" />
-          Logout
-        </button>
 
         {/* Delete Account */}
         <button

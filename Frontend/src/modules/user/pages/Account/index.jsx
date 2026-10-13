@@ -24,7 +24,6 @@ import {
   FiShield,
   FiZap,
   FiCheckCircle,
-  FiTrash2,
   FiGlobe
 } from 'react-icons/fi';
 import { MdAccountBalanceWallet } from 'react-icons/md';
@@ -34,8 +33,6 @@ import { useLanguage } from '../../../../context/LanguageContext';
 const Account = () => {
   const navigate = useNavigate();
   const { language, languages, t } = useLanguage();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [userProfile, setUserProfile] = useState({
     name: 'Verified Farmer',
     phone: '',
@@ -195,7 +192,7 @@ const Account = () => {
   }
 
   return (
-    <div className="min-h-screen pb-32 relative bg-white">
+    <div className="relative bg-white">
       {/* Refined Brand Mesh Gradient Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0"
@@ -341,31 +338,31 @@ const Account = () => {
           <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3 mb-6">
             <button
               onClick={() => navigate('/user/wallet')}
-              className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
+              className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
             >
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform"
                 style={{ backgroundColor: `${themeColors.brand.teal}15`, color: themeColors.brand.teal }}
               >
-                <MdAccountBalanceWallet className="w-5 h-5" />
+                <MdAccountBalanceWallet className="w-4 h-4" />
               </div>
-              <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Balance</span>
-              <p className={`text-lg font-black mt-0.5 ${userProfile.walletBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+              <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Balance</span>
+              <p className={`text-base font-black mt-0.5 ${userProfile.walletBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
                 ₹{Math.abs(userProfile.walletBalance || 0).toLocaleString('en-IN')}
                 {userProfile.walletBalance < 0 && <span className="text-xs font-normal ml-1">(Penalty)</span>}
               </p>
             </button>
             <button
               onClick={() => navigate('/user/rewards')}
-              className="bg-gray-900 p-4 rounded-3xl shadow-lg shadow-gray-200 hover:shadow-xl transition-all text-left relative overflow-hidden group"
+              className="bg-gray-900 p-3 rounded-2xl shadow-lg shadow-gray-200 hover:shadow-xl transition-all text-left relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-black opacity-50"></div>
               <div className="relative z-10 h-full flex flex-col justify-between">
-                <div className="w-10 h-10 bg-white/10 text-yellow-400 rounded-2xl flex items-center justify-center mb-3 backdrop-blur-sm group-hover:scale-110 transition-transform">
-                  <FiGift className="w-5 h-5" />
+                <div className="w-8 h-8 bg-white/10 text-yellow-400 rounded-xl flex items-center justify-center mb-2 backdrop-blur-sm group-hover:scale-110 transition-transform">
+                  <FiGift className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-xs text-white/60 font-bold uppercase tracking-wider">Rewards</span>
-                  <p className="text-lg font-black text-white mt-0.5">Refer & Earn</p>
+                  <span className="text-[11px] text-white/60 font-bold uppercase tracking-wider">Rewards</span>
+                  <p className="text-base font-black text-white mt-0.5">Refer & Earn</p>
                 </div>
               </div>
             </button>
@@ -374,8 +371,7 @@ const Account = () => {
           {/* Menu Groups */}
 
           {/* Shopping */}
-          <motion.div variants={itemVariants} className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-2">Membership</h3>
+          <motion.div variants={itemVariants}>
             <MenuItem
               icon={FiShield}
               label="My Subscription"
@@ -383,15 +379,14 @@ const Account = () => {
               onClick={() => navigate('/user/my-subscription')}
             />
             <MenuItem
-              icon={FiStar}
+              icon={FiZap}
               label="Explore Plans"
               onClick={() => navigate('/user/my-plan')}
             />
           </motion.div>
 
           {/* Activity */}
-          <motion.div variants={itemVariants} className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-2">Activity</h3>
+          <motion.div variants={itemVariants}>
             <MenuItem
               icon={FiClipboard}
               label="My Bookings"
@@ -405,8 +400,7 @@ const Account = () => {
           </motion.div>
 
           {/* Preferences */}
-          <motion.div variants={itemVariants} className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-2">Preferences</h3>
+          <motion.div variants={itemVariants}>
             <MenuItem
               icon={FiMapPin}
               label="Manage Addresses"
@@ -429,7 +423,6 @@ const Account = () => {
 
           {/* Support & Legal */}
           <motion.div variants={itemVariants} className="mb-8">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 pl-2">Support & More</h3>
             <MenuItem
               icon={FiHeadphones}
               label="Help & Support"
@@ -458,73 +451,14 @@ const Account = () => {
               <FiLogOut className="w-5 h-5" />
               <span>Log out</span>
             </motion.button>
-
-            {/* Delete Account Button */}
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowDeleteConfirm(true)}
-              className="w-full flex items-center justify-center gap-2 p-4 bg-white border-2 border-red-300 text-red-500 font-black uppercase tracking-wider rounded-2xl transition-all hover:bg-red-50"
-            >
-              <FiTrash2 className="w-5 h-5" />
-              <span>Delete Account</span>
-            </motion.button>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="text-center pb-8">
+          <motion.div variants={itemVariants} className="text-center pb-2">
             <p className="text-xs font-medium text-gray-400">Version 7.6.27 R547</p>
           </motion.div>
 
         </motion.main>
       </div>
-
-      {/* Delete Account Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mx-auto mb-4">
-              <FiTrash2 className="w-8 h-8 text-red-500" />
-            </div>
-            <h3 className="text-lg font-black text-gray-900 text-center mb-2">Delete Account?</h3>
-            <p className="text-sm text-gray-500 text-center mb-6">
-              Yeh action permanent hai. Aapka account aur saara data delete ho jayega.
-              Is number se dobara login karne ke liye aapko <strong>nayi registration</strong> karni padegi.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-700 font-bold text-sm hover:bg-gray-50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  setIsDeleting(true);
-                  try {
-                    const response = await userAuthService.deleteAccount();
-                    if (response.success) {
-                      toast.success('Account deleted successfully.');
-                      navigate('/user/login', { replace: true });
-                    } else {
-                      toast.error(response.message || 'Failed to delete account.');
-                      setIsDeleting(false);
-                      setShowDeleteConfirm(false);
-                    }
-                  } catch (error) {
-                    toast.error('Failed to delete account. Please try again.');
-                    setIsDeleting(false);
-                    setShowDeleteConfirm(false);
-                  }
-                }}
-                disabled={isDeleting}
-                className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all disabled:opacity-60"
-              >
-                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

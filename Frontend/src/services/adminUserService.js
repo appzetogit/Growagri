@@ -61,6 +61,16 @@ export const adminUserService = {
     }
   },
 
+  // Delete several users permanently
+  bulkDeleteUsers: async (ids) => {
+    try {
+      const response = await api.post('/admin/users/bulk-delete', { ids });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to delete users' };
+    }
+  },
+
   // Get user bookings
   getUserBookings: async (id, params) => {
     try {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FiPhone, FiArrowRight, FiChevronLeft, FiCheckCircle } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../theme';
@@ -74,6 +74,7 @@ const VendorLogin = () => {
             duration: 5000,
             icon: '⏳'
           });
+          setIsLoading(false);
           return;
         }
 
@@ -195,41 +196,40 @@ const VendorLogin = () => {
   const brandColor = '#426B4F'; // Solid dark green for buttons and text
   const inputBgColor = '#DFE8E2'; // Light green for inputs
 
+  // Mobile layout is anchored to the top with fixed px sizes (no vh, no vertical centering):
+  // the keyboard shrinks the viewport, and anything sized or centered against it would jump.
   return (
     <div
-      className="min-h-[100dvh] flex flex-col relative overflow-x-hidden bg-white justify-center items-center"
+      className="min-h-[100dvh] flex flex-col relative overflow-x-hidden bg-white justify-start sm:justify-center items-center pt-[175px] sm:pt-0 pb-10 sm:pb-0"
     >
       {/* Top Background with Wave */}
       <div
-        className="absolute top-0 left-0 w-full h-[25vh] bg-cover bg-center z-0 sm:hidden"
-        style={{ backgroundImage: "url('/auth-bg.jpg')", filter: 'brightness(0.95)' }}
+        className="absolute top-0 left-0 w-full h-[180px] bg-cover bg-center z-0 sm:hidden"
+        style={{ backgroundImage: "url('/auth-bg.jpg')" }}
       >
         <svg className="absolute bottom-0 w-full text-white" viewBox="0 0 1440 320" preserveAspectRatio="none" style={{ height: '50px', transform: 'translateY(1px)' }}>
           <path fill="currentColor" fillOpacity="1" d="M0,224L80,197.3C160,171,320,117,480,122.7C640,128,800,192,960,208C1120,224,1280,192,1360,176L1440,160L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
         </svg>
       </div>
 
-      <div className="bg-transparent px-8 py-4 w-full z-20 sm:max-w-md sm:mx-auto relative flex flex-col justify-center pb-10 sm:pb-0">
+      <div className="bg-transparent px-8 py-4 w-full z-20 sm:max-w-md sm:mx-auto relative flex flex-col">
         <div className="mb-8 text-center relative z-10 flex flex-col items-center">
-
-
           <div className="relative inline-block mb-2">
-            {step === 'phone' ? (
-              <Logo className="h-16 w-auto" />
-            ) : (
-              <h2 className="text-[32px] font-bold tracking-tight mb-2" style={{ color: brandColor }}>
-                Verify Phone
-              </h2>
-            )}
+            <Logo className="h-24 w-auto" />
           </div>
           {step === 'phone' ? (
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
               Equipment Owner Sign In
             </h2>
           ) : (
-            <p className="text-sm font-medium text-gray-500">
-              Code sent to +91 {phoneNumber}
-            </p>
+            <>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: brandColor }}>
+                Verify Phone
+              </h2>
+              <p className="text-sm font-medium text-gray-500 mt-1">
+                Code sent to +91 {phoneNumber}
+              </p>
+            </>
           )}
         </div>
 
@@ -262,13 +262,6 @@ const VendorLogin = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs px-2 mt-2">
-              <label className="flex items-center text-[#426B4F] font-medium cursor-pointer">
-                <input type="checkbox" className="mr-2 rounded-full text-[#426B4F] focus:ring-[#426B4F] border-gray-300 shadow-sm" />
-                Remember Me
-              </label>
-            </div>
-
             <div>
               <button
                 type="submit"
@@ -279,16 +272,9 @@ const VendorLogin = () => {
                 {isLoading ? (
                   <LogoLoader fullScreen={false} inline={true} size="w-6 h-6" />
                 ) : (
-                  <span>Login</span>
+                  <span>Continue</span>
                 )}
               </button>
-            </div>
-
-            <div className="mt-8 text-center text-sm">
-              <span className="text-gray-400 font-medium">Don't have a partner account? </span>
-              <Link to="/vendor/signup" className="text-[#426B4F] font-bold hover:underline">
-                Register Now
-              </Link>
             </div>
           </form>
         ) : (

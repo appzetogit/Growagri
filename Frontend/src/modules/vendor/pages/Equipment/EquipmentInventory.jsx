@@ -43,6 +43,21 @@ const EquipmentInventory = () => {
     }
   };
 
+  // Off = farmers can't see or book this machine, so no bookings come for it
+  const handleToggleAvailable = async (item) => {
+    const next = item.isAvailable === false;
+    const setAvailable = (value) => setEquipment(prev => prev.map(e => e._id === item._id ? { ...e, isAvailable: value } : e));
+    setAvailable(next); // optimistic
+    try {
+      const res = await vendorEquipmentService.update(item._id, { isAvailable: next });
+      if (!res.success) throw new Error(res.message);
+      toast.success(next ? 'Machine is ON — bookings will come' : 'Machine is OFF — no bookings will come');
+    } catch {
+      setAvailable(!next);
+      toast.error('Could not update. Please try again.');
+    }
+  };
+
   const StatusBadge = ({ status }) => {
     const configs = {
       pending: { color: 'bg-amber-50 text-amber-600 border-amber-100', icon: FiClock, label: 'Pending Verification' },
@@ -177,6 +192,27 @@ const EquipmentInventory = () => {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-slate-700">Accept bookings</p>
+                  <p className="text-[10px] font-medium text-slate-400">
+                    {item.isAvailable === false ? 'Off — no bookings will come for this machine' : 'On — farmers can book this machine'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={item.isAvailable !== false}
+                  aria-label={`Accept bookings for ${item.name}`}
+                  onClick={() => handleToggleAvailable(item)}
+                  className={`relative w-12 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${item.isAvailable === false ? 'bg-slate-300' : 'bg-emerald-500'}`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${item.isAvailable === false ? 'translate-x-0' : 'translate-x-6'}`}
+                  />
+                </button>
               </div>
 
               {item.status === 'rejected' && item.rejectionReason && (

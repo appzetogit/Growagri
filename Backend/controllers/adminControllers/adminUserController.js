@@ -1,5 +1,7 @@
 const User = require('../../models/User');
 const Booking = require('../../models/Booking');
+const mongoose = require('mongoose');
+const { BOOKING_STATUS } = require('../../utils/constants');
 const { validationResult } = require('express-validator');
 
 /**
@@ -170,32 +172,109 @@ const toggleUserStatus = async (req, res) => {
 /**
  * Delete user (soft delete)
  */
+// Bookings in these states are finished; anything else still has a vendor/payment attached to it
+const CLOSED_BOOKING_STATUSES = [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.REJECTED];
+const MAX_BULK_DELETE = 100;
+
+/**
+ * Permanently delete users from the database, with their personal data
+ * (carts, tokens, notifications). Bookings, orders, transactions and reviews are
+ * kept: they are the vendors' and platform's financial history.
+ * Users with a booking still in progress are skipped, not deleted.
+ * @returns {{ deleted: string[], skipped: { id: string, name: string, reason: string }[] }}
+ */
+const hardDeleteUsers = async (ids) => {
+  const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+  const busyIds = (await Booking.distinct('userId', {
+    userId: { $in: users.map(u => u._id) },
+    status: { $nin: CLOSED_BOOKING_STATUSES }
+  })).map(String);
+
+  const skipped = users
+    .filter(u => busyIds.includes(String(u._id)))
+    .map(u => ({ id: String(u._id), name: u.name, reason: 'Has a booking in progress' }));
+  const deletable = users.filter(u => !busyIds.includes(String(u._id))).map(u => u._id);
+
+  if (deletable.length > 0) {
+    const owned = { userId: { $in: deletable } };
+    await Promise.all([
+      require('../../models/Cart').deleteMany(owned),
+      require('../../models/EcommerceCart').deleteMany(owned),
+      require('../../models/Token').deleteMany(owned),
+      require('../../models/Notification').deleteMany(owned)
+    ]);
+    await User.deleteMany({ _id: { $in: deletable } });
+  }
+
+  return { deleted: deletable.map(String), skipped };
+};
+
+/**
+ * Delete user permanently
+ */
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
 
-    const user = await User.findById(id);
+    const { deleted, skipped } = await hardDeleteUsers([id]);
 
-    if (!user) {
+    if (skipped.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `${skipped[0].name || 'This user'} has a booking in progress and cannot be deleted yet.`
+      });
+    }
+    if (deleted.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
-    // Soft delete
-    user.isActive = false;
-    await user.save();
-
+    console.log(`[ADMIN] User permanently deleted: ${id} by admin ${req.user?._id}`);
     res.status(200).json({
       success: true,
-      message: 'User deleted successfully'
+      message: 'User deleted permanently'
     });
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete user. Please try again.'
+    });
+  }
+};
+
+/**
+ * Delete several users permanently
+ */
+const bulkDeleteUsers = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(String))] : [];
+    if (ids.length === 0 || ids.length > MAX_BULK_DELETE || !ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({
+        success: false,
+        message: `Send between 1 and ${MAX_BULK_DELETE} valid user ids`
+      });
+    }
+
+    const { deleted, skipped } = await hardDeleteUsers(ids);
+
+    console.log(`[ADMIN] ${deleted.length} users permanently deleted by admin ${req.user?._id}: ${deleted.join(', ')}`);
+    res.status(200).json({
+      success: true,
+      message: `${deleted.length} deleted` + (skipped.length ? `, ${skipped.length} skipped (booking in progress)` : ''),
+      deleted,
+      skipped
+    });
+  } catch (error) {
+    console.error('Bulk delete users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete users. Please try again.'
     });
   }
 };
@@ -428,6 +507,7 @@ module.exports = {
   getUserDetails,
   toggleUserStatus,
   deleteUser,
+  bulkDeleteUsers,
   getUserBookings,
   getUserWalletTransactions,
   getAllUserBookings,

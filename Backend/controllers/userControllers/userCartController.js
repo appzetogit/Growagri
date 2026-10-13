@@ -183,6 +183,13 @@ const addToCart = async (req, res) => {
           const VendorEquipment = require('../../models/VendorEquipment');
           vendorEquipment = await VendorEquipment.findById(serviceId);
           if (vendorEquipment) {
+            // Vendor has switched this machine off
+            if (vendorEquipment.isAvailable === false) {
+              return res.status(400).json({
+                success: false,
+                message: 'This equipment is currently not available for booking.'
+              });
+            }
             resolvedEquipmentId = vendorEquipment._id;
             if (!resolvedVendorId && vendorEquipment.vendorId) {
               resolvedVendorId = vendorEquipment.vendorId;

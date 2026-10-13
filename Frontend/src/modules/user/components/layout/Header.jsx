@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { HiLocationMarker, HiMenuAlt2 } from 'react-icons/hi';
+import { HiLocationMarker } from 'react-icons/hi';
 import { gsap } from 'gsap';
 import LocationSelector from '../common/LocationSelector';
 import { animateLogo } from '../../../../utils/gsapAnimations';
@@ -10,7 +10,6 @@ import { themeColors } from '../../../../theme';
 import CitySelectorModal from '../common/CitySelectorModal';
 import { useCity } from '../../../../context/CityContext';
 import { HiChevronDown } from 'react-icons/hi';
-import Sidebar from './Sidebar';
 import { useLanguage } from '../../../../context/LanguageContext';
 
 const Header = ({ location, onLocationClick }) => {
@@ -18,7 +17,6 @@ const Header = ({ location, onLocationClick }) => {
   const { currentCity } = useCity();
   const { t } = useLanguage();
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (logoRef.current) {
@@ -33,16 +31,8 @@ const Header = ({ location, onLocationClick }) => {
         <div className="w-full">
           {/* Top Row: Logo (Left) and Location (Right) */}
           <div className="px-4 py-3 flex items-center justify-between">
-            {/* Left: Hamburger & Logo */}
+            {/* Left: Logo */}
             <div className="flex items-center gap-3 shrink-0">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-700 transition-colors"
-                aria-label="Open Menu"
-              >
-                <HiMenuAlt2 className="w-6 h-6" />
-              </button>
-
               <div
                 className="cursor-pointer"
               onMouseEnter={() => {
@@ -114,11 +104,6 @@ const Header = ({ location, onLocationClick }) => {
       <CitySelectorModal
         isOpen={isCityModalOpen}
         onClose={() => setIsCityModalOpen(false)}
-      />
-
-      <Sidebar 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
       />
     </header>
   );

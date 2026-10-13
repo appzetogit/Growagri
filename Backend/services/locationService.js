@@ -94,6 +94,8 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
 
     // Find vendors who have listed this machinery equipment in VendorEquipment
     let equipmentVendorIds = [];
+    // Vendors whose every matching machine is switched off (isAvailable: false) — they get no job for it
+    let pausedVendorIds = [];
     if (categoryId || serviceCategory) {
       try {
         const VendorEquipment = require('../models/VendorEquipment');
@@ -119,11 +121,11 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
           const matchingEquipments = await VendorEquipment.find({
             $or: eqConditions,
             status: { $ne: 'maintenance' }
-          }).select('vendorId').lean();
+          }).select('vendorId isAvailable').lean();
 
-          equipmentVendorIds = matchingEquipments
-            .map(e => e.vendorId ? e.vendorId.toString() : null)
-            .filter(Boolean);
+          const idsOf = (list) => [...new Set(list.map(e => e.vendorId ? e.vendorId.toString() : null).filter(Boolean))];
+          equipmentVendorIds = idsOf(matchingEquipments.filter(e => e.isAvailable !== false));
+          pausedVendorIds = idsOf(matchingEquipments).filter(id => !equipmentVendorIds.includes(id));
 
           if (equipmentVendorIds.length > 0) {
             console.log(`[LocationService] Found ${equipmentVendorIds.length} vendor equipment matches for category: "${serviceCategory || categoryId}"`);
@@ -162,6 +164,12 @@ const findNearbyVendors = async (centerLocation, radiusKm = 10, filters = {}) =>
         baseQuery.$or = orConditions;
       }
       console.log(`[LocationService] Filtering vendors by category/service "${serviceCategory}" and ${equipmentVendorIds.length} machinery equipment owners`);
+    }
+
+    // Even if the category is in the vendor's profile, a switched-off machine means no job.
+    // $nor (not _id) because the Redis path below spreads baseQuery after its own _id filter.
+    if (pausedVendorIds.length > 0) {
+      baseQuery.$nor = [{ _id: { $in: pausedVendorIds } }];
     }
 
     // Apply Cash Limit Check if requested

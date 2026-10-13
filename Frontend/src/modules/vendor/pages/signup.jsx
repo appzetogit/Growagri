@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, Navigate, useLocation } from 'react-router-dom';
 import { FiUser, FiMail, FiPhone, FiFileText, FiUpload, FiX, FiArrowRight, FiChevronLeft, FiCheckCircle, FiCamera, FiBriefcase, FiChevronDown, FiCheck, FiSearch, FiLayers } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../theme';
-import { register, sendOTP as sendVendorOTP } from '../services/authService';
+import { register } from '../services/authService';
 import LogoLoader from '../../../components/common/LogoLoader';
 import Logo from '../../../components/common/Logo';
 import { compressImage } from '../../../utils/imageCompression';
@@ -27,7 +27,6 @@ const vendorSignupSchema = z.object({
 const VendorSignup = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [step, setStep] = useState('details'); // 'details' or 'otp'
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('vendor_signup_form_data');
     if (saved) {
@@ -60,13 +59,10 @@ const VendorSignup = () => {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const categoryDropdownRef = useRef(null);
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [otpToken, setOtpToken] = useState('');
-  const [verificationToken, setVerificationToken] = useState('');
+  const verificationToken = location.state?.verificationToken;
   const [isLoading, setIsLoading] = useState(false);
   const [documentPreview, setDocumentPreview] = useState({});
   const [uploadingDocs, setUploadingDocs] = useState({});
-  const [resendTimer, setResendTimer] = useState(0);
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
@@ -88,17 +84,6 @@ const VendorSignup = () => {
       setPolicyContent('Failed to load policy content.');
     }
   };
-
-  // Timer countdown effect
-  useEffect(() => {
-    let interval;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
 
   // Save form data to localStorage
   useEffect(() => {
@@ -150,13 +135,11 @@ const VendorSignup = () => {
 
   // Refs for auto-focus
   const nameInputRef = useRef(null);
-  const otpInputRefs = useRef([]);
 
-  // Unified Flow: Pre-fill
+  // Phone is already verified on the login page
   useEffect(() => {
-    if (location.state?.phone && location.state?.verificationToken) {
+    if (location.state?.phone) {
       setFormData(prev => ({ ...prev, phoneNumber: location.state.phone }));
-      setVerificationToken(location.state.verificationToken);
     }
   }, [location.state]);
 
@@ -167,14 +150,10 @@ const VendorSignup = () => {
     localStorage.removeItem('vendorData');
   }, []);
 
-  // Auto-focus logic
+  // Auto-focus
   useEffect(() => {
-    if (step === 'details' && nameInputRef.current) {
-      setTimeout(() => nameInputRef.current.focus(), 100);
-    } else if (step === 'otp' && otpInputRefs.current[0]) {
-      setTimeout(() => otpInputRefs.current[0].focus(), 100);
-    }
-  }, [step]);
+    setTimeout(() => nameInputRef.current?.focus(), 100);
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -362,144 +341,12 @@ const VendorSignup = () => {
 
     setIsLoading(true);
 
-    if (verificationToken) {
-      try {
-        const aadharDoc = formData.documents.find(d => d.type === 'aadhar')?.url || null;
-        const aadharBackDoc = formData.documents.find(d => d.type === 'aadharBack')?.url || null;
-        const panDoc = formData.documents.find(d => d.type === 'pan')?.url || null;
-        const otherDocs = formData.documents.filter(d => d.type === 'other').map(d => d.url);
-        
-        let labDetailsPayload = null;
-        if (formData.isLabRegistration) {
-          labDetailsPayload = {
-            ...formData.labDetails,
-            certificationDocument: formData.documents.find(d => d.type === 'labCert')?.url || null
-          };
-        }
-
-        let shopDetailsPayload = null;
-        if (formData.isShopRegistration) {
-          shopDetailsPayload = {
-            ...formData.shopDetails,
-            licenseDocument: formData.documents.find(d => d.type === 'shopLicense')?.url || null
-          };
-        }
-
-        const registerData = {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phoneNumber,
-          businessName: formData.businessName,
-          aadhar: formData.aadhar,
-          pan: formData.pan,
-          service: formData.service, // It's already an array now
-          aadharDocument: aadharDoc,
-          aadharBackDocument: aadharBackDoc,
-          panDocument: panDoc,
-          otherDocuments: otherDocs,
-          labDetails: labDetailsPayload ? JSON.stringify(labDetailsPayload) : null,
-          shopDetails: shopDetailsPayload ? JSON.stringify(shopDetailsPayload) : null,
-          verificationToken
-        };
-
-        const response = await register(registerData);
-
-        if (response.success) {
-          localStorage.removeItem('vendor_signup_form_data');
-          toast.success(
-            <div className="flex flex-col">
-              <span className="font-bold">Successfully Registered!</span>
-              <span className="text-xs">Your vendor account is pending admin approval.</span>
-            </div>,
-            { icon: <FiCheckCircle className="text-[#D68F35]" />, duration: 5000 }
-          );
-          navigate('/vendor/login');
-        } else {
-          toast.error(response.message || 'Registration failed');
-        }
-      } catch (error) {
-        toast.error(error.response?.data?.message || 'Registration failed');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    try {
-      const response = await sendVendorOTP(formData.phoneNumber);
-      if (response.success) {
-        setOtpToken(response.token);
-        setIsLoading(false);
-        setStep('otp');
-        setResendTimer(120); // Start timer
-        toast.success('OTP sent successfully');
-      } else {
-        setIsLoading(false);
-        toast.error(response.message || 'Failed to send OTP');
-      }
-    } catch (error) {
-      setIsLoading(false);
-      toast.error(error.response?.data?.message || 'Failed to send OTP');
-    }
-  };
-
-  const handleOtpChange = (index, value) => {
-    // Allow only numbers
-    if (value && !/^\d+$/.test(value)) return;
-
-    // Handle paste of full OTP
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').slice(0, 6);
-      if (digits.length === 6) {
-        const chars = digits.split('');
-        setOtp(chars);
-        otpInputRefs.current[5]?.focus();
-        return;
-      }
-      return;
-    }
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  // Auto-verify as last digit enters
-  useEffect(() => {
-    const otpValue = otp.join('');
-    if (otpValue.length === 6 && !isLoading && otpToken) {
-      handleOtpSubmit();
-    }
-  }, [otp]);
-
-  const handleOtpSubmit = async (e) => {
-    if (e) e.preventDefault();
-    const otpValue = otp.join('');
-    if (otpValue.length !== 6) {
-      toast.error('Please enter complete OTP');
-      return;
-    }
-    if (!otpToken) {
-      toast.error('Please request OTP first');
-      return;
-    }
-    setIsLoading(true);
     try {
       const aadharDoc = formData.documents.find(d => d.type === 'aadhar')?.url || null;
       const aadharBackDoc = formData.documents.find(d => d.type === 'aadharBack')?.url || null;
       const panDoc = formData.documents.find(d => d.type === 'pan')?.url || null;
       const otherDocs = formData.documents.filter(d => d.type === 'other').map(d => d.url);
-
+      
       let labDetailsPayload = null;
       if (formData.isLabRegistration) {
         labDetailsPayload = {
@@ -523,35 +370,41 @@ const VendorSignup = () => {
         businessName: formData.businessName,
         aadhar: formData.aadhar,
         pan: formData.pan,
-        service: formData.service, 
+        service: formData.service, // It's already an array now
         aadharDocument: aadharDoc,
         aadharBackDocument: aadharBackDoc,
         panDocument: panDoc,
         otherDocuments: otherDocs,
         labDetails: labDetailsPayload ? JSON.stringify(labDetailsPayload) : null,
         shopDetails: shopDetailsPayload ? JSON.stringify(shopDetailsPayload) : null,
-        otp: otpValue,
-        token: otpToken
+        verificationToken
       };
 
       const response = await register(registerData);
 
       if (response.success) {
-        setIsLoading(false);
         localStorage.removeItem('vendor_signup_form_data');
-        toast.success('Successfully Registered! Pending admin approval.');
+        toast.success(
+          <div className="flex flex-col">
+            <span className="font-bold">Successfully Registered!</span>
+            <span className="text-xs">Your vendor account is pending admin approval.</span>
+          </div>,
+          { icon: <FiCheckCircle className="text-[#D68F35]" />, duration: 5000 }
+        );
         navigate('/vendor/login');
       } else {
-        setIsLoading(false);
         toast.error(response.message || 'Registration failed');
       }
     } catch (error) {
-      setIsLoading(false);
       toast.error(error.response?.data?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const brandColor = themeColors.brand?.teal || '#347989';
+
+  if (!verificationToken) return <Navigate to="/vendor/login" replace />;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-start items-center py-10 px-4 sm:px-6 lg:px-8 relative">
@@ -564,7 +417,7 @@ const VendorSignup = () => {
       <div className="w-full max-w-2xl text-center mb-8 relative z-10 animate-fade-in">
         <Logo className="h-16 w-auto mx-auto transform hover:scale-110 transition-transform duration-500" />
         <h2 className="mt-4 text-3xl font-extrabold text-gray-900 tracking-tight">
-          {step === 'details' ? 'Partner Registration' : 'Verify Identity'}
+          Partner Registration
         </h2>
         <p className="mt-2 text-sm text-gray-600 animate-stagger-1 animate-fade-in">
           Partner with GrooAgri and grow your business
@@ -575,7 +428,6 @@ const VendorSignup = () => {
         <div className="bg-white py-8 px-4 shadow-2xl shadow-gray-200/50 sm:rounded-2xl sm:px-10 border border-gray-100 relative overflow-hidden animate-slide-in-bottom">
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#347989] via-[#D68F35] to-[#BB5F36]" />
 
-          {step === 'details' ? (
             <form onSubmit={handleDetailsSubmit} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Basic Details */}
@@ -1013,26 +865,6 @@ const VendorSignup = () => {
                     )}
                   </div>
 
-                  {!verificationToken && (
-                    <div className="animate-fade-in relative" style={{ animationDelay: '0.3s', zIndex: 0 }}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 border-r pr-2 flex items-center pointer-events-none">
-                          <span className="text-gray-500 text-sm font-bold">+91</span>
-                        </div>
-                        <input
-                          type="tel"
-                          required
-                          value={formData.phoneNumber}
-                          onChange={(e) => setFormData(p => ({ ...p, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                          className="block w-full pl-14 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 transition-all duration-300 outline-none hover:border-gray-400"
-                          style={{ '--tw-ring-color': brandColor }}
-                          placeholder="9876543210"
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   <div className="animate-fade-in relative" style={{ animationDelay: '0.4s', zIndex: 0 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Aadhar Number (Owner)</label>
                     <div className="relative group">
@@ -1205,90 +1037,13 @@ const VendorSignup = () => {
                     <LogoLoader fullScreen={false} inline={true} size="w-6 h-6" />
                   ) : (
                     <span className="flex items-center relative z-10">
-                      {verificationToken ? 'Finish Application' : 'Proceed to Verify'}
+                      Finish Application
                       <FiArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                     </span>
                   )}
                 </button>
               </div>
             </form>
-          ) : (
-            <div className="space-y-6">
-              <button
-                onClick={() => setStep('details')}
-                className="flex items-center text-sm text-gray-500 hover:text-[#347989] transition-colors mb-4 animate-fade-in"
-              >
-                <FiChevronLeft className="mr-1" /> Re-check details
-              </button>
-
-              <div className="text-center animate-fade-in">
-                <h3 className="text-xl font-bold text-gray-900">One Last Step</h3>
-                <p className="text-sm text-gray-500">Enter the 6-digit code sent to your phone</p>
-              </div>
-
-              <form onSubmit={handleOtpSubmit} className="space-y-8">
-                <div className="flex justify-between gap-3 px-4 sm:px-12 animate-stagger-1 animate-fade-in">
-                  {otp.map((digit, index) => (
-                    <input
-                      key={index}
-                      ref={(el) => (otpInputRefs.current[index] = el)}
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(index, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                      className="w-full h-14 text-center text-xl font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-offset-2 outline-none transition-all duration-300 hover:border-gray-400"
-                      style={{ '--tw-ring-color': brandColor, backgroundColor: digit ? `${brandColor}05` : 'white' }}
-                    />
-                  ))}
-                </div>
-
-                <div className="text-center animate-stagger-2 animate-fade-in">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (resendTimer > 0) return;
-                      try {
-                        const response = await sendVendorOTP(formData.phoneNumber);
-                        if (response.success) {
-                          setOtpToken(response.token);
-                          setResendTimer(120);
-                          toast.success('OTP sent again');
-                        }
-                      } catch { toast.error('Resend failed'); }
-                    }}
-                    disabled={resendTimer > 0}
-                    className="text-sm font-semibold transition-colors duration-300 opacity-70 hover:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ color: brandColor }}
-                  >
-                    {resendTimer > 0
-                      ? `Resend in ${Math.floor(resendTimer / 60)}:${String(resendTimer % 60).padStart(2, '0')}`
-                      : 'Resend Code'}
-                  </button>
-                </div>
-
-                <div className="animate-stagger-3 animate-fade-in">
-                  <button
-                    type="submit"
-                    disabled={isLoading || otp.join('').length !== 6}
-                    className="group relative w-full py-4 rounded-xl text-white font-bold transition-all transform hover:-translate-y-1 shadow-lg disabled:opacity-50 overflow-hidden"
-                    style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}4D` }}
-                  >
-                    <span className="absolute inset-0 w-full h-full bg-white/10 group-hover:translate-x-full transition-transform duration-700 -translate-x-full" />
-                    <span className="relative z-10 flex items-center justify-center">
-                      {isLoading ? (
-                        <LogoLoader fullScreen={false} inline={true} size="w-6 h-6" />
-                      ) : (
-                        'Verify & Register'
-                      )}
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </div>
 
         <p className="mt-8 mb-6 text-center text-sm text-gray-600 animate-fade-in animate-stagger-4">

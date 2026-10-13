@@ -109,6 +109,13 @@ const vendorEquipmentSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Vendor's own on/off switch (separate from admin approval `status`).
+  // Off = hidden from farmers and no bookings for this machine.
+  // Query with { isAvailable: { $ne: false } } so older docs without the field count as on.
+  isAvailable: {
+    type: Boolean,
+    default: true
+  },
   commissionPercentage: {
     type: Number,
     default: null

@@ -435,7 +435,7 @@ const getPublicServices = async (req, res) => {
     const VendorEquipment = require('../../models/VendorEquipment');
     const Product = require('../../models/Product');
 
-    const eqAndClauses = [{ status: 'approved' }];
+    const eqAndClauses = [{ status: 'approved', isAvailable: { $ne: false } }];
 
     // Category filter for equipment
     if (categoryId && matchedCategoryIds.length > 0) {

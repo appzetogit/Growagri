@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiUser, FiPhone, FiMail, FiCheckCircle, FiSlash, FiCheck, FiTrash2, FiPlus, FiX } from 'react-icons/fi';
+import { FiSearch, FiUser, FiPhone, FiMail, FiSlash, FiCheck, FiTrash2 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { adminUserService } from '../../../../services/adminUserService';
 
@@ -13,10 +12,9 @@ const AllFarmers = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
 
-  // Add Farmer State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newFarmer, setNewFarmer] = useState({ name: '', phone: '', email: '' });
-  const [isAdding, setIsAdding] = useState(false);
+  // Multi-select (ids on the current page only; cleared whenever the list is refetched)
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -25,31 +23,10 @@ const AllFarmers = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const handleAddFarmer = async (e) => {
-    e.preventDefault();
-    if (!newFarmer.name || !newFarmer.phone) {
-      return toast.error('Name and Phone are required');
-    }
-    
-    try {
-      setIsAdding(true);
-      const response = await adminUserService.addUser(newFarmer);
-      if (response.success) {
-        toast.success(response.message || 'Farmer added successfully');
-        setIsAddModalOpen(false);
-        setNewFarmer({ name: '', phone: '', email: '' });
-        fetchUsers();
-      }
-    } catch (error) {
-      toast.error(error.message || 'Failed to add farmer');
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setSelectedIds([]);
       const params = {
         page,
         limit: 10,
@@ -65,6 +42,8 @@ const AllFarmers = () => {
         setUsers(response.data);
         setTotalPages(response.pagination.pages);
         setTotalUsers(response.pagination.total);
+        // Deleting the last rows of the last page leaves it empty -> step back
+        if (response.data.length === 0 && page > 1) setPage(page - 1);
       }
     } catch (error) {
       console.error('Error fetching farmers:', error);
@@ -97,7 +76,7 @@ const AllFarmers = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this farmer? This action cannot be undone.')) {
+    if (!window.confirm('Permanently delete this farmer from the database? This cannot be undone.')) {
       return;
     }
 
@@ -109,6 +88,44 @@ const AllFarmers = () => {
       }
     } catch (error) {
       toast.error(error.message || 'Failed to delete farmer');
+    }
+  };
+
+  const allOnPageSelected = users.length > 0 && selectedIds.length === users.length;
+
+  const toggleSelect = (userId) => {
+    setSelectedIds(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allOnPageSelected ? [] : users.map(user => user._id));
+  };
+
+  const handleBulkDelete = async () => {
+    const count = selectedIds.length;
+    if (!window.confirm(`Permanently delete ${count} farmer${count > 1 ? 's' : ''} from the database? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const response = await adminUserService.bulkDeleteUsers(selectedIds);
+      if (response.success) {
+        if (response.deleted.length > 0) {
+          toast.success(`${response.deleted.length} farmer${response.deleted.length > 1 ? 's' : ''} deleted`);
+        }
+        if (response.skipped.length > 0) {
+          toast.error(
+            `Not deleted (booking in progress): ${response.skipped.map(s => s.name || s.id).join(', ')}`,
+            { duration: 6000 }
+          );
+        }
+        fetchUsers();
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete farmers');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -127,6 +144,17 @@ const AllFarmers = () => {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FiTrash2 className="w-3.5 h-3.5" />
+              {isDeleting ? 'Deleting...' : `Delete selected (${selectedIds.length})`}
+            </button>
+          )}
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -140,14 +168,6 @@ const AllFarmers = () => {
           <div className="px-3 py-2 bg-green-50 rounded-lg border border-green-100">
             <span className="text-xs font-bold text-green-700">{totalUsers} Farmers</span>
           </div>
-          
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
-          >
-            <FiPlus className="w-3.5 h-3.5" />
-            Add Farmer
-          </button>
         </div>
       </div>
 
@@ -156,6 +176,16 @@ const AllFarmers = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="pl-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || users.length === 0}
+                    aria-label="Select all farmers on this page"
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Farmer</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Contact</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
@@ -166,15 +196,27 @@ const AllFarmers = () => {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-xs text-gray-500">Loading farmers...</td>
+                  <td colSpan="6" className="px-4 py-8 text-center text-xs text-gray-500">Loading farmers...</td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-xs text-gray-500">No farmers found</td>
+                  <td colSpan="6" className="px-4 py-8 text-center text-xs text-gray-500">No farmers found</td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={user._id}
+                    className={`transition-colors ${selectedIds.includes(user._id) ? 'bg-red-50/40' : 'hover:bg-gray-50'}`}
+                  >
+                    <td className="pl-4 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(user._id)}
+                        onChange={() => toggleSelect(user._id)}
+                        aria-label={`Select ${user.name}`}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
@@ -228,7 +270,7 @@ const AllFarmers = () => {
                         <button
                           onClick={() => handleDeleteUser(user._id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete Farmer"
+                          title="Delete Farmer Permanently"
                         >
                           <FiTrash2 className="w-3.5 h-3.5" />
                         </button>
@@ -266,89 +308,6 @@ const AllFarmers = () => {
           </div>
         )}
       </div>
-
-      {/* Add Farmer Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden"
-            >
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 className="font-bold text-gray-800">Add New Farmer</h3>
-                <button
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddFarmer} className="p-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newFarmer.name}
-                    onChange={(e) => setNewFarmer({ ...newFarmer, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter farmer's name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={newFarmer.phone}
-                    onChange={(e) => setNewFarmer({ ...newFarmer, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email Address (Optional)</label>
-                  <input
-                    type="email"
-                    value={newFarmer.email}
-                    onChange={(e) => setNewFarmer({ ...newFarmer, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder="Enter email address"
-                  />
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isAdding}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isAdding ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Adding...
-                      </>
-                    ) : (
-                      'Add Farmer'
-                    )}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

@@ -39,6 +39,7 @@ const iconMap = {
   Notifications: FiBell,
   Reviews: FiStar,
   Settlements: FiDollarSign,
+  "Vendor Withdraw": FiDollarSign,
   Settings: FiSettings,
   Plans: FiPackage,
   "Agri Marketplace": FiShoppingBag,
@@ -93,12 +94,6 @@ const getChildRoute = (parentRoute, childName) => {
       "General Settings": "/admin/settings/general",
       "Equipment Configuration": "/admin/settings/service-config",
       "System Settings": "/admin/settings/system",
-    },
-    "/admin/settlements": {
-      "Pending": "/admin/settlements/pending",
-      "Withdrawals": "/admin/settlements/withdrawals",
-      "Owners with Due": "/admin/settlements/vendors",
-      "History": "/admin/settlements/history",
     },
     "/admin/marketplace": {
       "Marketplace Manager": "/admin/marketplace",
@@ -253,6 +248,11 @@ const AdminSidebar = ({ isOpen, onClose }) => {
       });
     }
 
+    // Vendor Withdraw lives under /admin/settlements but is its own menu item
+    if (route === "/admin/settlements" && location.pathname.startsWith("/admin/settlements/withdrawals")) {
+      return false;
+    }
+
     // Special case for Equipment Catalog to prevent false active state on sub-routes
     if (route === "/admin/equipment-catalog") {
       if (location.pathname.startsWith("/admin/equipment-catalog/vendor-")) {
@@ -337,9 +337,14 @@ const AdminSidebar = ({ isOpen, onClose }) => {
               {counts.owners > 99 ? '99+' : counts.owners}
             </span>
           )}
-          {item.title === "Settlements" && (counts.withdrawals + counts.pendingSettlements) > 0 && (
+          {item.title === "Settlements" && counts.pendingSettlements > 0 && (
             <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse mr-2">
-              {(counts.withdrawals + counts.pendingSettlements) > 99 ? '99+' : (counts.withdrawals + counts.pendingSettlements)}
+              {counts.pendingSettlements > 99 ? '99+' : counts.pendingSettlements}
+            </span>
+          )}
+          {item.title === "Vendor Withdraw" && counts.withdrawals > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse mr-2">
+              {counts.withdrawals > 99 ? '99+' : counts.withdrawals}
             </span>
           )}
 
@@ -384,16 +389,6 @@ const AdminSidebar = ({ isOpen, onClose }) => {
                         }
                       `}>
                       <span>{child}</span>
-                      {item.title === "Settlements" && child === "Pending" && counts.pendingSettlements > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full">
-                          {counts.pendingSettlements}
-                        </span>
-                      )}
-                      {item.title === "Settlements" && child === "Withdrawals" && counts.withdrawals > 0 && (
-                        <span className="bg-orange-500 text-white text-[10px] h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full">
-                          {counts.withdrawals}
-                        </span>
-                      )}
                     </div>
                   );
                 })}

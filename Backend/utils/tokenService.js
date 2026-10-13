@@ -66,7 +66,7 @@ module.exports = {
    */
   generateVerificationToken: (phone) => {
     return jwt.sign({ phone, type: 'verification' }, process.env.JWT_SECRET, {
-      expiresIn: '15m'
+      expiresIn: '1h' // vendor KYC form (document uploads) is filled after phone verification
     });
   },
 

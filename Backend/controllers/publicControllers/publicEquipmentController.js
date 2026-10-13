@@ -12,7 +12,7 @@ exports.getPublicEquipment = async (req, res) => {
     const Category = require('../../models/Category');
     const mongoose = require('mongoose');
 
-    const andConditions = [{ status: 'approved' }];
+    const andConditions = [{ status: 'approved', isAvailable: { $ne: false } }];
 
     // Category matching with siblings & requestedCategoryName
     if (categoryId) {
@@ -124,7 +124,8 @@ exports.getPublicEquipmentById = async (req, res) => {
   try {
     const equipment = await VendorEquipment.findOne({
       _id: req.params.id,
-      status: 'approved'
+      status: 'approved',
+      isAvailable: { $ne: false }
     })
       .populate('categoryId', 'title slug homeIconUrl')
       .populate('subCategoryIds', 'title slug')
