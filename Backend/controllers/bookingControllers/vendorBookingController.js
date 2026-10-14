@@ -58,6 +58,7 @@ const getVendorBookings = async (req, res) => {
       .populate('serviceId', 'title iconUrl')
       .populate('categoryId', 'title slug')
       .populate('workerId', 'name phone rating')
+      .populate('vendorBillId', 'vendorTotalEarning status') // actual earning, shown on the jobs list
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -1532,7 +1533,7 @@ const startTrip = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { start_kilometer_photo, driver_start_otp } = req.body;
+    const { start_kilometer_photo, driver_start_otp, handover_proof_photo } = req.body;
 
     const booking = await Booking.findOne({ _id: id, vendorId }).populate('categoryId');
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -1560,6 +1561,7 @@ const startTrip = async (req, res) => {
 
     // --- 3. KILOMETER VALIDATION ---
     booking.start_kilometer_photo = start_kilometer_photo || null;
+    booking.handover_proof_photo = handover_proof_photo || null;
     // OTP already verified, we can save the provided one if needed but usually it stays the same
     booking.status = BOOKING_STATUS.IN_PROGRESS;
     booking.startedAt = new Date();

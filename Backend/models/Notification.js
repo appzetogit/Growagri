@@ -95,6 +95,7 @@ const notificationSchema = new mongoose.Schema({
       'shop_approved',
       'shop_rejected',
       'withdrawal_rejected',
+      'withdrawal_approved',
       'admin_broadcast',
       'general'
     ],

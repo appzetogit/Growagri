@@ -54,15 +54,6 @@
     "children": []
   },
   {
-    "title": "Workers",
-    "route": "/admin/workers",
-    "allowedRoles": [
-      "super_admin",
-      "admin"
-    ],
-    "children": []
-  },
-  {
     "title": "Bookings",
     "route": "/admin/bookings",
     "allowedRoles": [
@@ -73,21 +64,22 @@
   },
   {
     "title": "Payments",
-    "route": "/admin/payments",
+    "route": "/admin/payments/overview",
     "allowedRoles": [
       "super_admin"
     ],
-    "children": [
-      "Payment Overview",
-      "Farmer Payments",
-      "Owner Payments",
-      "Admin Revenue",
-      "Payment Reports"
-    ]
+    "children": []
   },
   {
     "title": "Settlements",
     "route": "/admin/settlements",
+    "allowedRoles": [
+      "super_admin"
+    ]
+  },
+  {
+    "title": "Vendor Wallet Management",
+    "route": "/admin/vendor-wallets",
     "allowedRoles": [
       "super_admin"
     ]
@@ -109,19 +101,6 @@
     "children": [
       "Home",
       "Manage Categories"
-    ]
-  },
-  {
-    "title": "Reports",
-    "route": "/admin/reports",
-    "allowedRoles": [
-      "super_admin"
-    ],
-    "children": [
-      "Revenue Report",
-      "Booking Report",
-      "Payment Report",
-      "Agriculture Insights"
     ]
   },
   {
@@ -182,15 +161,6 @@
     "children": []
   },
   {
-    "title": "Help & Support",
-    "route": "/admin/support",
-    "allowedRoles": [
-      "super_admin",
-      "admin"
-    ],
-    "children": []
-  },
-  {
     "title": "Manage Website",
     "route": "/admin/manage-website",
     "allowedRoles": [
@@ -213,6 +183,14 @@
     "allowedRoles": [
       "super_admin",
       "admin"
+    ],
+    "children": []
+  },
+  {
+    "title": "Admin Revenue",
+    "route": "/admin/admin-revenue",
+    "allowedRoles": [
+      "super_admin"
     ],
     "children": []
   },

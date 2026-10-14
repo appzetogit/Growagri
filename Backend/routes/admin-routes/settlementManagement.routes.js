@@ -5,6 +5,7 @@ const { authenticate } = require('../../middleware/authMiddleware');
 const { isAdmin } = require('../../middleware/roleMiddleware');
 const {
   getVendorBalances,
+  updateVendorWallet,
   getVendorLedger,
   getPendingSettlements,
   approveSettlement,
@@ -17,7 +18,9 @@ const {
   // Withdrawals
   getWithdrawalRequests,
   approveWithdrawal,
-  rejectWithdrawal
+  rejectWithdrawal,
+  getWithdrawalSettings,
+  updateMinWithdrawalLimit
 } = require('../../controllers/adminControllers/settlementController');
 
 // Dashboard summary
@@ -33,6 +36,7 @@ router.get('/vendors/:vendorId/ledger', authenticate, isAdmin, getVendorLedger);
 router.post('/vendors/:vendorId/block', authenticate, isAdmin, blockVendor);
 router.post('/vendors/:vendorId/unblock', authenticate, isAdmin, unblockVendor);
 router.post('/vendors/:vendorId/cash-limit', authenticate, isAdmin, updateCashLimit);
+router.put('/vendors/:vendorId/wallet', authenticate, isAdmin, updateVendorWallet);
 
 // Get all pending settlements
 router.get('/pending', authenticate, isAdmin, getPendingSettlements);
@@ -57,6 +61,10 @@ router.post(
   [body('rejectionReason').notEmpty().withMessage('Rejection reason is required')],
   rejectSettlement
 );
+
+// Withdrawals Settings & Limits
+router.get('/withdrawals/settings', authenticate, isAdmin, getWithdrawalSettings);
+router.put('/withdrawals/min-limit', authenticate, isAdmin, updateMinWithdrawalLimit);
 
 // Withdrawals
 router.get('/withdrawals', authenticate, isAdmin, getWithdrawalRequests);

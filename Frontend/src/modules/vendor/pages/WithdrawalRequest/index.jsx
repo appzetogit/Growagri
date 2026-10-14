@@ -19,8 +19,7 @@ const WithdrawalRequest = () => {
     bankName: '',
     accountNumber: '',
     confirmAccountNumber: '',
-    ifscCode: '',
-    upiId: ''
+    ifscCode: ''
   });
   const [isBankSaved, setIsBankSaved] = useState(false);
   const [error, setError] = useState('');
@@ -43,8 +42,22 @@ const WithdrawalRequest = () => {
     };
   }, []);
 
+  // Platform fee deducted on payout (from global settings); no TDS is deducted
+  const [platformFeeRate, setPlatformFeeRate] = useState(1);
+  const [minWithdrawal, setMinWithdrawal] = useState(100); // set by admin on the Vendor Withdraw page
+
   useEffect(() => {
     loadData();
+    fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/vendors/settings`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('vendorAccessToken')}` }
+    })
+      .then(r => r.json())
+      .then(d => {
+        const g = d.success ? d.data?.global : null;
+        if (g?.platformFeePercentage != null) setPlatformFeeRate(g.platformFeePercentage);
+        if (g?.minWithdrawalAmount != null) setMinWithdrawal(g.minWithdrawalAmount);
+      })
+      .catch(() => {});
   }, []);
 
   const loadData = async () => {
@@ -74,8 +87,8 @@ const WithdrawalRequest = () => {
     const numAmount = parseInt(numValue) || 0;
     if (numAmount > wallet.available) {
       setError('Amount cannot exceed available earnings');
-    } else if (numAmount < 100 && numValue !== '') {
-      setError('Minimum withdrawal amount is ₹100');
+    } else if (numAmount < minWithdrawal && numValue !== '') {
+      setError(`Minimum withdrawal amount is ₹${minWithdrawal}`);
     }
   };
 
@@ -142,9 +155,9 @@ const WithdrawalRequest = () => {
     }
   };
 
-  const tdsRate = 2;
-  const tdsAmount = Math.round((parseInt(amount) || 0) * (tdsRate / 100));
-  const netAmount = (parseInt(amount) || 0) - tdsAmount;
+  // Same math as the server's withdrawal approval
+  const feeAmount = Math.round(((parseInt(amount) || 0) * platformFeeRate) / 100);
+  const netAmount = (parseInt(amount) || 0) - feeAmount;
 
   return (
     <div className="min-h-screen pb-24" style={{ background: themeColors.backgroundGradient }}>
@@ -204,7 +217,11 @@ const WithdrawalRequest = () => {
             />
           </div>
 
-          {error && <p className="text-red-500 text-[11px] font-bold text-center mb-4 flex justify-center items-center gap-1"><FiAlertCircle className="w-3.5 h-3.5" /> {error}</p>}
+          {error ? (
+            <p className="text-red-500 text-[11px] font-bold text-center mb-4 flex justify-center items-center gap-1"><FiAlertCircle className="w-3.5 h-3.5" /> {error}</p>
+          ) : (
+            <p className="text-gray-400 text-[11px] font-semibold text-center mb-4">Minimum withdrawal: ₹{minWithdrawal.toLocaleString()}</p>
+          )}
 
           {amount && !error && (
             <div className="bg-emerald-50/50 rounded-2xl p-4 space-y-3 border border-emerald-50">
@@ -212,10 +229,12 @@ const WithdrawalRequest = () => {
                 <span>Gross Total</span>
                 <span>₹{parseInt(amount).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-xs font-bold text-red-500/70">
-                <span>TDS Deduction (2%)</span>
-                <span>- ₹{tdsAmount.toLocaleString()}</span>
-              </div>
+              {feeAmount > 0 && (
+                <div className="flex justify-between text-xs font-bold text-red-500/70">
+                  <span>Platform Fee ({platformFeeRate}%)</span>
+                  <span>- ₹{feeAmount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="pt-2 border-t border-emerald-100 flex justify-between items-end">
                 <span className="text-xs font-black text-gray-400 uppercase tracking-widest leading-none">Net Payout</span>
                 <span className="text-2xl font-black text-emerald-600 leading-none">₹{netAmount.toLocaleString()}</span>
@@ -261,7 +280,7 @@ const WithdrawalRequest = () => {
                   value={bankAccount.accountHolderName}
                   onChange={handleBankInputChange}
                   className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold text-gray-800 placeholder:font-medium transition-all"
-                  placeholder="e.g. John Doe"
+                  placeholder="Enter account holder name"
                 />
               </div>
 
@@ -274,7 +293,7 @@ const WithdrawalRequest = () => {
                   value={bankAccount.bankName}
                   onChange={handleBankInputChange}
                   className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold text-gray-800 placeholder:font-medium transition-all"
-                  placeholder="e.g. HDFC Bank"
+                  placeholder="Enter bank name"
                 />
               </div>
 
@@ -286,8 +305,8 @@ const WithdrawalRequest = () => {
                   name="accountNumber"
                   value={bankAccount.accountNumber}
                   onChange={handleBankInputChange}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-xl font-bold text-gray-900 tracking-wide placeholder:font-medium transition-all"
-                  placeholder="0000000000"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-xl font-bold text-gray-900 tracking-wide placeholder:font-medium placeholder:text-sm placeholder:tracking-normal transition-all"
+                  placeholder="Enter account number"
                   inputMode="numeric"
                 />
                 <p className="text-[10px] text-gray-400 pl-1">Only numbers allowed</p>
@@ -301,11 +320,11 @@ const WithdrawalRequest = () => {
                   name="confirmAccountNumber"
                   value={bankAccount.confirmAccountNumber || ''}
                   onChange={handleBankInputChange}
-                  className={`w-full px-4 py-3 bg-gray-50 rounded-xl border focus:bg-white focus:ring-4 outline-none text-xl font-bold text-gray-900 tracking-wide placeholder:font-medium transition-all ${bankAccount.confirmAccountNumber && bankAccount.accountNumber !== bankAccount.confirmAccountNumber
+                  className={`w-full px-4 py-3 bg-gray-50 rounded-xl border focus:bg-white focus:ring-4 outline-none text-xl font-bold text-gray-900 tracking-wide placeholder:font-medium placeholder:text-sm placeholder:tracking-normal transition-all ${bankAccount.confirmAccountNumber && bankAccount.accountNumber !== bankAccount.confirmAccountNumber
                     ? 'border-red-200 focus:border-red-500 focus:ring-red-500/10'
                     : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/10'
                     }`}
-                  placeholder="0000000000"
+                  placeholder="Re-enter account number"
                   inputMode="numeric"
                   onPaste={(e) => e.preventDefault()}
                 />
@@ -325,21 +344,8 @@ const WithdrawalRequest = () => {
                   value={bankAccount.ifscCode}
                   onChange={handleBankInputChange}
                   className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold text-gray-800 placeholder:font-medium transition-all uppercase"
-                  placeholder="HDFC0000123"
+                  placeholder="Enter IFSC code"
                   maxLength={11}
-                />
-              </div>
-
-              {/* UPI ID */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider ml-1">UPI ID (Optional)</label>
-                <input
-                  type="text"
-                  name="upiId"
-                  value={bankAccount.upiId}
-                  onChange={handleBankInputChange}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold text-gray-800 placeholder:font-medium transition-all"
-                  placeholder="username@okaxis"
                 />
               </div>
 
@@ -457,8 +463,7 @@ const WithdrawalRequest = () => {
         </button>
 
         <p className="text-center text-[10px] text-gray-400 mt-8 font-black uppercase tracking-wider leading-relaxed opacity-50 px-6">
-          Payouts hit your bank in 24-48 business hours.<br />
-          TDS is mandated by govt. regulations.
+          Payouts hit your bank in 24-48 business hours.
         </p>
       </main>
 

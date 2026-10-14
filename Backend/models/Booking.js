@@ -199,6 +199,13 @@ const bookingSchema = new mongoose.Schema({
     type: String, // 'wallet', 'razorpay', 'cash', 'card', 'plan_benefit'
     default: null
   },
+  // What the farmer chose at booking time. Unlike paymentMethod (overwritten with how it was
+  // actually paid, e.g. a pay-at-home booking later paid via razorpay), this never changes.
+  paymentMode: {
+    type: String,
+    enum: ['online', 'pay_at_home', 'plan', null],
+    default: null
+  },
   paymentId: {
     type: String,
     default: null
@@ -374,6 +381,11 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Second photo taken at handover/start (start_kilometer_photo is the meter/condition photo)
+  handover_proof_photo: {
+    type: String,
+    default: null
+  },
   end_kilometer_photo: {
     type: String,
     default: null
@@ -445,15 +457,28 @@ const bookingSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate unique booking number (5-8 alphanumeric)
-bookingSchema.pre('save', async function (next) {
-  if (this.isNew && !this.bookingNumber) {
-    // Math.random().toString(36).substring(2, 8) generates exactly 6 alphanumeric chars
-    // .toUpperCase() converts it to a clean order ID format (e.g., 'K9R2X4')
-    this.bookingNumber = Math.random().toString(36).substring(2, 8).toUpperCase();
+// Short sequential booking number: BKGA001, BKGA002, ... (grows past 999 as BKGA1000)
+const formatBookingNumber = (seq) => `BKGA${String(seq).padStart(3, '0')}`;
+
+// pre('validate') so the number exists before the `required` check runs
+bookingSchema.pre('validate', async function (next) {
+  try {
+    if (this.isNew && !this.bookingNumber) {
+      if (this.constructor.modelName === 'BookingDraft') {
+        // Unpaid drafts get a placeholder; the BKGA number is assigned when the payment succeeds
+        this.bookingNumber = `DRAFT${this._id}`;
+      } else {
+        const Counter = require('./Counter');
+        this.bookingNumber = formatBookingNumber(await Counter.next('bookingNumber'));
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
+
+bookingSchema.statics.formatBookingNumber = formatBookingNumber;
 
 // Indexes
 bookingSchema.index({ userId: 1, status: 1, createdAt: -1 });

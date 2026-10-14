@@ -9,7 +9,8 @@ const {
   cancelBooking,
   overrideBookingStatus,
   refundBooking,
-  getBookingAnalytics
+  getBookingAnalytics,
+  bulkDeleteBookings
 } = require('../../controllers/bookingControllers/adminBookingController');
 
 // Validation rules
@@ -20,6 +21,7 @@ const cancelBookingValidation = [
 // Routes
 router.get('/bookings', authenticate, isAdmin, getAllBookings);
 router.get('/bookings/analytics', authenticate, isAdmin, getBookingAnalytics);
+router.post('/bookings/bulk-delete', authenticate, isAdmin, bulkDeleteBookings);
 router.get('/bookings/:id', authenticate, isAdmin, getBookingById);
 router.post('/bookings/:id/cancel', authenticate, isAdmin, cancelBookingValidation, cancelBooking);
 router.patch('/bookings/:id/status', authenticate, isAdmin, overrideBookingStatus);

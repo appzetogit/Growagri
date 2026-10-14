@@ -1,4 +1,5 @@
 const Booking = require('../../models/Booking');
+const BookingDraft = require('../../models/BookingDraft');
 const User = require('../../models/User');
 const Settings = require('../../models/Settings');
 const Plan = require('../../models/Plan');
@@ -26,8 +27,8 @@ const createPaymentOrder = async (req, res) => {
     const userId = req.user.id;
     const { bookingId } = req.body;
 
-    // Get booking
-    const booking = await Booking.findOne({ _id: bookingId, userId });
+    // Get booking (an unpaid Pay Now booking is still a draft)
+    const booking = await BookingDraft.findPayable({ _id: bookingId, userId });
 
     if (!booking) {
       return res.status(404).json({
@@ -109,8 +110,9 @@ const verifyPaymentWebhook = async (req, res) => {
       return res.status(verified.status).json({ success: false, message: verified.error });
     }
 
-    // Find booking by Razorpay order ID (must belong to caller and be unpaid)
-    const booking = await Booking.findOne({
+    // Find booking by Razorpay order ID (must belong to caller and be unpaid).
+    // Payment is verified above, so a Pay Now draft becomes a real booking here.
+    const booking = await BookingDraft.promote({
       razorpayOrderId: razorpay_order_id,
       userId: req.user.id,
       paymentStatus: { $ne: PAYMENT_STATUS.SUCCESS }
@@ -363,8 +365,8 @@ const processWalletPayment = async (req, res) => {
       });
     }
 
-    // Get booking
-    const booking = await Booking.findOne({ _id: bookingId, userId });
+    // Get booking (an unpaid Pay Now booking is still a draft)
+    let booking = await BookingDraft.findPayable({ _id: bookingId, userId });
 
     if (!booking) {
       return res.status(404).json({
@@ -380,6 +382,15 @@ const processWalletPayment = async (req, res) => {
         message: 'Payment already completed for this booking'
       });
     }
+
+    // Don't turn a draft into a real booking if the wallet can't pay for it
+    if ((user.wallet?.balance || 0) < booking.finalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient wallet balance'
+      });
+    }
+    booking = await BookingDraft.promote({ _id: bookingId, userId });
 
     // Atomic deduct: only succeeds if balance is still sufficient
     const debitedUser = await User.findOneAndUpdate(
@@ -714,7 +725,8 @@ const confirmPayAtHome = async (req, res) => {
     const userId = req.user.id;
     const { bookingId } = req.body;
 
-    const booking = await Booking.findOne({ _id: bookingId, userId });
+    // Choosing Pay at Home makes a Pay Now draft a real booking
+    const booking = await BookingDraft.promote({ _id: bookingId, userId });
 
     if (!booking) {
       return res.status(404).json({
@@ -732,6 +744,7 @@ const confirmPayAtHome = async (req, res) => {
 
     // Update booking status — NO earnings set (VendorBill handles that later)
     booking.paymentMethod = 'pay_at_home';
+    booking.paymentMode = 'pay_at_home';
     booking.paymentStatus = PAYMENT_STATUS.PENDING;
     booking.status = BOOKING_STATUS.CONFIRMED;
 

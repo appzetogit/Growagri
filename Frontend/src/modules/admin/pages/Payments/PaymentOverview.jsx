@@ -65,7 +65,9 @@ const PaymentOverview = () => {
           limit: pagination.limit,
           search: debouncedSearch,
           status: filters.status,
-          type: filters.type
+          type: filters.type,
+          // Vendor wallet credits are internal bookkeeping, not money in/out of the platform
+          excludeTypes: 'earnings_credit,wallet_adjustment'
         })
       ]);
 
@@ -266,13 +268,13 @@ const PaymentOverview = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[190px]">Transaction ID</th>
                 <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Farmer / Entity</th>
                 <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                 <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
                 <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Ref ID</th>
+                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Payment ID / Booking</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -295,7 +297,7 @@ const PaymentOverview = () => {
                 transactions.map((tx) => (
                   <tr key={tx._id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-3 px-4">
-                      <span className="text-xs font-mono text-gray-500">#{tx._id.slice(-6).toUpperCase()}</span>
+                      <span className="text-[11px] font-mono text-gray-600 break-all select-all" title="Transaction ID (searchable)">{tx._id}</span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-col">
@@ -332,15 +334,14 @@ const PaymentOverview = () => {
                       <span className="text-sm text-gray-500">{formatDate(tx.createdAt)}</span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-xs text-gray-400 font-mono" title={tx.razorpayOrderId || tx.referenceId || (tx.bookingId?.bookingNumber ? `Booking: ${tx.bookingId.bookingNumber}` : '')}>
-                        {tx.razorpayOrderId || tx.referenceId ? (
-                          (tx.razorpayOrderId || tx.referenceId).length > 15 
-                            ? `${(tx.razorpayOrderId || tx.referenceId).slice(0, 15)}...` 
-                            : (tx.razorpayOrderId || tx.referenceId)
-                        ) : tx.bookingId?.bookingNumber ? (
-                          `#${tx.bookingId.bookingNumber}`
-                        ) : '-'}
-                      </span>
+                      {/* Full payment / reference id (no truncation), with the booking it belongs to */}
+                      {tx.razorpayOrderId || tx.referenceId ? (
+                        <span className="block text-[11px] text-gray-600 font-mono break-all select-all">{tx.razorpayOrderId || tx.referenceId}</span>
+                      ) : null}
+                      {tx.bookingId?.bookingNumber && (
+                        <span className="block text-[11px] text-blue-600 font-semibold">#{tx.bookingId.bookingNumber}</span>
+                      )}
+                      {!tx.razorpayOrderId && !tx.referenceId && !tx.bookingId?.bookingNumber && <span className="text-xs text-gray-400">-</span>}
                     </td>
                   </tr>
                 ))

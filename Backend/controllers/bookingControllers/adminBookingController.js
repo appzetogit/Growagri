@@ -1,7 +1,9 @@
+const mongoose = require('mongoose');
 const Booking = require('../../models/Booking');
 const { validationResult } = require('express-validator');
 const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
 const { refundBookingToWallet } = require('../../services/refundService');
+const { reverseBookingVendorMoney } = require('../../services/bookingMoneyReversal');
 const { createNotification } = require('../notificationControllers/notificationController');
 
 // Tell both sides of a booking what the admin did
@@ -97,6 +99,7 @@ const getAllBookings = async (req, res) => {
       .populate('serviceId', 'title iconUrl')
       .populate('categoryId', 'title slug')
       .populate('workerId', 'name phone')
+      .populate('equipmentId', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -135,7 +138,9 @@ const getBookingById = async (req, res) => {
       .populate('vendorId', 'name businessName phone email address')
       .populate('serviceId', 'title description iconUrl images')
       .populate('categoryId', 'title slug')
-      .populate('workerId', 'name phone rating totalJobs completedJobs');
+      .populate('workerId', 'name phone rating totalJobs completedJobs')
+      .populate('equipmentId', 'name')
+      .populate('vendorBillId', 'grandTotal totalServiceBase totalPartsBase totalGST visitingCharges transportCharges vendorTotalEarning companyRevenue payoutConfig status');
 
     if (!booking) {
       return res.status(404).json({
@@ -389,12 +394,77 @@ const refundBooking = async (req, res) => {
   }
 };
 
+// Only finished bookings can be deleted; anything else still has a vendor/payment in motion
+const DELETABLE_STATUSES = [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.REJECTED];
+const MAX_BULK_DELETE = 100;
+
+/**
+ * Permanently delete bookings. The booking's effect on the vendor wallet is reversed
+ * (earnings and cash dues taken back; its transactions marked cancelled and its bill voided,
+ * both kept for audit). Reviews/disputes are kept.
+ * Skips bookings that are still in progress, have an open dispute, or whose money the vendor
+ * already withdrew/settled.
+ * @returns {{ deleted: string[], skipped: { id: string, bookingNumber: string, reason: string }[] }}
+ */
+const hardDeleteBookings = async (ids) => {
+  const Dispute = require('../../models/Dispute');
+  const BookingRequest = require('../../models/BookingRequest');
+
+  const bookings = await Booking.find({ _id: { $in: ids } }).select('bookingNumber status').lean();
+  const disputed = (await Dispute.distinct('bookingId', {
+    bookingId: { $in: bookings.map(b => b._id) },
+    status: { $in: ['pending', 'investigating'] }
+  })).map(String);
+
+  const skipped = [];
+  const deletable = [];
+  for (const b of bookings) {
+    const reason = !DELETABLE_STATUSES.includes(b.status) ? 'Still in progress (cancel it first)'
+      : disputed.includes(String(b._id)) ? 'Has an open dispute'
+      : await reverseBookingVendorMoney(b._id);
+    if (reason) skipped.push({ id: String(b._id), bookingNumber: b.bookingNumber, reason });
+    else deletable.push(b._id);
+  }
+
+  if (deletable.length > 0) {
+    await BookingRequest.deleteMany({ bookingId: { $in: deletable } });
+    await Booking.deleteMany({ _id: { $in: deletable } });
+  }
+  return { deleted: deletable.map(String), skipped };
+};
+
+/**
+ * Delete one or many bookings permanently
+ */
+const bulkDeleteBookings = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids.map(String))] : [];
+    if (ids.length === 0 || ids.length > MAX_BULK_DELETE || !ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, message: `Send between 1 and ${MAX_BULK_DELETE} valid booking ids` });
+    }
+
+    const { deleted, skipped } = await hardDeleteBookings(ids);
+    console.log(`[ADMIN] ${deleted.length} bookings permanently deleted by admin ${req.user?._id}: ${deleted.join(', ')}`);
+    res.status(200).json({
+      success: true,
+      message: `${deleted.length} deleted` + (skipped.length ? `, ${skipped.length} skipped` : ''),
+      deleted,
+      skipped
+    });
+  } catch (error) {
+    console.error('Bulk delete bookings error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete bookings. Please try again.' });
+  }
+};
+
 module.exports = {
   getAllBookings,
   getBookingById,
   cancelBooking,
   overrideBookingStatus,
   refundBooking,
-  getBookingAnalytics
+  getBookingAnalytics,
+  bulkDeleteBookings,
+  hardDeleteBookings
 };
 

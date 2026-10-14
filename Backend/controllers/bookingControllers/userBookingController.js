@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Booking = require('../../models/Booking');
+const BookingDraft = require('../../models/BookingDraft');
+const { createOrder: createRazorpayOrder } = require('../../services/razorpayService');
 const Service = require('../../models/Service');
 const Category = require('../../models/Category');
 const Plan = require('../../models/Plan');
@@ -97,6 +99,13 @@ const createBooking = async (req, res) => {
           return res.status(400).json({
             success: false,
             message: 'This equipment is currently not available for booking.'
+          });
+        }
+        // Owner blocked by admin: no new bookings for them
+        if (req.body.isDirectVendorBooking && vendorEquipmentDoc.vendorId?.wallet?.isBlocked) {
+          return res.status(400).json({
+            success: false,
+            message: 'This owner is not taking bookings right now. Please choose another equipment.'
           });
         }
         isVendorEquipmentBooking = true;
@@ -522,8 +531,7 @@ const createBooking = async (req, res) => {
     visitingCharges = Number(visitingCharges) || 0;
     finalAmount = Number(finalAmount) || 0;
 
-    // Create booking
-    const bookingNumber = `BK${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    // Create booking (bookingNumber BKGA### is assigned by the Booking model)
 
     // Improve Category Fetching if ID is missing (Fallback to title match)
     let finalCategory = category;
@@ -563,8 +571,11 @@ const createBooking = async (req, res) => {
       bookingStatus = BOOKING_STATUS.AWAITING_PAYMENT;
     }
 
-    const booking = await Booking.create({
-      bookingNumber,
+    // Prepay bookings are stored as drafts until paid (see models/BookingDraft.js)
+    const isPrepayDraft = bookingStatus === BOOKING_STATUS.AWAITING_PAYMENT;
+    const BookingModel = isPrepayDraft ? BookingDraft : Booking;
+
+    const booking = await BookingModel.create({
       userId,
       vendorId: (isVendorEquipmentBooking && vendorEquipmentDoc?.vendorId && req.body.isDirectVendorBooking) 
         ? (vendorEquipmentDoc.vendorId._id || vendorEquipmentDoc.vendorId) 
@@ -616,6 +627,9 @@ const createBooking = async (req, res) => {
       // userNotes: userNotes || null, // Removed
       // isPlusAdded: isPlusAdded || false, // Removed
       paymentMethod: paymentMethod || null,
+      paymentMode: paymentMethod === 'plan_benefit' ? 'plan'
+        : ['pay_at_home', 'cash'].includes(paymentMethod) ? 'pay_at_home'
+        : paymentMethod ? 'online' : null,
       status: bookingStatus,
       paymentStatus: bookingPaymentStatus,
       selectedImplements: selectedImplements || []
@@ -649,8 +663,27 @@ const createBooking = async (req, res) => {
       await dispatchWave1(booking._id, req.app.get('io'));
     }
 
+    // Prepay: create the Razorpay order now so the app can open checkout without a second request
+    let razorpayOrder = null;
+    if (isPrepayDraft) {
+      const orderResult = await createRazorpayOrder(booking.finalAmount, 'INR', booking.bookingNumber, {
+        bookingId: booking._id.toString(),
+        userId: userId.toString()
+      });
+      if (orderResult.success) {
+        booking.razorpayOrderId = orderResult.orderId;
+        await booking.save();
+        razorpayOrder = {
+          orderId: orderResult.orderId,
+          amount: orderResult.amount / 100,
+          currency: orderResult.currency,
+          key: process.env.RAZORPAY_KEY_ID
+        };
+      } // on failure the app falls back to POST /payments/create-order
+    }
+
     // Populate booking details
-    const populatedBooking = await Booking.findById(booking._id)
+    const populatedBooking = await BookingModel.findById(booking._id)
       .populate('userId', 'name phone email')
       .populate('serviceId', 'title iconUrl')
       .populate('categoryId', 'title slug requiresDriver');
@@ -738,7 +771,8 @@ const createBooking = async (req, res) => {
       success: true,
       message: sortedVendors.length > 0 ? 'Booking created successfully' : 'No vendors found nearby',
       noVendorsFound: sortedVendors.length === 0,
-      data: populatedBooking
+      data: populatedBooking,
+      razorpayOrder
     });
   } catch (error) {
     console.error('Create booking error:', error);

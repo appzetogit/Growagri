@@ -44,6 +44,15 @@ const Wallet = () => {
 
   useEffect(() => {
     loadWalletData();
+
+    const handleWalletUpdated = () => {
+      loadWalletData();
+    };
+
+    window.addEventListener('vendorWalletUpdated', handleWalletUpdated);
+    return () => {
+      window.removeEventListener('vendorWalletUpdated', handleWalletUpdated);
+    };
   }, []);
 
   const loadWalletData = async () => {
@@ -315,7 +324,6 @@ const Wallet = () => {
             { id: 'cash_collected', label: 'Cash Collected' },
             { id: 'settlement', label: 'Settlements' },
             { id: 'withdrawal', label: 'Withdrawals' },
-            { id: 'tds_deduction', label: 'TDS' },
             { id: 'platform_fee', label: 'Platform Fees' },
           ].map((filterOption) => (
             <button
@@ -383,7 +391,7 @@ const Wallet = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <p className="font-bold text-gray-900 text-sm">
-                          {getTransactionLabel(txn.type)}
+                          {txn.type === 'withdrawal' && txn.status !== 'completed' ? 'Withdrawal Request' : getTransactionLabel(txn.type)}
                         </p>
                         <p className={`text-lg font-bold ${['tds_deduction', 'withdrawal', 'platform_fee'].includes(txn.type)
                           ? 'text-red-600'
@@ -407,10 +415,13 @@ const Wallet = () => {
                           ) : null;
                         })()}
 
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${txn.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          txn.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                          {txn.status}
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          txn.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          txn.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                          txn.status === 'failed' || txn.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {txn.status === 'completed' ? 'Done' : txn.status === 'pending' ? 'Pending' : txn.status === 'failed' || txn.status === 'cancelled' ? 'Rejected' : txn.status}
                         </span>
                       </div>
                     </div>

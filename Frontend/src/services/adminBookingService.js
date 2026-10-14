@@ -11,6 +11,16 @@ export const adminBookingService = {
     }
   },
 
+  // Permanently delete one or many bookings (in-progress/disputed ones are skipped)
+  bulkDeleteBookings: async (ids) => {
+    try {
+      const response = await api.post('/admin/bookings/bulk-delete', { ids });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to delete bookings' };
+    }
+  },
+
   // Get booking details by ID
   getBookingById: async (id) => {
     try {

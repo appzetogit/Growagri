@@ -142,10 +142,11 @@ export const completeSelfJob = async (bookingId, data) => {
  * @param {string} kmPhotoUrl - Cloudinary URL of start KM photo
  * @param {string} otp        - OTP provided by farmer
  */
-export const startTrip = async (bookingId, kmPhotoUrl, otp) => {
+export const startTrip = async (bookingId, kmPhotoUrl, otp, handoverProofUrl) => {
   const response = await api.post(`/vendors/bookings/${bookingId}/trip/start`, {
     start_kilometer_photo: kmPhotoUrl,
-    driver_start_otp: otp
+    driver_start_otp: otp,
+    handover_proof_photo: handoverProofUrl
   });
   return response.data;
 };
@@ -174,10 +175,11 @@ export const endTrip = async (bookingId, kmPhotoUrl, otp, workUnits, workEvidenc
  * @param {string} otp - 4-digit OTP provided by farmer
  * @param {string} startKmPhoto - Cloudinary URL of starting meter photo
  */
-export const machineryStartWork = async (bookingId, otp, startKmPhoto) => {
+export const machineryStartWork = async (bookingId, otp, startKmPhoto, handoverProofPhoto) => {
   const response = await api.post(`/vendors/equipment/bookings/${bookingId}/start`, {
     otp,
-    startKmPhoto
+    startKmPhoto,
+    handoverProofPhoto
   });
   return response.data;
 };

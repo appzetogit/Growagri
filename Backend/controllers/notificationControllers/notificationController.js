@@ -508,7 +508,7 @@ const deleteAllNotifications = async (req, res) => {
 
 /**
  * Admin broadcast: in-app notification + push to every active account in the audience.
- * POST /api/notifications/admin/broadcast { audience: 'users'|'vendors'|'workers'|'all', title, message }
+ * POST /api/notifications/admin/broadcast { audience: 'users'|'vendors'|'all', title, message }
  */
 const broadcastNotification = async (req, res) => {
   try {
@@ -519,8 +519,7 @@ const broadcastNotification = async (req, res) => {
 
     const groups = {
       users: [require('../../models/User'), 'userId'],
-      vendors: [require('../../models/Vendor'), 'vendorId'],
-      workers: [require('../../models/Worker'), 'workerId']
+      vendors: [require('../../models/Vendor'), 'vendorId']
     };
     const targets = audience === 'all' ? Object.values(groups) : [groups[audience]].filter(Boolean);
     if (!targets.length) return res.status(400).json({ success: false, message: 'Invalid audience' });

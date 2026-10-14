@@ -193,7 +193,6 @@ app.use('/api/admin', require('./routes/admin-routes/cityManagement.routes.js'))
 app.use('/api/admin', require('./routes/admin-routes/dashboard.routes'));
 app.use('/api/admin', require('./routes/admin-routes/userManagement.routes'));
 app.use('/api/admin', require('./routes/admin-routes/vendorManagement.routes'));
-app.use('/api/admin/workers', require('./routes/admin-routes/workerManagement.routes'));
 app.use('/api/admin/equipment', require('./routes/admin-routes/equipmentManagement.routes'));
 app.use('/api/admin/reports', require('./routes/admin-routes/reportManagement.routes'));
 app.use('/api/admin', require('./routes/admin-routes/categoryManagement.routes'));

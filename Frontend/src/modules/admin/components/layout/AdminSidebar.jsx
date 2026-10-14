@@ -22,6 +22,8 @@ import {
   FiGlobe,
   FiTruck,
   FiAward,
+  FiCreditCard,
+  FiTrendingUp,
 } from "react-icons/fi";
 import adminMenu from "../../config/adminMenu.json";
 import dashboardService from "../../services/dashboardService";
@@ -33,14 +35,15 @@ const iconMap = {
   "Farmer Analytics": FiActivity,
   "Owner Analytics": FiAward,
   "Equipment Owners": FiBriefcase,
-  Workers: FiUser,
   Bookings: FiShoppingBag,
   "User Catalog": FiGrid,
   Payments: FiDollarSign,
   Reports: FiFileText,
   Notifications: FiBell,
+  "Admin Revenue": FiTrendingUp,
   Reviews: FiStar,
   Settlements: FiDollarSign,
+  "Vendor Wallet Management": FiCreditCard,
   "Vendor Withdraw": FiDollarSign,
   Settings: FiSettings,
   Plans: FiPackage,
@@ -61,17 +64,9 @@ const getChildRoute = (parentRoute, childName) => {
       "Home": "/admin/equipment-catalog/home",
       "Manage Categories": "/admin/equipment-catalog/categories",
     },
-    "/admin/payments": {
-      "Payment Overview": "/admin/payments/overview",
-      "Farmer Payments": "/admin/payments/users",
-      "Owner Payments": "/admin/payments/vendors",
-      "Admin Revenue": "/admin/payments/revenue",
-      "Payment Reports": "/admin/payments/reports",
-    },
     "/admin/reports": {
       "Revenue Report": "/admin/reports/revenue",
       "Booking Report": "/admin/reports/bookings",
-      "Payment Report": "/admin/payments/reports",
       "Agriculture Insights": "/admin/reports/agri-insights",
     },
     "/admin/notifications": {

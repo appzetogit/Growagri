@@ -34,7 +34,9 @@ const getSettings = async (req, res) => {
           rentalPayoutPercentage: globalSettings?.rentalPayoutPercentage ?? 90,
           servicePayoutPercentage: globalSettings?.servicePayoutPercentage ?? 70,
           partsPayoutPercentage: globalSettings?.partsPayoutPercentage ?? 10,
-          bookingCommissionPercentage: globalSettings?.bookingCommissionPercentage ?? 10
+          bookingCommissionPercentage: globalSettings?.bookingCommissionPercentage ?? 10,
+          platformFeePercentage: globalSettings?.platformFeePercentage ?? 1, // deducted on withdrawals
+          minWithdrawalAmount: globalSettings?.minWithdrawalAmount ?? 100
         }
       }
     });

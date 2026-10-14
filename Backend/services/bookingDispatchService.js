@@ -5,6 +5,20 @@ const { createNotification } = require('../controllers/notificationControllers/n
 const WAVE_1_COUNT = 3;
 
 /**
+ * Drop vendors that are blocked right now (admin block / unpaid dues). potentialVendors is saved at
+ * booking creation, so a vendor blocked after that must be filtered when alerts actually go out.
+ */
+const withoutBlockedVendors = async (candidates) => {
+  if (!candidates.length) return candidates;
+  const Vendor = require('../models/Vendor');
+  const blocked = new Set((await Vendor.distinct('_id', {
+    _id: { $in: candidates.map(v => v.vendorId) },
+    'wallet.isBlocked': true
+  })).map(String));
+  return candidates.filter(v => !blocked.has(String(v.vendorId)));
+};
+
+/**
  * Alert the closest vendors (wave 1) about a booking: BookingRequest rows, instant socket popup,
  * then DB/push notifications. Later waves are handled by bookingScheduler (status 'searching').
  * Uses booking.potentialVendors (sorted by distance) saved at booking creation.
@@ -14,7 +28,7 @@ const dispatchWave1 = async (bookingId, io) => {
   const booking = await Booking.findById(bookingId).populate('userId', 'name phone');
   if (!booking) return 0;
 
-  const wave1 = (booking.potentialVendors || []).slice(0, WAVE_1_COUNT);
+  const wave1 = (await withoutBlockedVendors(booking.potentialVendors || [])).slice(0, WAVE_1_COUNT);
   booking.currentWave = 1;
   booking.waveStartedAt = new Date();
   booking.notifiedVendors = wave1.map(v => v.vendorId);
@@ -95,4 +109,4 @@ const dispatchWave1 = async (bookingId, io) => {
   return wave1.length;
 };
 
-module.exports = { dispatchWave1 };
+module.exports = { dispatchWave1, withoutBlockedVendors };

@@ -40,23 +40,5 @@ export const adminTransactionService = {
       console.error('Error fetching settlement dashboard:', error);
       throw error;
     }
-  },
-
-  // Worker Payment endpoints
-  getWorkerPaymentsSummary: async () => {
-    try {
-      const response = await api.get('/admin/workers/payments');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching worker payments summary:', error);
-      throw error;
-    }
-  },
-
-  // Reports
-  getPaymentReports: async (params) => {
-    // Re-using transactions endpoint with report-specific filters if needed
-    // or we can implement specific report endpoint later
-    return adminTransactionService.getAllTransactions(params);
   }
 };

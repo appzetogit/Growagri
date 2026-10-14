@@ -90,6 +90,14 @@ const adminSettlementService = {
   },
 
   /**
+   * Edit a vendor wallet (earnings, dues, cash limit) with a reason; expected* = values shown on screen
+   */
+  updateVendorWallet: async (vendorId, data) => {
+    const response = await api.put(`/admin/settlements/vendors/${vendorId}/wallet`, data);
+    return response.data;
+  },
+
+  /**
    * Get withdrawal requests
    */
   getWithdrawalRequests: async (params = {}) => {
@@ -110,6 +118,22 @@ const adminSettlementService = {
    */
   rejectWithdrawal: async (withdrawalId, rejectionReason) => {
     const response = await api.post(`/admin/settlements/withdrawals/${withdrawalId}/reject`, { rejectionReason });
+    return response.data;
+  },
+
+  /**
+   * Get withdrawal settings (minimum withdrawal limit, platform fee rate)
+   */
+  getWithdrawalSettings: async () => {
+    const response = await api.get('/admin/settlements/withdrawals/settings');
+    return response.data;
+  },
+
+  /**
+   * Update minimum withdrawal amount required for vendor payouts
+   */
+  updateMinWithdrawalLimit: async (minWithdrawalAmount) => {
+    const response = await api.put('/admin/settlements/withdrawals/min-limit', { minWithdrawalAmount });
     return response.data;
   }
 };

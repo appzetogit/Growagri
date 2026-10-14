@@ -841,7 +841,7 @@ const Checkout = () => {
       let noVendorsFoundOnCreate = false;
 
       if (!currentBooking || !currentBooking._id) {
-        toast.loading('Preparing booking...');
+        toast.loading('Opening secure payment...');
 
         const addressObj = {
           type: 'home',
@@ -943,15 +943,25 @@ const Checkout = () => {
           return;
         }
 
-        currentBooking = bookingResponse.data;
+        // The server returns the Razorpay order with the booking, so checkout opens without another request
+        currentBooking = { ...bookingResponse.data, razorpayOrder: bookingResponse.razorpayOrder };
         noVendorsFoundOnCreate = !!bookingResponse.noVendorsFound;
         setBookingRequest(currentBooking);
       }
 
-      // 3. Create Razorpay Order
-      toast.loading('Opening secure payment gateway...');
-      const orderResponse = await paymentService.createOrder(currentBooking._id);
-      toast.dismiss();
+      // 3. Razorpay Order (reuse the one created with the booking; retries reopen the same order)
+      let orderResponse;
+      if (currentBooking.razorpayOrder?.orderId) {
+        orderResponse = { success: true, data: currentBooking.razorpayOrder };
+      } else {
+        toast.loading('Opening secure payment gateway...');
+        orderResponse = await paymentService.createOrder(currentBooking._id);
+        toast.dismiss();
+        if (orderResponse.success) {
+          currentBooking = { ...currentBooking, razorpayOrder: orderResponse.data };
+          setBookingRequest(currentBooking);
+        }
+      }
 
       if (!orderResponse.success) {
         toast.error(orderResponse.message || 'Failed to initiate payment');

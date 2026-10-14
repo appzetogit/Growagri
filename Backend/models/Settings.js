@@ -56,6 +56,12 @@ const settingsSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  // Smallest amount a vendor can request as a withdrawal
+  minWithdrawalAmount: {
+    type: Number,
+    default: 100,
+    min: 0
+  },
   platformFeePercentage: {
     type: Number,
     default: 1, // 1% default platform fee

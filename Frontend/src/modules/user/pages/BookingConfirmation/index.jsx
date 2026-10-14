@@ -286,10 +286,12 @@ const BookingConfirmation = () => {
           {/* Success Icon - Show when confirmed */}
           {!isSearching && ['confirmed', 'assigned', 'journey_started', 'in_progress', 'visited', 'work_done', 'completed'].includes(booking?.status?.toLowerCase()) && (
             <div className="flex flex-col items-center justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                <FiCheckCircle className="w-12 h-12 text-green-600" />
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 shrink-0 rounded-full bg-green-100 flex items-center justify-center">
+                  <FiCheckCircle className="w-7 h-7 text-green-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-black">Booking Confirmed!</h1>
               </div>
-              <h1 className="text-2xl font-bold text-black mb-2">Booking Confirmed!</h1>
               <p className="text-sm text-gray-600 text-center">
                 Your booking has been confirmed. We'll send you updates via SMS.
               </p>
@@ -523,22 +525,15 @@ const BookingConfirmation = () => {
                 </div>
               )}
 
-              {/* Convenience Fee */}
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Convenience Fee</span>
-                {booking.paymentMethod === 'plan_benefit' ? (
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-slate-400 text-xs">₹{(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}</span>
-                    <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">FREE ✓</span>
-                  </div>
-                ) : (
-                  <span className={`font-medium ${(booking.visitingCharges || booking.visitationFee || 0) === 0 ? 'text-slate-400 font-normal italic' : 'text-slate-700'}`}>
-                    {(booking.visitingCharges || booking.visitationFee || 0) === 0
-                      ? 'Not Added'
-                      : `₹${(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}`}
+              {/* Convenience Fee - only when one was actually charged, so the breakdown still adds up */}
+              {(booking.visitingCharges || booking.visitationFee || 0) > 0 && booking.paymentMethod !== 'plan_benefit' && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Convenience Fee</span>
+                  <span className="font-medium text-slate-700">
+                    ₹{(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Total */}
               <div className="border-t border-slate-200 pt-4 mt-2">

@@ -49,14 +49,15 @@ const ActiveJobs = memo(() => {
       // Map API response to Component State structure
       const mappedJobs = jobsData.map(job => ({
         id: job._id || job.id,
-        serviceType: job.serviceId?.title || job.serviceType || 'Equipment',
+        serviceType: job.serviceName || job.serviceId?.title || job.serviceType || 'Equipment',
         user: {
           name: job.userId?.name || job.customerName || 'Farmer'
         },
         location: {
           address: job.address?.addressLine1 || job.location?.address || 'Address not available'
         },
-        price: (job.vendorEarnings || (job.finalAmount ? job.finalAmount * 0.9 : 0)).toFixed(2),
+        // Vendor's real earning from the bill (excludes GST & admin commission); unknown until billed
+        price: job.vendorBillId?.vendorTotalEarning != null ? Number(job.vendorBillId.vendorTotalEarning).toFixed(2) : null,
         status: job.status,
         paymentStatus: job.paymentStatus,
         assignedTo: job.workerId ? { name: job.workerId.name } : (job.assignedAt ? { name: 'You (Self)' } : null),
@@ -358,7 +359,7 @@ const ActiveJobs = memo(() => {
                           border: `1px solid ${hexToRgba(themeColors.button, 0.2)}`,
                         }}
                       >
-                        {job.status?.toLowerCase() === 'completed' ? `₹${job.price}` : <FiClock className="w-5 h-5 opacity-40" title="Earnings visible after completion" />}
+                        {job.status?.toLowerCase() === 'completed' && job.price ? `₹${job.price}` : <FiClock className="w-5 h-5 opacity-40" title="Earnings visible after completion" />}
                       </div>
                     </div>
 

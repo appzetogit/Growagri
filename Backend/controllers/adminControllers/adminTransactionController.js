@@ -7,6 +7,15 @@ const Worker = require('../../models/Worker');
 const PlatformEarning = require('../../models/PlatformEarning');
 
 /**
+ * Only transactions of bookings that still exist (plus ones not tied to a booking, e.g. settlements).
+ * Records of admin-deleted bookings are kept in the DB for audit but left out of payment screens.
+ * ponytail: loads all booking ids; switch to a $lookup aggregation if bookings grow very large
+ */
+const liveBookingFilter = async () => ({
+  $or: [{ bookingId: null }, { bookingId: { $in: await Booking.distinct('_id') } }]
+});
+
+/**
  * Get all transactions with pagination and filtering
  */
 const getAllTransactions = async (req, res) => {
@@ -138,9 +147,11 @@ const getAllTransactions = async (req, res) => {
       query.status = status;
     }
 
-    // Apply type filter
+    // Apply type filter (excludeTypes lets a screen hide internal entries, e.g. vendor wallet credits)
     if (type && type !== 'all') {
       query.type = type;
+    } else if (req.query.excludeTypes) {
+      query.type = { $nin: String(req.query.excludeTypes).split(',') };
     }
 
     // Apply entity filter
@@ -192,6 +203,8 @@ const getAllTransactions = async (req, res) => {
         query.$or.push({ _id: search });
       }
     }
+
+    query = { $and: [query, await liveBookingFilter()] };
 
     const transactions = await Transaction.find(query)
       .populate('userId', 'name email phone')
@@ -278,10 +291,10 @@ const getTransactionStats = async (req, res) => {
       if (entity === 'worker') matchQuery.workerId = { $ne: null };
     }
 
-    // We count 'completed' transactions for revenue
+    // We count 'completed' transactions for revenue (of bookings that still exist)
     const revenueStats = await Transaction.aggregate([
       {
-        $match: matchQuery
+        $match: { $and: [matchQuery, await liveBookingFilter()] }
       },
       {
         $group: {

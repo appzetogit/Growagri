@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FiArrowLeft, FiSearch, FiMessageCircle, FiMail, FiPhone,
+  FiArrowLeft, FiSearch, FiMail, FiPhone,
   FiChevronRight, FiHelpCircle, FiBook, FiAlertCircle,
   FiCheckCircle, FiClock, FiSend
 } from 'react-icons/fi';
@@ -11,7 +11,6 @@ import api from '../../../../services/api';
 const HelpSupport = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [supportInfo, setSupportInfo] = useState({
     email: 'grooagri@gmail.com',
@@ -20,7 +19,7 @@ const HelpSupport = () => {
   });
 
   const [categories, setCategories] = useState([]);
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -28,7 +27,7 @@ const HelpSupport = () => {
           api.get('/public/config').catch(() => null),
           api.get('/content/faq').catch(() => null)
         ]);
-        
+
         if (configRes?.data?.success && configRes?.data?.settings) {
           const { supportEmail, supportPhone, supportWhatsapp } = configRes.data.settings;
           setSupportInfo({
@@ -41,7 +40,7 @@ const HelpSupport = () => {
         if (faqRes?.data?.success && faqRes.data.data) {
           // Filter out 'Owner' FAQs for the farmer app
           const backendFaqs = faqRes.data.data.filter(faq => faq.category !== 'Owner');
-          
+
           const grouped = backendFaqs.reduce((acc, curr) => {
             const cat = curr.category || 'General';
             if (!acc[cat]) acc[cat] = [];
@@ -53,7 +52,7 @@ const HelpSupport = () => {
             let icon = FiHelpCircle;
             let color = '#3B82F6';
             if (cat === 'Farmer') { icon = FiBook; color = '#10B981'; }
-            
+
             return {
               id: cat.toLowerCase(),
               title: cat + ' FAQs',
@@ -62,7 +61,7 @@ const HelpSupport = () => {
               questions: grouped[cat]
             };
           });
-          
+
           if (newCategories.length > 0) {
             setCategories(newCategories);
           }
@@ -84,21 +83,6 @@ const HelpSupport = () => {
 
   // Quick actions
   const quickActions = [
-    {
-      id: 'chat',
-      title: 'WhatsApp Chat',
-      subtitle: 'Chat with our support team',
-      icon: FiMessageCircle,
-      color: '#25D366',
-      action: () => {
-        if (supportInfo.whatsapp) {
-          const cleanNumber = supportInfo.whatsapp.replace(/\D/g, '');
-          window.location.href = `whatsapp://send?phone=${cleanNumber}`;
-        } else {
-          toast.info('WhatsApp support is currently unavailable');
-        }
-      }
-    },
     {
       id: 'email',
       title: 'Email Us',
@@ -169,20 +153,6 @@ const HelpSupport = () => {
             <h1 className="text-xl font-bold text-gray-900">Help & Support</h1>
           </div>
         </div>
-
-        {/* Search Bar */}
-        <div className="px-4 pb-4">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search for help..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-            />
-          </div>
-        </div>
       </div>
 
       <main className="px-4 pt-4">
@@ -192,9 +162,7 @@ const HelpSupport = () => {
           <div className="grid grid-cols-1 gap-3">
             {quickActions.map(action => {
               let href = null;
-              if (action.id === 'chat' && supportInfo.whatsapp) {
-                href = `whatsapp://send?phone=${supportInfo.whatsapp.replace(/\D/g, '')}`;
-              } else if (action.id === 'email' && supportInfo.email) {
+              if (action.id === 'email' && supportInfo.email) {
                 href = `mailto:${supportInfo.email}`;
               } else if (action.id === 'call' && supportInfo.phone) {
                 href = `tel:${supportInfo.phone.replace(/\D/g, '')}`;
@@ -234,52 +202,6 @@ const HelpSupport = () => {
           <FiSend className="w-5 h-5" />
           Submit a Request
         </button>
-
-        {/* FAQ Categories */}
-        {searchQuery === '' && (
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-3">Browse by Category</h2>
-            <div className="space-y-3">
-              {categories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id === selectedCategory ? null : category.id)}
-                  className="w-full bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border border-gray-100"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${category.color}15` }}
-                      >
-                        <category.icon className="w-5 h-5" style={{ color: category.color }} />
-                      </div>
-                      <h3 className="font-semibold text-gray-900">{category.title}</h3>
-                    </div>
-                    <FiChevronRight
-                      className={`w-5 h-5 text-gray-400 transition-transform ${selectedCategory === category.id ? 'rotate-90' : ''}`}
-                    />
-                  </div>
-
-                  {/* Expanded Questions */}
-                  {selectedCategory === category.id && (
-                    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
-                      {category.questions.map((item, idx) => (
-                        <div key={idx} className="text-left">
-                          <div className="flex items-start gap-2 mb-2">
-                            <FiHelpCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <p className="font-medium text-gray-900 text-sm">{item.q}</p>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">{item.a}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Search Results */}
         {searchQuery !== '' && (

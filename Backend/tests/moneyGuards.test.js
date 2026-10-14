@@ -2,6 +2,7 @@
 // Run: node tests/moneyGuards.test.js
 process.env.JWT_SECRET ||= 'test';
 process.env.JWT_REFRESH_SECRET ||= 'test';
+process.env.RAZORPAY_KEY_SECRET ||= 'test_secret';
 const assert = require('assert');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');

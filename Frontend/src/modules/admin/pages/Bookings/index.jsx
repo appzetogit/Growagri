@@ -4,25 +4,29 @@ import { Link } from 'react-router-dom';
 import {
   FiSearch, FiCalendar, FiDownload, FiMoreVertical,
   FiClock, FiCheckCircle, FiBox, FiTruck, FiXCircle, FiRefreshCw, FiShoppingBag,
-  FiNavigation, FiEye
+  FiNavigation, FiTrash2
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { adminBookingService } from '../../../../services/adminBookingService';
+import adminVendorService from '../../../../services/adminVendorService';
 import { getDashboardStats } from '../../../../services/adminDashboardService';
 import BookingTrackingModal from './components/BookingTrackingModal';
+import { bookingItems, paymentInfo, PAYMENT_TONES } from './bookingDisplay';
 
 const BookingStatsCard = ({ title, count, icon: Icon, colorClass, bgClass }) => (
-  <div className={`p-3 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between ${bgClass}`}>
-    <div>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${colorClass.replace('text-', 'bg-').replace('600', '100')}`}>
-        <Icon className={`w-4 h-4 ${colorClass}`} />
-      </div>
-      <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">{title}</h3>
-      <p className="text-xl font-bold text-gray-800 mt-0.5">{count}</p>
+  <div className={`px-2.5 py-2 rounded-lg border border-gray-100 shadow-sm flex items-center gap-2 min-w-0 ${bgClass}`}>
+    <div className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center ${colorClass.replace('text-', 'bg-').replace('600', '100')}`}>
+      <Icon className={`w-3 h-3 ${colorClass}`} />
     </div>
-    <div className={`w-12 h-12 rounded-full opacity-10 -mr-3 -mb-3 ${colorClass.replace('text-', 'bg-')}`}></div>
+    <div className="min-w-0">
+      <h3 className="text-gray-500 text-[9px] font-bold uppercase tracking-wider truncate">{title}</h3>
+      <p className="text-sm font-bold text-gray-800 leading-tight">{count}</p>
+    </div>
   </div>
 );
+
+const PAGE_SIZE = 15;
+const isDeletable = (b) => ['completed', 'cancelled', 'rejected'].includes(b.status?.toLowerCase());
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -33,12 +37,26 @@ const Bookings = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [moduleFilter, setModuleFilter] = useState('All Types');
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [vendors, setVendors] = useState([]);
+
+  // Vendor list for the "bookings of one vendor" filter (loaded once)
+  useEffect(() => {
+    adminVendorService.getAllVendors({ limit: 500 })
+      .then(res => setVendors((res?.data || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))))
+      .catch(() => {});
+  }, []);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalMatching, setTotalMatching] = useState(0);
+
+  // Selection for delete (only finished bookings can be deleted; backend enforces it too)
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleting, setDeleting] = useState(false);
 
   // Stats
   const [stats, setStats] = useState({
@@ -58,14 +76,15 @@ const Bookings = () => {
   }, [search]);
 
   // Load Data
-  const fetchData = async () => {
+  const fetchData = async (refreshStats = false) => {
     try {
       setLoading(true);
+      setSelectedIds([]);
 
       // 1. Fetch Bookings
       const params = {
         page,
-        limit: 10,
+        limit: PAGE_SIZE,
         search: debouncedSearch.trim(),
         startDate,
         endDate
@@ -74,6 +93,7 @@ const Bookings = () => {
         params.status = statusFilter;
       }
       
+      if (vendorFilter) params.vendorId = vendorFilter;
       if (moduleFilter === 'Hourly Rent') params.rental_type = 'hourly';
       if (moduleFilter === 'Monthly Rent') params.rental_type = 'monthly';
       if (moduleFilter === 'Acre Rent') params.rental_type = 'land_based';
@@ -82,10 +102,11 @@ const Bookings = () => {
       if (res.success) {
         setBookings(res.data);
         setTotalPages(res.pagination.pages);
+        setTotalMatching(res.pagination.total);
       }
 
-      // 2. Fetch Stats (only if not already fetched or if total is 0)
-      if (stats.total === 0) {
+      // 2. Fetch Stats (first load, or after a delete)
+      if (refreshStats || stats.total === 0) {
         const statsRes = await getDashboardStats();
         if (statsRes.success) {
           const s = statsRes.data.stats;
@@ -109,15 +130,46 @@ const Bookings = () => {
 
   useEffect(() => {
     fetchData();
-  }, [page, debouncedSearch, statusFilter, moduleFilter, startDate, endDate]);
+  }, [page, debouncedSearch, statusFilter, moduleFilter, vendorFilter, startDate, endDate]);
+
+  const deletableOnPage = bookings.filter(isDeletable).map(b => b._id);
+  const allSelected = deletableOnPage.length > 0 && deletableOnPage.every(id => selectedIds.includes(id));
+  const toggleSelect = (id) => setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  const toggleSelectAll = () => setSelectedIds(allSelected ? [] : deletableOnPage);
+
+  const handleDelete = async (ids) => {
+    const label = ids.length === 1
+      ? `booking #${bookings.find(b => b._id === ids[0])?.bookingNumber || ''}`
+      : `${ids.length} bookings`;
+    if (!window.confirm(`Permanently delete ${label}? This cannot be undone.\n\nThe vendor's earnings and cash dues from ${ids.length === 1 ? 'this booking' : 'these bookings'} will be reversed in their wallet.`)) return;
+
+    try {
+      setDeleting(true);
+      const res = await adminBookingService.bulkDeleteBookings(ids);
+      if (res.deleted?.length) toast.success(`${res.deleted.length} booking${res.deleted.length > 1 ? 's' : ''} deleted`);
+      if (res.skipped?.length) {
+        toast.error(res.skipped.map(s => `#${s.bookingNumber}: ${s.reason}`).join('\n'), { duration: 6000 });
+      }
+      // Step back a page if this one is now empty
+      if (res.deleted?.length === bookings.length && page > 1) setPage(p => p - 1);
+      else fetchData(true);
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete bookings');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleExport = () => {
-    const headers = ['Order ID', 'Farmer', 'Equipment', 'Total', 'Status', 'Date'];
+    const headers = ['Order ID', 'Farmer', 'Vendor', 'Vendor Phone', 'Equipment', 'Total', 'Payment', 'Status', 'Date'];
     const rows = bookings.map(b => [
       b.bookingNumber,
       b.userId?.name || 'Unknown',
-      b.serviceId?.title || 'Equipment',
+      b.vendorId?.name || b.vendorId?.businessName || '',
+      b.vendorId?.phone || '',
+      bookingItems(b).main,
       b.finalAmount,
+      `${paymentInfo(b).label} - ${paymentInfo(b).detail}`,
       b.status,
       new Date(b.createdAt).toLocaleDateString()
     ]);
@@ -137,7 +189,7 @@ const Bookings = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
         <BookingStatsCard title="Awaiting" count={stats.pending} icon={FiClock} bgClass="bg-yellow-50" colorClass="text-yellow-600" />
         <BookingStatsCard title="Confirmed" count={stats.pending} icon={FiCheckCircle} bgClass="bg-blue-50" colorClass="text-blue-600" />
         <BookingStatsCard title="In Progress" count={stats.inProgress} icon={FiBox} bgClass="bg-purple-50" colorClass="text-purple-600" />
@@ -176,6 +228,20 @@ const Bookings = () => {
           </select>
 
           <select
+            value={vendorFilter}
+            onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
+            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:border-green-500 cursor-pointer max-w-[200px]"
+            title="Show bookings of one vendor"
+          >
+            <option value="">All Vendors</option>
+            {vendors.map(v => (
+              <option key={v._id} value={v._id}>
+                {v.name || v.businessName}{v.name && v.businessName ? ` (${v.businessName})` : ''}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={moduleFilter}
             onChange={(e) => setModuleFilter(e.target.value)}
             className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs text-blue-600 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
@@ -209,6 +275,15 @@ const Bookings = () => {
           >
             <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={() => handleDelete(selectedIds)}
+              disabled={deleting}
+              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <FiTrash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : `Delete selected (${selectedIds.length})`}
+            </button>
+          )}
           <button
             onClick={handleExport}
             className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm shadow-green-200"
@@ -224,8 +299,20 @@ const Bookings = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="pl-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || deletableOnPage.length === 0}
+                    aria-label="Select all finished bookings on this page"
+                    title="Select all finished bookings on this page"
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order ID</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Farmer</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Items</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total (₹)</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
@@ -237,15 +324,26 @@ const Bookings = () => {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-xs text-gray-500">Loading bookings...</td>
+                  <td colSpan="10" className="px-4 py-8 text-center text-xs text-gray-500">Loading bookings...</td>
                 </tr>
               ) : bookings.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-xs text-gray-500">No bookings found</td>
+                  <td colSpan="10" className="px-4 py-8 text-center text-xs text-gray-500">No bookings found</td>
                 </tr>
               ) : (
                 bookings.map((booking) => (
-                  <tr key={booking._id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={booking._id} className={`transition-colors ${selectedIds.includes(booking._id) ? 'bg-red-50/40' : 'hover:bg-gray-50'}`}>
+                    <td className="pl-4 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(booking._id)}
+                        onChange={() => toggleSelect(booking._id)}
+                        disabled={!isDeletable(booking)}
+                        aria-label={`Select booking ${booking.bookingNumber}`}
+                        title={isDeletable(booking) ? 'Select' : 'Only completed/cancelled bookings can be deleted'}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <Link to={`/admin/bookings/${booking._id}`}>
                         <span className="font-bold text-blue-600 hover:underline text-xs cursor-pointer">
@@ -260,9 +358,28 @@ const Bookings = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-blue-600 text-[11px] font-bold">
-                        {booking.items?.length || 1} items
-                      </div>
+                      {booking.vendorId ? (
+                        <div>
+                          <p className="font-bold text-gray-900 text-xs">{booking.vendorId.name || booking.vendorId.businessName}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {booking.vendorId.phone}
+                            {booking.vendorId.name && booking.vendorId.businessName && ` · ${booking.vendorId.businessName}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-400">Not assigned</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 max-w-[200px]">
+                      {(() => {
+                        const { main, sub } = bookingItems(booking);
+                        return (
+                          <div className="min-w-0" title={[main, sub].filter(Boolean).join(' — ')}>
+                            <p className="font-bold text-gray-900 text-xs truncate">{main}</p>
+                            {sub && <p className="text-[10px] text-gray-500 truncate">{sub}</p>}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-bold text-gray-900 text-xs">₹{booking.finalAmount?.toLocaleString()}</span>
@@ -278,7 +395,15 @@ const Bookings = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-[11px] text-gray-600 capitalize font-medium">{booking.paymentMethod?.replace('_', ' ')}</span>
+                      {(() => {
+                        const p = paymentInfo(booking);
+                        return (
+                          <div>
+                            <span className={`inline-block px-2 py-0.5 rounded-md border text-[10px] font-bold ${PAYMENT_TONES[p.tone]}`}>{p.label}</span>
+                            <p className="text-[10px] text-gray-500 mt-0.5">{p.detail}</p>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-[10px] text-gray-600 font-medium">
@@ -297,13 +422,15 @@ const Bookings = () => {
                           <FiNavigation className="w-3.5 h-3.5" />
                           Track
                         </button>
-                        <Link
-                          to={`/admin/bookings/${booking._id}`}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="View Details"
+                        <button
+                          onClick={() => handleDelete([booking._id])}
+                          disabled={deleting || !isDeletable(booking)}
+                          className="p-1.5 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={isDeletable(booking) ? 'Delete booking' : 'Only completed/cancelled bookings can be deleted'}
+                          aria-label={`Delete booking ${booking.bookingNumber}`}
                         >
-                          <FiEye className="w-4 h-4" />
-                        </Link>
+                          <FiTrash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -316,8 +443,11 @@ const Bookings = () => {
         {/* Pagination Footer */}
         {!loading && bookings.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/30">
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Showing {bookings.length} of {stats.total} entries</p>
-            <div className="flex gap-1.5">
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + bookings.length} of {totalMatching} entries
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-500 font-bold mr-1">Page {page} of {Math.max(totalPages, 1)}</span>
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
@@ -327,7 +457,7 @@ const Bookings = () => {
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                disabled={page >= totalPages}
                 className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 disabled:opacity-50 hover:bg-white transition-all"
               >
                 Next

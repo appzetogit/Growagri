@@ -384,43 +384,91 @@ const requestWithdrawal = async (req, res) => {
     const vendorId = req.user.id;
     const { amount, bankDetails, notes } = req.body;
 
-    if (!amount || amount <= 0) {
+    const numAmount = Number(amount);
+    if (!amount || isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
+    }
+
+    // Admin-set minimum (Vendor Withdraw page)
+    const minWithdrawal = (await require('../../models/Settings').findOne({ type: 'global' }).select('minWithdrawalAmount').lean())?.minWithdrawalAmount ?? 100;
+    if (numAmount < minWithdrawal) {
+      return res.status(400).json({ success: false, message: `Minimum withdrawal amount is ₹${minWithdrawal}` });
     }
 
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
 
-    const currentEarnings = vendor.wallet?.earnings || 0;
-
-    // Check pending withdrawals?
-    const pendingWithdrawals = await Withdrawal.aggregate([
-      { $match: { vendorId: vendor._id, status: 'pending' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
-    const pendingAmount = pendingWithdrawals[0]?.total || 0;
-    // Dues = cash the vendor already holds (incl. their own share), so it is netted off first
-    const currentDues = vendor.wallet?.dues || 0;
-    const availableEarnings = Math.max(0, currentEarnings - currentDues - pendingAmount);
-
     if (vendor.wallet?.isBlocked) {
       return res.status(403).json({ success: false, message: 'Wallet is blocked. Please clear your dues first.' });
     }
 
-    if (Number(amount) > availableEarnings) {
+    const currentEarnings = vendor.wallet?.earnings || 0;
+    const currentDues = vendor.wallet?.dues || 0;
+
+    // Check pending withdrawals that were NOT yet debited from earnings
+    const pendingWithdrawals = await Withdrawal.aggregate([
+      { $match: { vendorId: vendor._id, status: 'pending', isDebited: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const pendingAmount = pendingWithdrawals[0]?.total || 0;
+
+    // Available earnings must cover current dues and any un-debited legacy pending withdrawals
+    const availableEarnings = Math.max(0, currentEarnings - currentDues - pendingAmount);
+
+    if (numAmount > availableEarnings) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient earnings. Available: ₹${availableEarnings} (Dues: ₹${currentDues}, Pending: ₹${pendingAmount})`
+        message: `Insufficient earnings. Available: ₹${availableEarnings} (Dues: ₹${currentDues}${pendingAmount > 0 ? `, Pending: ₹${pendingAmount}` : ''})`
       });
     }
 
-    const withdrawal = await Withdrawal.create({
-      vendorId,
-      amount,
-      bankDetails: bankDetails || vendor.bankAccount,
-      adminNotes: notes,
-      status: 'pending'
-    });
+    // Atomically debit requested amount from vendor earnings so Available Earnings immediately decreases
+    const updatedVendor = await Vendor.findOneAndUpdate(
+      { _id: vendorId, 'wallet.earnings': { $gte: numAmount } },
+      { $inc: { 'wallet.earnings': -numAmount } },
+      { new: true }
+    );
+
+    if (!updatedVendor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient earnings balance to process withdrawal'
+      });
+    }
+
+    let withdrawal;
+    try {
+      withdrawal = await Withdrawal.create({
+        vendorId,
+        amount: numAmount,
+        bankDetails: bankDetails || vendor.bankAccount,
+        adminNotes: notes,
+        status: 'pending',
+        isDebited: true
+      });
+
+      // Create pending transaction so vendor sees it immediately in Withdrawals ledger
+      await Transaction.create({
+        vendorId,
+        type: 'withdrawal',
+        amount: numAmount,
+        status: 'pending',
+        paymentMethod: 'bank_transfer',
+        description: `Withdrawal request submitted for ₹${numAmount}. Pending admin approval.`,
+        balanceBefore: currentEarnings,
+        balanceAfter: updatedVendor.wallet.earnings,
+        metadata: {
+          withdrawalId: withdrawal._id,
+          bankDetails: bankDetails || vendor.bankAccount
+        }
+      });
+    } catch (createErr) {
+      // Rollback earnings deduction on error
+      await Vendor.findByIdAndUpdate(vendorId, {
+        $inc: { 'wallet.earnings': numAmount }
+      });
+      throw createErr;
+    }
 
     // 🔔 NOTIFY ALL ADMINS about withdrawal request
     try {
@@ -434,13 +482,13 @@ const requestWithdrawal = async (req, res) => {
           adminId: admin._id,
           type: 'vendor_withdrawal_request',
           title: '💸 Withdrawal Request',
-          message: `${vendor.businessName || vendor.name} requested withdrawal of ₹${amount}`,
+          message: `${vendor.businessName || vendor.name} requested withdrawal of ₹${numAmount}`,
           relatedId: withdrawal._id,
           relatedType: 'withdrawal',
           data: {
             vendorId: vendor._id,
             vendorName: vendor.businessName || vendor.name,
-            amount,
+            amount: numAmount,
             withdrawalId: withdrawal._id
           },
           pushData: {
@@ -462,7 +510,7 @@ const requestWithdrawal = async (req, res) => {
 
   } catch (error) {
     console.error('Request withdrawal error:', error);
-    res.status(500).json({ success: false, message: 'Failed to request withdrawal' });
+    res.status(500).json({ success: false, message: error.message || 'Failed to request withdrawal' });
   }
 };
 

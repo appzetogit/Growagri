@@ -17,7 +17,8 @@ exports.getAllReviews = async (req, res) => {
     } = req.query;
 
     const query = {};
-    if (status) query.status = status;
+    // Deleted reviews never show in the list (delete is a soft delete)
+    query.status = status && status !== 'deleted' ? status : { $ne: 'deleted' };
     if (rating) query.rating = parseInt(rating);
     if (vendorId) query.vendorId = vendorId;
     if (serviceId) query.serviceId = serviceId;
@@ -57,7 +58,7 @@ exports.getAllReviews = async (req, res) => {
       .populate('vendorId', 'businessName name phone')
       .populate('serviceId', 'title iconUrl')
       .populate('workerId', 'name phone')
-      .populate('bookingId', 'bookingNumber status')
+      .populate('bookingId', 'bookingNumber status serviceName')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));

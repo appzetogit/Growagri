@@ -1,46 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSettings, FiGrid, FiDollarSign, FiSave, FiUser, FiMail, FiTrash2, FiPlus, FiUsers, FiShield, FiFileText, FiMapPin, FiPhone, FiHeadphones, FiMessageCircle, FiEdit, FiLock, FiUnlock, FiX } from 'react-icons/fi';
-import { getSettings, updateSettings, updateAdminProfile, getAdminProfile, getAllAdmins, createAdmin, deleteAdmin, updateAdminDetails, toggleAdminStatus } from '../../services/settingsService';
-import { cityService } from '../../services/cityService';
+import { FiSettings, FiSave, FiUser, FiMail, FiShield, FiMapPin, FiPhone, FiHeadphones } from 'react-icons/fi';
+import { getSettings, updateSettings, updateAdminProfile, getAdminProfile } from '../../services/settingsService';
 import CityManagement from '../Cities';
 import { toast } from 'react-hot-toast';
 
 const AdminSettings = () => {
-  const [settings, setSettings] = useState({
-    // No operator assignment in GrooAgri
-  });
-
-  const [financialSettings, setFinancialSettings] = useState({
-    visitedCharges: 0,
-    serviceGstPercentage: 18,
-    partsGstPercentage: 18,
-    servicePayoutPercentage: 90,
-    partsPayoutPercentage: 100,
-    vendorCashLimit: 10000,
-    cancellationPenalty: 49,
-    tdsPercentage: 1,
-    platformFeePercentage: 1,
-    bookingCommissionPercentage: 10,
-    rentalGstPercentage: 5
-  });
-
-  // Billing Configuration State
-  const [billingSettings, setBillingSettings] = useState({
-    companyName: 'TodayMyDream',
-    companyGSTIN: '',
-    companyPAN: '',
-    companyAddress: '',
-    companyCity: '',
-    companyState: '',
-    companyPincode: '',
-    companyPhone: '',
-    companyEmail: '',
-    invoicePrefix: 'INV',
-    sacCode: '998599'
-  });
-  const [billingLoading, setBillingLoading] = useState(false);
-
   // Support Settings State
   const [supportSettings, setSupportSettings] = useState({
     supportEmail: '',
@@ -59,16 +24,8 @@ const AdminSettings = () => {
     confirmPassword: ''
   });
 
-  // Admin Management State
-  const [admins, setAdmins] = useState([]);
-  const [cities, setCities] = useState([]); // State for cities
-  const [showAddAdmin, setShowAddAdmin] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '', role: 'admin', cityId: '' }); // Added cityId
-  const [adminLoading, setAdminLoading] = useState(false);
-
-  const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [activeView, setActiveView] = useState('main'); // 'main', 'profile', 'financial', 'system', 'admins'
+  const [activeView, setActiveView] = useState('main'); // 'main', 'profile', 'system', 'cities'
 
   const isSuperAdmin = profile.role === 'super_admin';
 
@@ -93,40 +50,10 @@ const AdminSettings = () => {
       }
     };
 
-    const loadFinancialSettings = async () => {
+    const loadSettings = async () => {
       try {
         const res = await getSettings();
         if (res?.settings) {
-          const financialConfig = {
-            visitedCharges: res.settings.visitedCharges || 0,
-            serviceGstPercentage: res.settings.serviceGstPercentage ?? 18,
-            partsGstPercentage: res.settings.partsGstPercentage ?? 18,
-            servicePayoutPercentage: res.settings.servicePayoutPercentage ?? 90,
-            partsPayoutPercentage: res.settings.partsPayoutPercentage ?? 100,
-            tdsPercentage: res.settings.tdsPercentage || 1,
-            platformFeePercentage: res.settings.platformFeePercentage || 1,
-            vendorCashLimit: res.settings.vendorCashLimit || 10000,
-            cancellationPenalty: res.settings.cancellationPenalty ?? 49,
-            bookingCommissionPercentage: res.settings.bookingCommissionPercentage ?? 10,
-            rentalGstPercentage: res.settings.rentalGstPercentage ?? 5
-          };
-          setFinancialSettings(financialConfig);
-          setSettings(financialConfig);
-
-          // Load billing settings
-          setBillingSettings({
-            companyName: res.settings.companyName || 'TodayMyDream',
-            companyGSTIN: res.settings.companyGSTIN || '',
-            companyPAN: res.settings.companyPAN || '',
-            companyAddress: res.settings.companyAddress || '',
-            companyCity: res.settings.companyCity || '',
-            companyState: res.settings.companyState || '',
-            companyPincode: res.settings.companyPincode || '',
-            companyPhone: res.settings.companyPhone || '',
-            companyEmail: res.settings.companyEmail || '',
-            invoicePrefix: res.settings.invoicePrefix || 'INV',
-            sacCode: res.settings.sacCode || '998599'
-          });
           // Load support settings
           setSupportSettings({
             supportEmail: res.settings.supportEmail || '',
@@ -140,162 +67,12 @@ const AdminSettings = () => {
     };
 
     loadProfile();
-    loadFinancialSettings();
+    loadSettings();
   }, []);
-
-  const loadAdmins = async () => {
-    try {
-      console.log('Fetching admins list...');
-      const res = await getAllAdmins();
-      console.log('Admins fetched:', res);
-      if (res.success) {
-        setAdmins(res.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading admins:', error);
-    }
-  };
-
-  // Fetch cities for dropdown
-  const loadCities = async () => {
-    try {
-      const res = await cityService.getAll();
-      if (res.success) {
-        setCities(res.cities || []);
-      }
-    } catch (error) {
-      console.error('Error loading cities:', error);
-    }
-  };
-
-  // Load admins and cities ONLY when entering admin view
-  useEffect(() => {
-    if (isSuperAdmin && activeView === 'admins') {
-      if (admins.length === 0) loadAdmins();
-      if (cities.length === 0) loadCities();
-    }
-  }, [isSuperAdmin, activeView]);
-
-  const handleToggle = (key) => {
-    const updated = { ...settings, [key]: !settings[key] };
-    setSettings(updated);
-    localStorage.setItem('adminSettings', JSON.stringify(updated));
-    window.dispatchEvent(new Event('adminSettingsUpdated'));
-  };
-
-  const handleFinancialChange = (e) => {
-    const { name, value } = e.target;
-    setFinancialSettings(prev => ({
-      ...prev,
-      [name]: Number(value)
-    }));
-  };
 
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfile(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleFinancialSave = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await updateSettings(financialSettings);
-      toast.success('Financial settings updated');
-    } catch (error) {
-      toast.error('Failed to update settings');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle billing settings change
-  const handleBillingChange = (e) => {
-    const { name, value } = e.target;
-    let newValue = value;
-
-    // Live Input Restrictions
-    if (name === 'companyCity' || name === 'companyState') {
-      // Accept only alphabets and spaces
-      newValue = value.replace(/[^a-zA-Z\s]/g, '');
-    } else if (name === 'companyPhone') {
-      // Accept only digits and limit to 10
-      newValue = value.replace(/\D/g, '').slice(0, 10);
-    } else if (name === 'companyPincode') {
-      // Accept only digits and limit to 6
-      newValue = value.replace(/\D/g, '').slice(0, 6);
-    } else if (name === 'sacCode') {
-      // Accept only digits and limit to 6
-      newValue = value.replace(/\D/g, '').slice(0, 6);
-    } else if (name === 'companyPAN') {
-      // Auto-uppercase and limit to 10
-      newValue = value.toUpperCase().slice(0, 10);
-    } else if (name === 'companyGSTIN') {
-      // Auto-uppercase and limit to 15
-      newValue = value.toUpperCase().slice(0, 15);
-    } else if (name === 'invoicePrefix') {
-      newValue = value.toUpperCase().slice(0, 5);
-    }
-
-    setBillingSettings(prev => ({ ...prev, [name]: newValue }));
-  };
-
-  const validateBilling = () => {
-    const {
-      companyName, companyGSTIN, companyPAN, companyAddress,
-      companyCity, companyState, companyPincode,
-      companyPhone, companyEmail, invoicePrefix, sacCode
-    } = billingSettings;
-
-    if (!companyName?.trim()) return "Company Name is required";
-
-    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    if (!companyGSTIN || !gstRegex.test(companyGSTIN)) return "Invalid GSTIN format (ex: 27ABCDE1234F1Z5)";
-
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    if (!companyPAN || !panRegex.test(companyPAN)) return "PAN should be in format (ex - ASDFE1234D)";
-
-    if (!companyAddress?.trim()) return "Address is required";
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!companyEmail || !emailRegex.test(companyEmail)) return "Company mail should be in format (ex: info@company.com)";
-
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!companyPhone || !phoneRegex.test(companyPhone)) return "Company phone no. should be in format (10 digits starting with 6-9)";
-
-    if (!companyCity?.trim()) return "City field is required";
-    if (/[^a-zA-Z\s]/.test(companyCity)) return "City field accept only alphabet";
-
-    if (!companyState?.trim()) return "State field is required";
-    if (/[^a-zA-Z\s]/.test(companyState)) return "State field accept only alphabet";
-
-    const pincodeRegex = /^[1-9][0-9]{5}$/;
-    if (!companyPincode || !pincodeRegex.test(companyPincode)) return "Invalid Pincode (must be 6 digits)";
-
-    if (!invoicePrefix?.trim()) return "Invoice Prefix is required";
-
-    const sacRegex = /^\d{6}$/;
-    if (!sacCode || !sacRegex.test(sacCode)) return "Invalid SAC Code (must be 6 digits)";
-
-    return null;
-  };
-
-  // Save billing settings
-  const handleBillingSave = async (e) => {
-    e.preventDefault();
-
-    const error = validateBilling();
-    if (error) return toast.error(error);
-
-    setBillingLoading(true);
-    try {
-      await updateSettings(billingSettings);
-      toast.success('Billing settings updated');
-    } catch (error) {
-      toast.error('Failed to update billing settings');
-    } finally {
-      setBillingLoading(false);
-    }
   };
 
   // Handle support settings change
@@ -351,82 +128,6 @@ const AdminSettings = () => {
     }
   };
 
-  const handleCreateAdmin = async (e) => {
-    e.preventDefault();
-    const isEdit = !!newAdmin.id;
-
-    if (!newAdmin.name || !newAdmin.email) {
-      return toast.error('Name and Email are required');
-    }
-    if (!isEdit && !newAdmin.password) {
-      return toast.error('Password is required for new admin');
-    }
-
-    setAdminLoading(true);
-    try {
-      // Prepare payload
-      const payload = { ...newAdmin };
-      if (payload.cityId) {
-        const cityObj = cities.find(c => (c._id || c.id) === payload.cityId);
-        if (cityObj) payload.cityName = cityObj.name;
-      } else {
-        delete payload.cityId;
-        payload.cityName = '';
-      }
-
-      if (isEdit) {
-        await updateAdminDetails(newAdmin.id, payload);
-        toast.success('Admin updated successfully');
-      } else {
-        await createAdmin(payload);
-        toast.success('Admin created successfully');
-      }
-      setNewAdmin({ name: '', email: '', password: '', role: 'admin', cityId: '' });
-      setShowAddAdmin(false);
-      loadAdmins();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Operation failed');
-    } finally {
-      setAdminLoading(false);
-    }
-  };
-
-  const handleEditClick = (admin) => {
-    setNewAdmin({
-      id: admin._id,
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-      password: '',
-      cityId: admin.cityId?._id || admin.cityId || '' // Handle populated or raw ID
-    });
-    setShowAddAdmin(true);
-  };
-
-  const handleBlockAdmin = async (id, currentStatus) => {
-    const action = currentStatus ? 'block' : 'unblock';
-    if (!window.confirm(`Are you sure you want to ${action} this admin?`)) return;
-
-    try {
-      await toggleAdminStatus(id);
-      toast.success(`Admin ${action}ed`);
-      loadAdmins();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update status');
-    }
-  };
-
-  const handleDeleteAdmin = async (id, name) => {
-    if (!window.confirm(`Delete admin "${name}"? This cannot be undone.`)) return;
-    try {
-      await deleteAdmin(id);
-      toast.success('Admin deleted');
-      loadAdmins();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete');
-    }
-  };
-
   // Render Function for Main Settings Menu
   const renderMainMenu = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -439,18 +140,6 @@ const AdminSettings = () => {
         <h3 className="text-lg font-bold text-gray-800 mb-2">Profile Settings</h3>
         <p className="text-sm text-gray-500">Manage your personal account details and password</p>
       </div>
-
-      {/* Financial Settings Card - Super Admin Only */}
-      {isSuperAdmin && (
-        <div onClick={() => setActiveView('financial')}
-          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
-            <FiDollarSign className="w-6 h-6 text-green-600" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">Financial Info</h3>
-          <p className="text-sm text-gray-500">Configure charges, commissions, and billing details</p>
-        </div>
-      )}
 
       {/* System Settings Card - Super Admin Only */}
       {isSuperAdmin && (
@@ -473,18 +162,6 @@ const AdminSettings = () => {
           </div>
           <h3 className="text-lg font-bold text-gray-800 mb-2">City Management</h3>
           <p className="text-sm text-gray-500">Manage operational cities and default location</p>
-        </div>
-      )}
-
-      {/* Admin Management Card - Super Admin Only */}
-      {isSuperAdmin && (
-        <div onClick={() => setActiveView('admins')}
-          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer group">
-          <div className="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-amber-100 transition-colors">
-            <FiUsers className="w-6 h-6 text-amber-600" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">Manage Admins</h3>
-          <p className="text-sm text-gray-500">Add, remove, and view all system administrators</p>
         </div>
       )}
 
@@ -571,213 +248,11 @@ const AdminSettings = () => {
           </motion.div >
         )}
 
-        {/* Financial View */}
-        {
-          activeView === 'financial' && (
-            <motion.div key="financial" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-              {/* General Financial Settings */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <FiDollarSign className="w-5 h-5 text-green-600" />
-                  </div>
-                  <h2 className="text-lg font-bold text-gray-800">Financial Configuration</h2>
-                </div>
-
-                <form onSubmit={handleFinancialSave} className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Visit Charges (₹)</label>
-                      <input type="number" name="visitedCharges" value={financialSettings.visitedCharges} onChange={handleFinancialChange}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Owner Cash Limit (₹)</label>
-                      <input type="number" name="vendorCashLimit" value={financialSettings.vendorCashLimit} onChange={handleFinancialChange}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Service GST (%)</label>
-                      <input type="number" name="serviceGstPercentage" value={financialSettings.serviceGstPercentage} onChange={handleFinancialChange}
-                        min="0" max="100"
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                      <p className="text-[10px] text-gray-400 mt-1">GST rate applied to services</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Rental GST (%)</label>
-                      <input type="number" name="rentalGstPercentage" value={financialSettings.rentalGstPercentage} onChange={handleFinancialChange}
-                        min="0" max="100"
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                      <p className="text-[10px] text-gray-400 mt-1">GST rate applied on machine rentals (Agri)</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">TDS Percentage (%)</label>
-                      <input type="number" name="tdsPercentage" value={financialSettings.tdsPercentage} onChange={handleFinancialChange}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Platform Fee (%)</label>
-                      <input type="number" name="platformFeePercentage" value={financialSettings.platformFeePercentage} onChange={handleFinancialChange}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                      <p className="text-[10px] text-gray-400 mt-1">Fee charged on owner withdrawals</p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Cancellation Penalty (₹)</label>
-                      <input type="number" name="cancellationPenalty" value={financialSettings.cancellationPenalty} onChange={handleFinancialChange}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-green-500 transition-all" />
-                    </div>
-                    {/* Booking Commission Field */}
-                    <div className="md:col-span-2">
-                      <div className="flex justify-between items-center mb-1.5">
-                        <label className="block text-xs font-semibold text-gray-500 uppercase">Booking Commission (%)</label>
-                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                          Vendor Gets: {100 - (financialSettings.bookingCommissionPercentage || 0)}%
-                        </span>
-                      </div>
-                      <input
-                        type="number" name="bookingCommissionPercentage"
-                        value={financialSettings.bookingCommissionPercentage}
-                        onChange={handleFinancialChange}
-                        min="0" max="100"
-                        className="w-full px-4 py-2.5 bg-orange-50 border border-orange-200 rounded-lg outline-none focus:border-orange-500 transition-all font-bold text-orange-700"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Commission % deducted from vendor per booking — this will be visible in the vendor's booking popup</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button type="submit" disabled={loading}
-                      className="px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-green-200">
-                      {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FiSave className="w-4 h-4" />}
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Billing Information - Super Admin Only */}
-              {isSuperAdmin && (
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <FiFileText className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-gray-800">Billing & Company Details</h2>
-                      <p className="text-xs text-gray-500">For invoices and tax documents</p>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleBillingSave} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Company Name</label>
-                      <input type="text" name="companyName" value={billingSettings.companyName} onChange={handleBillingChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">GSTIN</label>
-                        <input type="text" name="companyGSTIN" value={billingSettings.companyGSTIN} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500 uppercase" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">PAN</label>
-                        <input type="text" name="companyPAN" value={billingSettings.companyPAN} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500 uppercase" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Full Address</label>
-                      <textarea name="companyAddress" value={billingSettings.companyAddress} onChange={handleBillingChange} rows="2"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500 resize-none" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Company Email</label>
-                        <input type="email" name="companyEmail" value={billingSettings.companyEmail} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Company Phone</label>
-                        <input type="text" name="companyPhone" value={billingSettings.companyPhone} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
-                        <input type="text" name="companyCity" value={billingSettings.companyCity} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">State</label>
-                        <input type="text" name="companyState" value={billingSettings.companyState} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Pincode</label>
-                        <input type="text" name="companyPincode" value={billingSettings.companyPincode} onChange={handleBillingChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-100">
-                      <h4 className="text-xs font-bold text-gray-700 mb-3">Invoice Settings</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Prefix</label>
-                          <input type="text" name="invoicePrefix" value={billingSettings.invoicePrefix} onChange={handleBillingChange}
-                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500 uppercase" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">SAC Code</label>
-                          <input type="text" name="sacCode" value={billingSettings.sacCode} onChange={handleBillingChange}
-                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-indigo-500" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-2">
-                      <button type="submit" disabled={billingLoading}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60">
-                        {billingLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FiSave className="w-4 h-4" />}
-                        Update Billing
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </motion.div>
-          )
-        }
-
         {/* System & Support View */}
         {
           activeView === 'system' && (
             <motion.div key="system" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
               className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-              {/* System Settings */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <FiSettings className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <h2 className="text-lg font-bold text-gray-800">System Preferences</h2>
-                </div>
-
-                <div className="space-y-4">
-
-                </div>
-              </div>
-
               {/* Support Settings */}
               <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
                 <div className="flex items-center gap-3 mb-6">
@@ -804,14 +279,6 @@ const AdminSettings = () => {
                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-blue-500 transition-all" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">WhatsApp Support</label>
-                    <div className="relative">
-                      <FiMessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input type="tel" name="supportWhatsapp" value={supportSettings.supportWhatsapp} onChange={handleSupportChange}
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-blue-500 transition-all" />
-                    </div>
-                  </div>
                   <div className="flex justify-end pt-2">
                     <button type="submit" disabled={supportLoading}
                       className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 disabled:opacity-60 shadow-lg shadow-blue-200">
@@ -834,162 +301,6 @@ const AdminSettings = () => {
           )
         }
 
-        {/* Admin Management View - Super Admin Only */}
-        {
-          activeView === 'admins' && isSuperAdmin && (
-            <motion.div key="admins" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-100 rounded-lg">
-                      <FiUsers className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-800">Admin Management</h2>
-                      <p className="text-sm text-gray-500">Total {admins.length} administrators found</p>
-                    </div>
-                  </div>
-                  <button onClick={() => { setNewAdmin({ name: '', email: '', password: '', role: 'admin', cityId: '' }); setShowAddAdmin(!showAddAdmin); }}
-                    className={`px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg transition-all ${showAddAdmin ? 'bg-gray-100 text-gray-600' : 'bg-amber-600 text-white hover:bg-amber-700 shadow-amber-100'}`}>
-                    {showAddAdmin ? <FiX className="w-4 h-4" /> : <FiPlus className="w-4 h-4" />}
-                    {showAddAdmin ? 'Cancel' : 'Add New Admin'}
-                  </button>
-                </div>
-
-                {/* Add/Edit Admin Form */}
-                <AnimatePresence>
-                  {showAddAdmin && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-b border-gray-100 bg-amber-50/50">
-                      <form onSubmit={handleCreateAdmin} className="p-6">
-                        <h3 className="text-sm font-bold text-gray-800 mb-4">{newAdmin.id ? 'Edit Administrator' : 'Create New Administrator'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4"> {/* Increased columns */}
-                          <input type="text" placeholder="Full Name" value={newAdmin.name} onChange={e => setNewAdmin(p => ({ ...p, name: e.target.value }))}
-                            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
-                          <input type="email" placeholder="Email Address" value={newAdmin.email} onChange={e => setNewAdmin(p => ({ ...p, email: e.target.value }))}
-                            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
-                          <input type="password" placeholder={newAdmin.id ? "Password (leave blank to keep)" : "Password"} value={newAdmin.password} onChange={e => setNewAdmin(p => ({ ...p, password: e.target.value }))}
-                            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
-
-                          {/* Role Selection */}
-                          <select value={newAdmin.role} onChange={e => setNewAdmin(p => ({ ...p, role: e.target.value }))}
-                            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Super Admin</option>
-                          </select>
-
-                          {/* City Selection */}
-                          <select value={newAdmin.cityId} onChange={e => setNewAdmin(p => ({ ...p, cityId: e.target.value }))}
-                            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
-                            <option value="">All Cities (Global)</option>
-                            {cities.map(city => (
-                              <option key={city._id} value={city._id}>
-                                {city.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex justify-end mt-4">
-                          <button type="submit" disabled={adminLoading}
-                            className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-60 font-medium text-sm">
-                            {adminLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (newAdmin.id ? 'Update Admin' : 'Create Admin')}
-                          </button>
-                        </div>
-                      </form>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Admins Table List */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b border-gray-100">
-                        <th className="px-6 py-4 font-semibold">Administrator</th>
-                        <th className="px-6 py-4 font-semibold">Role</th>
-                        <th className="px-6 py-4 font-semibold">Assigned City</th>
-                        <th className="px-6 py-4 font-semibold">Status</th>
-                        <th className="px-6 py-4 font-semibold text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {admins.map((admin) => (
-                        <tr key={admin._id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center font-bold text-gray-600 shadow-sm border border-white">
-                                {admin.name?.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-gray-800 text-sm">{admin.name}</p>
-                                <p className="text-xs text-gray-500">{admin.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 text-xs font-bold rounded-full border ${admin.role === 'super_admin'
-                              ? 'bg-amber-50 text-amber-700 border-amber-100'
-                              : 'bg-blue-50 text-blue-700 border-blue-100'
-                              }`}>
-                              {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            {admin.cityId ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
-                                {admin.cityId.name || 'Unknown City'}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">All Cities</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`flex items-center gap-1.5 text-xs font-medium ${admin.isActive !== false ? 'text-green-600' : 'text-red-500'}`}>
-                              <span className={`w-2 h-2 rounded-full ${admin.isActive !== false ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              {admin.isActive !== false ? 'Active' : 'Blocked'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {admin._id !== profile.id && admin.email !== 'admin@admin.com' && (
-                              <div className="flex justify-end gap-2">
-                                <button onClick={() => handleEditClick(admin)}
-                                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                  title="Edit Admin">
-                                  <FiEdit className="w-4 h-4" />
-                                </button>
-
-                                <button onClick={() => handleBlockAdmin(admin._id, admin.isActive !== false)}
-                                  className={`p-2 text-gray-400 rounded-lg transition-all ${admin.isActive !== false ? 'hover:text-amber-600 hover:bg-amber-50' : 'hover:text-green-600 hover:bg-green-50'
-                                    }`}
-                                  title={admin.isActive !== false ? "Block Admin" : "Unblock Admin"}>
-                                  {admin.isActive !== false ? <FiLock className="w-4 h-4" /> : <FiUnlock className="w-4 h-4" />}
-                                </button>
-
-                                <button onClick={() => handleDeleteAdmin(admin._id, admin.name)}
-                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                  title="Delete Admin">
-                                  <FiTrash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {admins.length === 0 && (
-                        <tr>
-                          <td colSpan="4" className="px-6 py-12 text-center text-gray-400">
-                            <FiUsers className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                            <p>No administrators found</p>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </motion.div>
-          )
-        }
       </AnimatePresence >
     </motion.div >
   );

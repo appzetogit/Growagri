@@ -16,6 +16,10 @@ const withdrawalSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
+  isDebited: {
+    type: Boolean,
+    default: false
+  },
   requestDate: {
     type: Date,
     default: Date.now

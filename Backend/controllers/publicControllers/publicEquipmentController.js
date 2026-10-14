@@ -83,6 +83,10 @@ exports.getPublicEquipment = async (req, res) => {
       andConditions.push({ isFeatured: true });
     }
 
+    // Blocked owners can't take bookings, so don't list their equipment to farmers
+    const blockedVendorIds = await require('../../models/Vendor').distinct('_id', { 'wallet.isBlocked': true });
+    if (blockedVendorIds.length) andConditions.push({ vendorId: { $nin: blockedVendorIds } });
+
     const query = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
 
     let equipment = await VendorEquipment.find(query)

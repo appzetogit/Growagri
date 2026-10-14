@@ -249,7 +249,7 @@ exports.startMachineryWork = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { bookingId } = req.params;
-    const { otp, startKmPhoto, conditionPhoto } = req.body;
+    const { otp, startKmPhoto, conditionPhoto, handoverProofPhoto } = req.body;
 
     const Booking = require('../../models/Booking');
     const { BOOKING_STATUS } = require('../../utils/constants');
@@ -275,6 +275,7 @@ exports.startMachineryWork = async (req, res) => {
       // Machine Service (Tractor): KM photo is optional
       booking.start_kilometer_photo = startKmPhoto || null;
     }
+    booking.handover_proof_photo = handoverProofPhoto || null;
 
     booking.status = BOOKING_STATUS.IN_PROGRESS;
     booking.startedAt = new Date();

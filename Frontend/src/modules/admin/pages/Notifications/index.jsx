@@ -5,14 +5,14 @@ import { toast } from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import api from '../../../../services/api';
 
-// Send an announcement (in-app + push) to farmers, owners, workers or everyone
+// Send an announcement (in-app + push) to farmers or equipment owners
 const BroadcastForm = () => {
-  const [form, setForm] = useState({ audience: 'all', title: '', message: '' });
+  const [form, setForm] = useState({ audience: 'users', title: '', message: '' });
   const [sending, setSending] = useState(false);
 
   const send = async (e) => {
     e.preventDefault();
-    if (!window.confirm(`Send this notification to ${form.audience}?`)) return;
+    if (!window.confirm(`Send this notification to all ${form.audience === 'users' ? 'farmers' : 'equipment owners'}?`)) return;
     try {
       setSending(true);
       const res = await api.post('/notifications/admin/broadcast', form);
@@ -30,10 +30,8 @@ const BroadcastForm = () => {
       <h2 className="font-bold text-gray-800">Send Push Notification</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} className="p-2 border border-gray-200 rounded-lg text-sm">
-          <option value="all">Everyone</option>
           <option value="users">Farmers</option>
           <option value="vendors">Equipment Owners</option>
-          <option value="workers">Workers</option>
         </select>
         <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="flex-1 p-2 border border-gray-200 rounded-lg text-sm" />
       </div>

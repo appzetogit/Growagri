@@ -432,7 +432,7 @@ const BookingTimeline = () => {
 
       // 2. Call API with URLs
       if (tripModalMode === 'start') {
-        await startTrip(id, photoUrl, otp);
+        await startTrip(id, photoUrl, otp, evidenceUrl);
         toast.success(requiresDriver === false ? 'Equipment Handover Successful' : 'Engine started successfully');
       } else {
         await endTrip(id, photoUrl, otp, workUnits, evidenceUrl);

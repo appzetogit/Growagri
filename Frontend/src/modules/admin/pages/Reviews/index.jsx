@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import {
   FiStar,
   FiFilter,
-  FiEye,
-  FiEyeOff,
   FiTrash2,
   FiSearch,
   FiUser,
@@ -17,7 +15,6 @@ import CardShell from '../UserCategories/components/CardShell';
 
 const ReviewsPage = () => {
   const [reviews, setReviews] = useState([]);
-  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     page: 1,
@@ -46,36 +43,21 @@ const ReviewsPage = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await reviewService.getReviewStats();
-      if (response.success) {
-        setStats(response.stats);
-      }
-    } catch (error) {
-      console.error('Fetch stats error:', error);
-    }
-  };
-
   useEffect(() => {
     fetchReviews();
   }, [filters]);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const handleStatusUpdate = async (id, newStatus) => {
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this review?')) return;
     try {
-      const response = await reviewService.updateReviewStatus(id, newStatus);
+      const response = await reviewService.updateReviewStatus(id, 'deleted');
       if (response.success) {
-        toast.success(`Review status updated to ${newStatus}`);
+        toast.success('Review deleted');
         fetchReviews();
-        fetchStats();
       }
     } catch (error) {
-      console.error('Update status error:', error);
-      toast.error('Failed to update status');
+      console.error('Delete review error:', error);
+      toast.error('Failed to delete review');
     }
   };
 
@@ -95,23 +77,6 @@ const ReviewsPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Stats Section */}
-      {stats && (
-        <div className="flex justify-end gap-3 overflow-x-auto pb-2 md:pb-0">
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 min-w-[120px]">
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Avg Rating</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xl font-bold text-gray-900">{stats.averageRating?.toFixed(1)}</span>
-              <FiStar className="text-yellow-400 fill-yellow-400 w-4 h-4" />
-            </div>
-          </div>
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 min-w-[120px]">
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Reviews</p>
-            <p className="text-xl font-bold text-gray-900 mt-0.5">{stats.totalReviews}</p>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <CardShell className="bg-white p-3.5">
         <div className="flex flex-wrap items-center gap-3">
@@ -130,19 +95,6 @@ const ReviewsPage = () => {
               <option value="1">1 Star</option>
             </select>
           </div>
-
-          <div className="flex-1 min-w-[180px]">
-            <label className="block text-xs font-bold text-gray-700 mb-1 ml-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="hidden">Hidden</option>
-            </select>
-          </div>
         </div>
       </CardShell>
 
@@ -154,8 +106,8 @@ const ReviewsPage = () => {
               <tr className="bg-gray-50/80 border-b border-gray-200">
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Farmer</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Feedback</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Entity</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Vendor / Equipment</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Booking ID</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -203,49 +155,28 @@ const ReviewsPage = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 text-[10px]">
+                        <div className="flex items-center gap-1.5 text-xs">
                           <FiBriefcase className="text-slate-400 w-3 h-3" />
-                          <span className="font-bold text-slate-700">{review.vendorId?.businessName || 'N/A'}</span>
+                          <span className="font-bold text-slate-700">{review.vendorId?.name || review.vendorId?.businessName || 'N/A'}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px]">
+                        <div className="flex items-center gap-1.5 text-[11px]">
                           <FiBox className="text-slate-400 w-3 h-3" />
-                          <span className="text-slate-600">{review.serviceId?.title || 'N/A'}</span>
+                          <span className="text-slate-600">{review.bookingId?.serviceName || review.serviceId?.title || 'N/A'}</span>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${review.status === 'active'
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'bg-amber-100 text-amber-700 border border-amber-200'
-                        }`}>
-                        {review.status}
+                      <span className="font-mono text-xs font-semibold text-slate-700">
+                        {review.bookingId?.bookingNumber ? `#${review.bookingId.bookingNumber}` : 'N/A'}
                       </span>
+                      {review.status === 'hidden' && (
+                        <span className="block mt-1 text-[9px] font-bold uppercase text-amber-600">Hidden</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        {review.status === 'active' ? (
-                          <button
-                            onClick={() => handleStatusUpdate(review._id, 'hidden')}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Hide Review"
-                          >
-                            <FiEyeOff size={16} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleStatusUpdate(review._id, 'active')}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Show Review"
-                          >
-                            <FiEye size={16} />
-                          </button>
-                        )}
                         <button
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this review?')) {
-                              handleStatusUpdate(review._id, 'deleted');
-                            }
-                          }}
+                          onClick={() => handleDelete(review._id)}
                           className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete Review"
                         >

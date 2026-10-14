@@ -26,6 +26,8 @@ const Notifications = lazy(() => import('../pages/Notifications'));
 const Plans = lazy(() => import('../pages/Plans/Plans'));
 
 const Settlements = lazy(() => import('../pages/Settlements'));
+const VendorWallets = lazy(() => import('../pages/VendorWallets'));
+const AdminRevenue = lazy(() => import('../pages/AdminRevenue'));
 const Reviews = lazy(() => import('../pages/Reviews'));
 const Products = lazy(() => import('../pages/Products'));
 const EcommerceOrders = lazy(() => import('../pages/Products/Orders'));
@@ -37,8 +39,6 @@ const Disputes = lazy(() => import('../pages/Disputes'));
 const SchemeManagement = lazy(() => import('../pages/Schemes'));
 const WebsiteSettings = lazy(() => import('../pages/WebsiteSettings'));
 const EquipmentApproval = lazy(() => import('../pages/EquipmentApproval'));
-const Support = lazy(() => import('../pages/Support'));
-const Workers = lazy(() => import('../pages/Workers'));
 
 
 
@@ -70,7 +70,7 @@ const AdminRoutes = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users/*" element={<Users />} />
           <Route path="vendors/*" element={<Vendors />} />
-          <Route path="workers" element={<Workers />} />
+          <Route path="workers" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="bookings" element={<Bookings />} />
           <Route path="bookings/:id" element={<BookingDetailsPage />} />
           <Route path="bookings/tracking" element={<Navigate to="/admin/bookings" replace />} />
@@ -93,8 +93,9 @@ const AdminRoutes = () => {
           <Route path="disputes" element={<Disputes />} />
           <Route path="schemes" element={<SchemeManagement />} />
           <Route path="settlements/*" element={<Settlements />} />
+          <Route path="vendor-wallets" element={<VendorWallets />} />
+          <Route path="admin-revenue" element={<AdminRevenue />} />
           <Route path="manage-website/*" element={<WebsiteSettings />} />
-          <Route path="support" element={<Support />} />
           <Route path="settings/*" element={<Settings />} />
         </Route>
       </Routes>

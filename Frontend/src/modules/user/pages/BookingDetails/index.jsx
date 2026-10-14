@@ -1158,53 +1158,39 @@ const BookingDetails = () => {
           )}
 
           {/* ══════ AGRICULTURE: TRIP FLOW DETAILS (KM Photos) ══════ */}
-          {(booking.start_kilometer_photo || booking.end_kilometer_photo) && (
+          {(booking.start_kilometer_photo || booking.handover_proof_photo || booking.end_kilometer_photo) && (() => {
+            const isHandover = booking.requiresDriver === false || booking.categoryId?.requiresDriver === false;
+            const photoUrl = (p) => (p.startsWith('http') ? p : toAssetUrl(p));
+            const photos = [
+              { src: booking.start_kilometer_photo, label: isHandover ? 'Condition Photo' : 'Arrival KM Photo' },
+              { src: booking.handover_proof_photo, label: 'Handover Proof' },
+              { src: booking.end_kilometer_photo, label: isHandover ? 'Return Photo' : 'Completion KM Photo' }
+            ].filter(p => p.src);
+
+            return (
             <section className="bg-white rounded-3xl p-6 shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-gray-100 space-y-4">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 uppercase tracking-wider">
                 <FiCamera className="text-teal-600" />
-                {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Handover Evidence' : 'Equipment Trip Evidence'}
+                {isHandover ? 'Handover Evidence' : 'Equipment Trip Evidence'}
               </h3>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Arrival / Handover Photo */}
-                {booking.start_kilometer_photo && (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">
-                      {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Handover Photo' : 'Arrival KM Photo'}
-                    </p>
+                {photos.map(({ src, label }) => (
+                  <div key={label} className="space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
                     <div className="aspect-square rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 group relative">
                       <img
-                        src={booking.start_kilometer_photo.startsWith('http') ? booking.start_kilometer_photo : toAssetUrl(booking.start_kilometer_photo)}
-                        alt="Start Photo"
-                        className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                        onClick={() => window.open(booking.start_kilometer_photo.startsWith('http') ? booking.start_kilometer_photo : toAssetUrl(booking.start_kilometer_photo), '_blank')}
+                        src={photoUrl(src)}
+                        alt={label}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-110 cursor-pointer"
+                        onClick={() => window.open(photoUrl(src), '_blank')}
                       />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                         <span className="text-white text-[10px] font-bold">View Full</span>
                       </div>
                     </div>
                   </div>
-                )}
-
-                {/* Completion / Return Photo */}
-                {booking.end_kilometer_photo && (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">
-                      {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Return Photo' : 'Completion KM Photo'}
-                    </p>
-                    <div className="aspect-square rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 group relative">
-                      <img
-                        src={booking.end_kilometer_photo.startsWith('http') ? booking.end_kilometer_photo : toAssetUrl(booking.end_kilometer_photo)}
-                        alt="End Photo"
-                        className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                        onClick={() => window.open(booking.end_kilometer_photo.startsWith('http') ? booking.end_kilometer_photo : toAssetUrl(booking.end_kilometer_photo), '_blank')}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-[10px] font-bold">View Full</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
 
               {/* Trip Summary if both photos exist */}
@@ -1220,7 +1206,8 @@ const BookingDetails = () => {
                 </div>
               )}
             </section>
-          )}
+            );
+          })()}
 
           {/* Agriculture Completion OTP - Share only when work is done */}
           {['in_progress', 'work_done'].includes(booking.status?.toLowerCase()) && booking.driver_end_otp && (

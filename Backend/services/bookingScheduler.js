@@ -95,7 +95,9 @@ class BookingScheduler {
           const { start, end } = getVendorRange(nextWave);
 
           // Get vendors for this wave
-          let vendorsToNotify = booking.potentialVendors.slice(start, end === Infinity ? undefined : end);
+          let vendorsToNotify = await require('./bookingDispatchService').withoutBlockedVendors(
+            booking.potentialVendors.slice(start, end === Infinity ? undefined : end)
+          );
 
           if (vendorsToNotify.length === 0) {
             // No more vendors to notify - keep searching or mark as no vendors

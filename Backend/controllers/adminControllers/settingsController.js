@@ -6,7 +6,7 @@ const SECRET_FIELDS = '-razorpayKeySecret -razorpayWebhookSecret -cloudinaryApiS
 
 const UPDATABLE_FIELDS = [
   'visitedCharges', 'serviceGstPercentage', 'partsGstPercentage', 'servicePayoutPercentage', 'partsPayoutPercentage',
-  'rentalGstPercentage', 'rentalPayoutPercentage', 'tdsPercentage', 'platformFeePercentage', 'vendorCashLimit',
+  'rentalGstPercentage', 'rentalPayoutPercentage', 'tdsPercentage', 'platformFeePercentage', 'vendorCashLimit', 'minWithdrawalAmount',
   'cancellationPenalty', 'bookingCommissionPercentage',
   'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret', 'cloudinaryCloudName', 'cloudinaryApiKey', 'cloudinaryApiSecret',
   'companyName', 'companyGSTIN', 'companyPAN', 'companyAddress', 'companyCity', 'companyState', 'companyPincode',

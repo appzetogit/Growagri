@@ -209,7 +209,7 @@ export default function BookingDetails() {
           ),
 
           // Display Price (Vendor Earnings by default as requested)
-          price: (apiData.vendorEarnings || (apiData.finalAmount ? apiData.finalAmount - (apiData.commission || 0) : 0)).toFixed(2),
+          price: (billData?.vendorTotalEarning || apiData.vendorEarnings || (apiData.finalAmount ? apiData.finalAmount - (apiData.commission || 0) : 0)).toFixed(2),
 
           timeSlot: {
             date: apiData.scheduledDate ? new Date(apiData.scheduledDate).toLocaleDateString() : 'Today',
@@ -676,10 +676,10 @@ export default function BookingDetails() {
     if (tripMode === 'start') {
       if (isMachinery) {
         // Machinery: vendor enters farmer's Start OTP + KM photo
-        await machineryStartWork(id, otp, photoUrl);
+        await machineryStartWork(id, otp, photoUrl, evidencePhoto);
         toast.success('🚜 Trip Started! OTP verified, work has begun.');
       } else {
-        await startTrip(id, photoUrl, otp);
+        await startTrip(id, photoUrl, otp, evidencePhoto);
         toast.success('🚜 Trip Started! KM Photo & OTP verified.');
       }
     } else {
@@ -798,14 +798,6 @@ export default function BookingDetails() {
       ? Number(booking.tax)
       : parseFloat(((originalBase * serviceGstPercent) / 100).toFixed(2));
 
-  const totalGST = originalGST + extraServiceGST + partsGST;
-
-  // Final Total from bill or booking
-  let finalTotal = (bill && bill.grandTotal > originalBase)
-    ? bill.grandTotal
-    : (booking?.finalAmount && booking.finalAmount > originalBase)
-      ? booking.finalAmount
-      : (totalServiceBase + totalGST + partsBase + (Number(booking?.visitingCharges) || 0));
   const hasBill = !!bill;
 
   return (
@@ -1154,36 +1146,8 @@ export default function BookingDetails() {
           </div>
         </div>
 
-        {/* Payment Invoice Card - Dark Header Style (Exact Match with Billing) */}
+        {/* Payment Invoice Card */}
         <div className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 mb-6">
-          <div className="bg-gray-900 px-6 py-6 text-white text-center">
-            <p className="text-gray-400 text-xs font-medium uppercase tracking-widest mb-1">TOTAL INVOICE AMOUNT</p>
-            <h2 className="text-4xl font-black">₹{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
-            <div className="mt-2.5">
-              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}>
-                💰 Payment: {booking.paymentStatus === 'SUCCESS' || booking.paymentStatus === 'paid' || booking.paymentStatus === 'success' || booking.paymentStatus === 'PAID' ? 'Received' : 'Pending'}
-              </span>
-            </div>
-            {isPlanBenefit && (
-              <span className="inline-block mt-2 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">
-                Plan Benefit Applied
-              </span>
-            )}
-            {hasBill && (
-              <button
-                onClick={handleDownloadInvoice}
-                disabled={actionLoading}
-                className="mt-4 flex items-center justify-center gap-2 w-full max-w-[200px] mx-auto py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-all active:scale-95 text-xs font-bold"
-              >
-                <FiDownload className="w-4 h-4" />
-                {actionLoading ? 'Generating...' : 'Download Invoice PDF'}
-              </button>
-            )}
-          </div>
-
           <div className="p-6 space-y-6 text-sm">
             {/* Services Section */}
             <div>
@@ -1239,6 +1203,35 @@ export default function BookingDetails() {
                   <span>Total Service</span>
                   <span>₹{(bill ? (originalBase + extraServiceBase + originalGST + extraServiceGST) : (originalBase - (booking.discount || 0) + (booking.tax || originalGST))).toFixed(2)}</span>
                 </div>
+
+                {/* Payment status (cash collected at home counts as received) */}
+                {(() => {
+                  const received = ['success', 'paid', 'collected_by_vendor'].includes(String(booking.paymentStatus).toLowerCase()) || booking.cashCollected;
+                  return (
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${received
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                        💰 Payment: {received ? 'Received' : 'Pending'}
+                      </span>
+                      {isPlanBenefit && (
+                        <span className="inline-block bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase">
+                          Plan Benefit Applied
+                        </span>
+                      )}
+                      {hasBill && (
+                        <button
+                          onClick={handleDownloadInvoice}
+                          disabled={actionLoading}
+                          className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full transition-all active:scale-95 text-[10px] font-bold text-gray-700"
+                        >
+                          <FiDownload className="w-3.5 h-3.5" />
+                          {actionLoading ? 'Generating...' : 'Invoice PDF'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

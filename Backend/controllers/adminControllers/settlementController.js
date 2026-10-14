@@ -28,7 +28,7 @@ const getVendorBalances = async (req, res) => {
     }
 
     const vendors = await Vendor.find(matchQuery)
-      .select('name businessName phone email wallet profilePhoto')
+      .select('name businessName phone email wallet profilePhoto bankAccount isActive createdAt')
       .sort({ 'wallet.dues': -1 }) // Highest dues first
       .skip(skip)
       .limit(parseInt(limit));
@@ -43,6 +43,19 @@ const getVendorBalances = async (req, res) => {
 
     const totalDueToAdmin = Math.abs(totalDueResult[0]?.total || 0);
 
+    // Platform-wide totals for the wallet screen (independent of the current page)
+    const [walletTotals] = await Vendor.aggregate([
+      { $match: { approvalStatus: 'approved' } },
+      {
+        $group: {
+          _id: null,
+          totalPayableToVendors: { $sum: { $ifNull: ['$wallet.earnings', 0] } },
+          blockedVendors: { $sum: { $cond: [{ $eq: ['$wallet.isBlocked', true] }, 1, 0] } },
+          totalVendors: { $sum: 1 }
+        }
+      }
+    ]);
+
     // Format vendor data
     const vendorData = vendors.map(v => ({
       _id: v._id,
@@ -56,8 +69,20 @@ const getVendorBalances = async (req, res) => {
       amountDue: v.wallet?.dues || 0,
       balance: (v.wallet?.earnings || 0) - (v.wallet?.dues || 0), // Net for reference
       totalCashCollected: v.wallet?.totalCashCollected || 0,
+      totalWithdrawn: v.wallet?.totalWithdrawn || 0,
+      totalSettled: v.wallet?.totalSettled || 0,
       cashLimit: v.wallet?.cashLimit || 10000,
-      isBlocked: v.wallet?.isBlocked || false
+      isBlocked: v.wallet?.isBlocked || false,
+      blockReason: v.wallet?.blockReason || null,
+      isActive: v.isActive !== false,
+      joinedAt: v.createdAt,
+      // Payout account (number masked)
+      bank: v.bankAccount?.bankName ? {
+        holder: v.bankAccount.accountHolderName,
+        bankName: v.bankAccount.bankName,
+        ifsc: v.bankAccount.ifscCode,
+        accountLast4: v.bankAccount.accountNumber ? String(v.bankAccount.accountNumber).slice(-4) : null
+      } : null
     }));
 
     res.status(200).json({
@@ -65,7 +90,10 @@ const getVendorBalances = async (req, res) => {
       data: vendorData,
       summary: {
         totalDueToAdmin,
-        vendorsWithDue: await Vendor.countDocuments({ 'wallet.dues': { $gt: 0 } })
+        vendorsWithDue: await Vendor.countDocuments({ 'wallet.dues': { $gt: 0 } }),
+        totalPayableToVendors: walletTotals?.totalPayableToVendors || 0,
+        blockedVendors: walletTotals?.blockedVendors || 0,
+        totalVendors: walletTotals?.totalVendors || 0
       },
       pagination: {
         page: parseInt(page),
@@ -110,7 +138,15 @@ const getVendorLedger = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .populate('bookingId', 'bookingNumber serviceName');
+      .populate({
+        path: 'bookingId',
+        select: 'bookingNumber serviceName basePrice tax finalAmount status paymentMethod paymentMode paymentStatus cashCollected cashCollectedAt cashCollectedBy scheduledDate scheduledTime rental_type estimatedDuration address bookedItems createdAt completedAt userId equipmentId vendorBillId',
+        populate: [
+          { path: 'userId', select: 'name phone' },
+          { path: 'equipmentId', select: 'name' },
+          { path: 'vendorBillId', select: 'grandTotal totalServiceBase totalGST vendorTotalEarning companyRevenue status' }
+        ]
+      });
 
     const total = await Transaction.countDocuments(query);
 
@@ -519,8 +555,79 @@ const updateCashLimit = async (req, res) => {
   }
 };
 
+/**
+ * Admin edits a vendor wallet (earnings, cash dues, cash limit).
+ * Requires a reason; every changed field is logged as a 'wallet_adjustment' transaction
+ * (before → after, admin id). The client sends the values it was shown (expected*);
+ * if the wallet changed meanwhile (e.g. a booking credited earnings) the edit is refused.
+ */
+const updateVendorWallet = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { earnings, dues, cashLimit, expectedEarnings, expectedDues, reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor id' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ success: false, message: 'Please give a reason for this change' });
+    }
+    const next = { earnings: Number(earnings), dues: Number(dues), cashLimit: Number(cashLimit) };
+    if (Object.values(next).some(v => !Number.isFinite(v) || v < 0)) {
+      return res.status(400).json({ success: false, message: 'Amounts must be 0 or more' });
+    }
+    next.earnings = Math.round(next.earnings * 100) / 100;
+    next.dues = Math.round(next.dues * 100) / 100;
+
+    const vendor = await Vendor.findById(vendorId).select('name wallet');
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const before = {
+      earnings: vendor.wallet?.earnings || 0,
+      dues: vendor.wallet?.dues || 0,
+      cashLimit: vendor.wallet?.cashLimit || 10000
+    };
+    if (Number(expectedEarnings) !== before.earnings || Number(expectedDues) !== before.dues) {
+      return res.status(409).json({ success: false, message: 'This wallet changed while you were editing. Please reopen and try again.' });
+    }
+
+    const changed = Object.keys(next).filter(k => next[k] !== before[k]);
+    if (changed.length === 0) {
+      return res.status(400).json({ success: false, message: 'Nothing changed' });
+    }
+
+    // Compare-and-set: only applies if the wallet still has the values we validated against
+    const updated = await Vendor.updateOne(
+      { _id: vendorId, 'wallet.earnings': before.earnings, 'wallet.dues': before.dues },
+      { $set: { 'wallet.earnings': next.earnings, 'wallet.dues': next.dues, 'wallet.cashLimit': next.cashLimit } }
+    );
+    if (updated.modifiedCount === 0) {
+      return res.status(409).json({ success: false, message: 'This wallet changed while you were editing. Please reopen and try again.' });
+    }
+
+    const labels = { earnings: 'Available earnings', dues: 'Cash due to admin', cashLimit: 'Cash limit' };
+    const note = String(reason).trim().slice(0, 300);
+    await Transaction.insertMany(changed.map(field => ({
+      vendorId,
+      type: 'wallet_adjustment',
+      amount: Math.abs(next[field] - before[field]),
+      status: 'completed',
+      paymentMethod: 'system',
+      description: `Admin changed ${labels[field]}: ₹${before[field]} → ₹${next[field]}. Reason: ${note}`,
+      metadata: { field, before: before[field], after: next[field], reason: note, adminId: req.user?._id }
+    })));
+
+    console.log(`[ADMIN] Wallet of vendor ${vendorId} edited by admin ${req.user?._id}: ${changed.map(f => `${f} ${before[f]}→${next[f]}`).join(', ')}`);
+    res.status(200).json({ success: true, message: 'Wallet updated', data: { before, after: next } });
+  } catch (error) {
+    console.error('Update vendor wallet error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update wallet' });
+  }
+};
+
 module.exports = {
   getVendorBalances,
+  updateVendorWallet,
   getVendorLedger,
   getPendingSettlements,
   approveSettlement,
@@ -534,16 +641,20 @@ module.exports = {
   // Withdrawal functions
   getWithdrawalRequests: async (req, res) => {
     try {
-      const { page = 1, limit = 20 } = req.query;
+      const { page = 1, limit = 20, status } = req.query;
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const withdrawals = await Withdrawal.find({ status: 'pending' })
+      // ?status=history → processed (approved/rejected), newest first; default → pending queue, oldest first
+      const isHistory = status === 'history';
+      const filter = isHistory ? { status: { $in: ['approved', 'rejected'] } } : { status: 'pending' };
+
+      const withdrawals = await Withdrawal.find(filter)
         .populate('vendorId', 'name businessName phone wallet.earnings')
-        .sort({ createdAt: 1 })
+        .sort(isHistory ? { processedDate: -1, createdAt: -1 } : { createdAt: 1 })
         .skip(skip)
         .limit(parseInt(limit));
 
-      const total = await Withdrawal.countDocuments({ status: 'pending' });
+      const total = await Withdrawal.countDocuments(filter);
 
       res.status(200).json({
         success: true,
@@ -569,8 +680,9 @@ module.exports = {
       // Fetch global settings for rates
       const Settings = require('../../models/Settings');
       const settings = await Settings.findOne({ type: 'global' });
-      // ?? (not ||) so an admin can set 0%
-      const tdsRate = settings?.tdsPercentage ?? 1;
+      // No TDS on vendor withdrawals (business decision, Oct 2026); only the platform fee is deducted.
+      // ?? (not ||) so an admin can set the platform fee to 0%
+      const tdsRate = 0;
       const platformFeeRate = settings?.platformFeePercentage ?? 1;
 
       // Claim the withdrawal atomically: a double click / two admins can't both approve it
@@ -582,14 +694,24 @@ module.exports = {
       if (!withdrawal) return res.status(400).json({ success: false, message: 'Withdrawal not found or not pending' });
 
       // Debit only if earnings still cover it (atomic)
-      const vendor = await Vendor.findOneAndUpdate(
-        { _id: withdrawal.vendorId, 'wallet.earnings': { $gte: withdrawal.amount } },
-        { $inc: { 'wallet.earnings': -withdrawal.amount, 'wallet.totalWithdrawn': withdrawal.amount } },
-        { new: true }
-      );
+      let vendor;
+      if (withdrawal.isDebited) {
+        // Debited when withdrawal request was placed, so only record totalWithdrawn
+        vendor = await Vendor.findByIdAndUpdate(
+          withdrawal.vendorId,
+          { $inc: { 'wallet.totalWithdrawn': withdrawal.amount } },
+          { new: true }
+        );
+      } else {
+        vendor = await Vendor.findOneAndUpdate(
+          { _id: withdrawal.vendorId, 'wallet.earnings': { $gte: withdrawal.amount } },
+          { $inc: { 'wallet.earnings': -withdrawal.amount, 'wallet.totalWithdrawn': withdrawal.amount } },
+          { new: true }
+        );
+      }
       if (!vendor) {
         await Withdrawal.updateOne({ _id: withdrawal._id }, { $set: { status: 'pending' } });
-        return res.status(400).json({ success: false, message: 'Insufficient vendor earnings for this withdrawal' });
+        return res.status(400).json({ success: false, message: 'Vendor not found or insufficient earnings' });
       }
 
       // Calculate Deductions
@@ -618,44 +740,48 @@ module.exports = {
       const { sendWithdrawalApprovedEmail } = require('../../services/emailService');
       sendWithdrawalApprovedEmail(vendor, grossAmount, transactionReference).catch(e => console.error(e));
 
-      // Transaction 1: Withdrawal Payout (Gross Amount Debited from Wallet)
-      await Transaction.create({
-        vendorId: vendor._id,
-        type: 'withdrawal',
-        amount: grossAmount,
-        status: 'completed',
-        paymentMethod: 'bank_transfer',
-        description: `Withdrawal payout processed. Gross: ₹${grossAmount}`,
-        referenceId: transactionReference,
-        metadata: {
+      // Transaction 1: Update existing pending withdrawal transaction or create if not present
+      const existingTxn = await Transaction.findOne({
+        'metadata.withdrawalId': withdrawal._id,
+        type: 'withdrawal'
+      });
+
+      if (existingTxn) {
+        existingTxn.status = 'completed';
+        existingTxn.referenceId = transactionReference;
+        existingTxn.description = `Withdrawal payout processed. Gross: ₹${grossAmount}`;
+        existingTxn.metadata = {
+          ...existingTxn.metadata,
           withdrawalId: withdrawal._id,
           tdsRate,
           tdsAmount,
           platformFeeRate,
           platformFeeAmount,
           netAmount
-        }
-      });
+        };
+        await existingTxn.save();
+      } else {
+        await Transaction.create({
+          vendorId: vendor._id,
+          type: 'withdrawal',
+          amount: grossAmount,
+          status: 'completed',
+          paymentMethod: 'bank_transfer',
+          description: `Withdrawal payout processed. Gross: ₹${grossAmount}`,
+          referenceId: transactionReference,
+          metadata: {
+            withdrawalId: withdrawal._id,
+            tdsRate,
+            tdsAmount,
+            platformFeeRate,
+            platformFeeAmount,
+            netAmount
+          }
+        });
+      }
 
-      // Transaction 2: TDS Deduction
-      await Transaction.create({
-        vendorId: vendor._id,
-        type: 'tds_deduction',
-        amount: tdsAmount,
-        status: 'completed',
-        paymentMethod: 'system',
-        description: `TDS Deduction (${tdsRate}%) on withdrawal of ₹${grossAmount}`,
-        referenceId: transactionReference,
-        metadata: {
-          withdrawalId: withdrawal._id,
-          grossAmount,
-          tdsRate,
-          netAmountTransferred: netAmount
-        }
-      });
-
-      // Transaction 3: Platform Fee Deduction
-      await Transaction.create({
+      // Transaction 2: Platform Fee Deduction (skipped when the fee is 0%)
+      if (platformFeeAmount > 0) await Transaction.create({
         vendorId: vendor._id,
         type: 'platform_fee',
         amount: platformFeeAmount,
@@ -670,6 +796,21 @@ module.exports = {
           netAmountTransferred: netAmount
         }
       });
+
+      // Send in-app notification to vendor
+      try {
+        const { createNotification } = require('../notificationControllers/notificationController');
+        await createNotification({
+          vendorId: vendor._id,
+          type: 'withdrawal_approved',
+          title: 'Withdrawal Approved',
+          message: `Your withdrawal of ₹${grossAmount} has been approved and processed. Reference: ${transactionReference || 'N/A'}`,
+          relatedId: withdrawal._id,
+          relatedType: 'withdrawal'
+        });
+      } catch (notifyErr) {
+        console.error('[Withdrawal] Failed to notify vendor of approval:', notifyErr);
+      }
 
       res.status(200).json({
         success: true,
@@ -705,20 +846,85 @@ module.exports = {
       );
       if (!withdrawal) return res.status(400).json({ success: false, message: 'Withdrawal not found or not pending' });
 
+      // If amount was debited at request time, refund it back to vendor's wallet earnings!
+      if (withdrawal.isDebited) {
+        await Vendor.findByIdAndUpdate(withdrawal.vendorId, {
+          $inc: { 'wallet.earnings': withdrawal.amount }
+        });
+      }
+
+      // Update pending transaction if exists
+      const existingTxn = await Transaction.findOne({
+        'metadata.withdrawalId': withdrawal._id,
+        type: 'withdrawal'
+      });
+      if (existingTxn) {
+        existingTxn.status = 'failed';
+        existingTxn.description = `Withdrawal request of ₹${withdrawal.amount} rejected${reason ? `: ${reason}` : ''}. Amount refunded.`;
+        await existingTxn.save();
+      }
+
       const { createNotification } = require('../notificationControllers/notificationController');
       await createNotification({
         vendorId: withdrawal.vendorId,
         type: 'withdrawal_rejected',
         title: 'Withdrawal Rejected',
-        message: `Your withdrawal of ₹${withdrawal.amount} was rejected${reason ? `: ${reason}` : '.'}`,
+        message: `Your withdrawal of ₹${withdrawal.amount} was rejected${reason ? `: ${reason}` : '.'}${withdrawal.isDebited ? ' The amount has been refunded to your earnings.' : ''}`,
         relatedId: withdrawal._id,
         relatedType: 'withdrawal'
       }).catch(() => {});
 
-
-
       res.status(200).json({ success: true, message: 'Withdrawal rejected' });
     } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
+  getWithdrawalSettings: async (req, res) => {
+    try {
+      const Settings = require('../../models/Settings');
+      let settings = await Settings.findOne({ type: 'global' });
+      if (!settings) {
+        settings = await Settings.create({ type: 'global' });
+      }
+      res.status(200).json({
+        success: true,
+        data: {
+          minWithdrawalAmount: settings.minWithdrawalAmount ?? 100,
+          platformFeePercentage: settings.platformFeePercentage ?? 1
+        }
+      });
+    } catch (error) {
+      console.error('getWithdrawalSettings error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
+  updateMinWithdrawalLimit: async (req, res) => {
+    try {
+      const { minWithdrawalAmount } = req.body;
+      const amount = Number(minWithdrawalAmount);
+      if (isNaN(amount) || amount < 0) {
+        return res.status(400).json({ success: false, message: 'Valid minimum withdrawal amount is required' });
+      }
+
+      const Settings = require('../../models/Settings');
+      let settings = await Settings.findOne({ type: 'global' });
+      if (!settings) {
+        settings = new Settings({ type: 'global' });
+      }
+      settings.minWithdrawalAmount = amount;
+      await settings.save();
+
+      res.status(200).json({
+        success: true,
+        message: `Vendor minimum withdrawal limit updated to ₹${amount.toLocaleString()}`,
+        data: {
+          minWithdrawalAmount: settings.minWithdrawalAmount
+        }
+      });
+    } catch (error) {
+      console.error('updateMinWithdrawalLimit error:', error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
