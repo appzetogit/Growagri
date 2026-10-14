@@ -98,6 +98,17 @@ const soilTestRequestSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    // Admin's reason for sending the lab report back to the vendor
+    reportRejectionReason: {
+        type: String,
+        default: ''
+    },
+    // Created for an online payment that hasn't been verified yet; hidden until paid
+    awaitingPayment: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
     rejectedByVendors: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Vendor'

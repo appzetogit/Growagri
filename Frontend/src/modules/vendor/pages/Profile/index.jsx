@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiUser, FiEdit2, FiMapPin, FiPhone, FiMail, FiBriefcase, FiStar, FiArrowRight, FiSettings, FiChevronRight, FiCreditCard, FiLogOut, FiClock, FiCheckCircle, FiPackage, FiActivity } from 'react-icons/fi';
-import { FaWallet, FaTractor } from 'react-icons/fa';
+import { FaTractor } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
 import { vendorAuthService } from '../../../../services/authService';
@@ -27,8 +27,8 @@ const Profile = () => {
   const [hasOutOfStockProducts, setHasOutOfStockProducts] = useState(false);
 
   const menuItems = React.useMemo(() => [
-    { id: 12, label: 'My Agri-Store (Supplies)', icon: FaTractor, path: '/vendor/store' },
-    { id: 14, label: 'Business Profile & Registrations', icon: FiBriefcase, path: '/vendor/business-details' },
+    { id: 12, label: 'My Agri-Store', icon: FaTractor, path: '/vendor/store' },
+    { id: 14, label: 'Registered for Soil Testing', icon: FiBriefcase, path: '/vendor/business-details' },
     { id: 5, label: 'My Ratings', icon: FiStar, path: '/vendor/my-ratings' },
     { id: 7, label: 'Manage Address', icon: FiMapPin, path: '/vendor/address-management' },
     { id: 8, label: 'Settings', icon: FiSettings, path: '/vendor/settings' },
@@ -283,79 +283,6 @@ const Profile = () => {
             </button>
           </div>
         )}
-
-        {/* Three Cards Section - Horizontal */}
-        <div className="px-4 mb-5">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Active Jobs */}
-            <button
-              onClick={() => navigate('/vendor/jobs')}
-              className="flex flex-col items-center justify-center p-4 rounded-2xl active:scale-95 transition-all duration-300 relative overflow-hidden bg-white"
-              style={{
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05)',
-                border: '1.5px solid rgba(0, 166, 166, 0.15)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 166, 166, 0.15), 0 3px 8px rgba(0, 0, 0, 0.08)';
-                e.currentTarget.style.borderColor = hexToRgba(themeColors.button, 0.25);
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05)';
-                e.currentTarget.style.borderColor = hexToRgba(themeColors.button, 0.15);
-              }}
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
-                style={{
-                  backgroundColor: hexToRgba(themeColors.button, 0.12),
-                  boxShadow: `0 2px 8px ${hexToRgba(themeColors.button, 0.2)}`,
-                }}
-              >
-                <FiBriefcase className="w-5 h-5" style={{ color: themeColors.button }} />
-              </div>
-              <span className="text-[11px] font-bold text-gray-800 text-center leading-tight">
-                Field Operations
-              </span>
-            </button>
-
-            {/* Wallet */}
-            <button
-              onClick={() => navigate('/vendor/wallet')}
-              className="flex flex-col items-center justify-center p-4 rounded-2xl active:scale-95 transition-all duration-300 relative overflow-hidden bg-white"
-              style={{
-                boxShadow: '0 4px 12px rgba(0, 166, 166, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05)',
-                border: '1.5px solid rgba(0, 166, 166, 0.15)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 166, 166, 0.15), 0 3px 8px rgba(0, 0, 0, 0.08)';
-                e.currentTarget.style.borderColor = hexToRgba(themeColors.button, 0.25);
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05)';
-                e.currentTarget.style.borderColor = hexToRgba(themeColors.button, 0.15);
-              }}
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
-                style={{
-                  backgroundColor: hexToRgba(themeColors.button, 0.12),
-                  boxShadow: `0 2px 8px ${hexToRgba(themeColors.button, 0.2)}`,
-                }}
-              >
-                <FaWallet className="w-5 h-5" style={{ color: themeColors.button }} />
-              </div>
-              <span className="text-[11px] font-bold text-gray-800 text-center leading-tight">
-                Wallet
-              </span>
-            </button>
-
-
-          </div>
-        </div>
 
         {/* Menu List Section */}
         <div className="px-4 mb-4 space-y-3">

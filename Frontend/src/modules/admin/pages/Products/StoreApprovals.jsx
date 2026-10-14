@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { FiCheck, FiX, FiMapPin, FiFileText, FiUser, FiShoppingBag, FiExternalLink, FiClock } from 'react-icons/fi';
+import { FiCheck, FiX, FiExternalLink, FiFileText, FiInbox } from 'react-icons/fi';
 import api from '../../../../services/api';
 import { toast } from 'react-hot-toast';
+
+const isPdf = (url) => url?.toLowerCase().includes('.pdf');
 
 const StoreApprovals = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedReq, setSelectedReq] = useState(null);
+    const [actingId, setActingId] = useState(null);
+
+    const statusOf = (req) => req.shopDetails?.storeApprovalStatus;
+    const visible = requests; // API returns pending registrations only
+    const STATUS_BADGE = {
+        pending: 'bg-amber-50 text-amber-700 border-amber-100',
+        approved: 'bg-green-50 text-green-700 border-green-100',
+        rejected: 'bg-red-50 text-red-700 border-red-100'
+    };
 
     useEffect(() => {
         fetchRequests();
@@ -16,180 +26,143 @@ const StoreApprovals = () => {
         try {
             setLoading(true);
             const res = await api.get('/admin/vendors/shop-approvals');
-            if (res.data.success) {
-                setRequests(res.data.data);
-            }
-        } catch (err) {
-            toast.error("Failed to load shop approvals");
+            if (res.data.success) setRequests(res.data.data);
+        } catch {
+            toast.error('Failed to load shop approvals');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAction = async (id, status, remarks = '') => {
+    const handleAction = async (req, status) => {
+        let remarks = '';
+        if (status === 'rejected') {
+            remarks = window.prompt(`Reason for rejecting "${req.shopDetails?.shopName}" (sent to the vendor):`);
+            if (remarks === null) return; // cancelled
+        }
         try {
-            const res = await api.post(`/admin/vendors/shop-approvals/${id}`, { status, remarks });
+            setActingId(req._id);
+            const res = await api.post(`/admin/vendors/shop-approvals/${req._id}`, { status, remarks });
             if (res.data.success) {
                 toast.success(`Shop ${status} successfully`);
                 fetchRequests();
-                setSelectedReq(null);
             }
-        } catch (err) {
-            toast.error("Action failed");
+        } catch {
+            toast.error('Action failed');
+        } finally {
+            setActingId(null);
         }
     };
 
-    if (loading) return <div className="p-10 text-center">Loading requests...</div>;
+    const th = 'px-4 py-3 text-xs font-medium text-gray-500 whitespace-nowrap';
 
     return (
         <div className="p-6">
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-800">Shop Registration Requests</h1>
-                <p className="text-gray-500">Approve or reject vendor agri-store registrations</p>
+            <div className="flex items-end justify-between mb-4">
+                <div>
+                    <h1 className="text-xl font-semibold text-gray-900">Shop Registration Requests</h1>
+                    <p className="text-sm text-gray-500 mt-0.5">Approve or reject vendor agri-store registrations</p>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* List of Requests */}
-                <div className="lg:col-span-1 space-y-4">
-                    {requests.length === 0 ? (
-                        <div className="bg-white p-8 rounded-2xl border border-gray-100 text-center">
-                            <FiClock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                            <p className="text-gray-500 font-medium">No pending requests</p>
-                        </div>
-                    ) : (
-                        requests.map(req => (
-                            <div 
-                                key={req._id}
-                                onClick={() => setSelectedReq(req)}
-                                className={`p-5 rounded-2xl cursor-pointer transition-all border-2 ${
-                                    selectedReq?._id === req._id ? 'bg-teal-50 border-teal-500 shadow-lg' : 'bg-white border-transparent hover:border-gray-200 shadow-sm'
-                                }`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                                        <FiShoppingBag className="text-teal-600 w-6 h-6" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-gray-800 truncate">{req.shopDetails?.shopName}</h3>
-                                        <p className="text-xs text-gray-500 truncate">{req.name}</p>
-                                    </div>
-                                    <FiChevronRight className="text-gray-400" />
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                {/* Detail View */}
-                <div className="lg:col-span-2">
-                    {selectedReq ? (
-                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 sticky top-24">
-                            <div className="flex justify-between items-start mb-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center">
-                                        <FiShoppingBag className="text-teal-600 w-8 h-8" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-800">{selectedReq.shopDetails?.shopName}</h2>
-                                        <p className="text-gray-500">Agri-Store Registration Request</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => handleAction(selectedReq._id, 'approved')}
-                                        className="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-green-700 transition-colors"
-                                    >
-                                        <FiCheck /> Approve
-                                    </button>
-                                    <button 
-                                        onClick={() => handleAction(selectedReq._id, 'rejected')}
-                                        className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-red-700 transition-colors"
-                                    >
-                                        <FiX /> Reject
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-8">
-                                <section className="space-y-6">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Vendor Details</h4>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3 text-sm">
-                                                <FiUser className="text-teal-600" />
-                                                <span className="font-bold">{selectedReq.name}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                                                <FiPhone className="text-teal-600" />
-                                                <span>{selectedReq.phone}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Shop Address</h4>
-                                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex gap-3">
-                                            <FiMapPin className="text-teal-600 shrink-0 mt-1" />
-                                            <p className="text-sm font-medium leading-relaxed">{selectedReq.shopDetails?.shopAddress}</p>
-                                        </div>
-                                        {selectedReq.shopDetails?.shopLocation?.lat && (
-                                            <a 
-                                                href={`https://www.google.com/maps?q=${selectedReq.shopDetails.shopLocation.lat},${selectedReq.shopDetails.shopLocation.lng}`} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="mt-3 text-xs text-teal-600 font-bold flex items-center gap-1 hover:underline"
-                                            >
-                                                View on Google Maps <FiExternalLink />
-                                            </a>
-                                        )}
-                                    </div>
-                                </section>
-
-                                <section className="space-y-6">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">License Info</h4>
-                                        <div className="flex items-center gap-3 text-sm mb-4">
-                                            <FiFileText className="text-teal-600" />
-                                            <span className="font-bold">License: {selectedReq.shopDetails?.shopLicense || 'N/A'}</span>
-                                        </div>
-                                        {selectedReq.shopDetails?.licenseDocument ? (
-                                            <div className="group relative">
-                                                <img 
-                                                    src={selectedReq.shopDetails.licenseDocument} 
-                                                    alt="License" 
-                                                    className="w-full h-48 object-cover rounded-2xl border border-gray-200"
-                                                />
-                                                <a 
-                                                    href={selectedReq.shopDetails.licenseDocument} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl text-white font-bold"
-                                                >
-                                                    View Full Size
-                                                </a>
-                                            </div>
-                                        ) : (
-                                            <div className="w-full h-48 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 border border-dashed border-gray-200 font-medium">
-                                                No document uploaded
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-200 h-[500px] flex flex-col items-center justify-center text-gray-400">
-                            <FiShoppingBag className="w-16 h-16 mb-4 opacity-20" />
-                            <p className="font-medium">Select a request to view details</p>
-                        </div>
-                    )}
-                </div>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {loading ? (
+                    <div className="flex justify-center py-16">
+                        <div className="w-8 h-8 border-[3px] border-gray-200 border-t-green-600 rounded-full animate-spin" />
+                    </div>
+                ) : visible.length === 0 ? (
+                    <div className="py-16 text-center">
+                        <FiInbox className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500">No pending shop registrations</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[1000px]">
+                            <thead>
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className={th}>Shop</th>
+                                    <th className={th}>Vendor</th>
+                                    <th className={th}>Shop Address</th>
+                                    <th className={th}>License</th>
+                                    <th className={th}>Status</th>
+                                    <th className={`${th} text-right`}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {visible.map(req => {
+                                    const shop = req.shopDetails || {};
+                                    const busy = actingId === req._id;
+                                    const status = statusOf(req);
+                                    return (
+                                        <tr key={req._id} className="hover:bg-gray-50/60 align-top">
+                                            <td className="px-4 py-3">
+                                                <p className="text-sm font-medium text-gray-900">{shop.shopName || '—'}</p>
+                                                {req.businessName && <p className="text-xs text-gray-500">{req.businessName}</p>}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <p className="text-sm text-gray-900">{req.name}</p>
+                                                <p className="text-xs text-gray-500">{req.phone}</p>
+                                            </td>
+                                            <td className="px-4 py-3 max-w-xs">
+                                                <p className="text-sm text-gray-700 line-clamp-2" title={shop.shopAddress}>{shop.shopAddress || '—'}</p>
+                                                {shop.shopLocation?.lat && (
+                                                    <a href={`https://www.google.com/maps?q=${shop.shopLocation.lat},${shop.shopLocation.lng}`}
+                                                        target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:underline">
+                                                        View on map <FiExternalLink className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    {shop.licenseDocument && (
+                                                        <a href={shop.licenseDocument} target="_blank" rel="noopener noreferrer" title="Open license document"
+                                                            className="w-12 h-12 rounded-lg border border-gray-200 overflow-hidden flex items-center justify-center bg-gray-50 flex-shrink-0">
+                                                            {isPdf(shop.licenseDocument)
+                                                                ? <FiFileText className="text-gray-400" />
+                                                                : <img src={shop.licenseDocument} alt="License" className="w-full h-full object-cover" />}
+                                                        </a>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-sm font-mono text-gray-900">{shop.shopLicense || 'N/A'}</p>
+                                                        {shop.licenseDocument
+                                                            ? <a href={shop.licenseDocument} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">View document</a>
+                                                            : <p className="text-xs text-gray-400">No document</p>}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 max-w-[200px]">
+                                                <span className={`inline-block px-2 py-0.5 rounded-md border text-xs font-medium capitalize ${STATUS_BADGE[status] || ''}`}>{status}</span>
+                                                {status === 'rejected' && shop.remarks && (
+                                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={shop.remarks}>{shop.remarks}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex justify-end gap-2">
+                                                    {status !== 'rejected' && (
+                                                        <button onClick={() => handleAction(req, 'rejected')} disabled={busy}
+                                                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                                                            <FiX className="w-4 h-4" /> Reject
+                                                        </button>
+                                                    )}
+                                                    {status !== 'approved' && (
+                                                        <button onClick={() => handleAction(req, 'approved')} disabled={busy}
+                                                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                                                            <FiCheck className="w-4 h-4" /> Approve
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
-
-// Internal imports for sub-components (if not already defined globably)
-import { FiChevronRight, FiPhone } from 'react-icons/fi';
 
 export default StoreApprovals;

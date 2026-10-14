@@ -1,60 +1,143 @@
 const SoilTestRequest = require('../../models/SoilTestRequest');
 const Admin = require('../../models/Admin');
 const User = require('../../models/User');
-const Vendor = require('../../models/Vendor');
 const Transaction = require('../../models/Transaction');
 const { createNotification } = require('../notificationControllers/notificationController');
 const { createOrder, verifyAndClaimPayment, releasePayment } = require('../../services/razorpayService');
+const { getSoilTestPricing, splitSoilTestAmount } = require('../../services/soilTestPricing');
+
+const notifyAdminsOfNewRequest = async (request, farmerName) => {
+    try {
+        const admins = await Admin.find({ isActive: true });
+        await Promise.all(admins.map(admin => createNotification({
+            adminId: admin._id,
+            type: 'soil_test_request',
+            title: '🌾 New Soil Test Request',
+            message: `Farmer ${farmerName || 'A user'} has paid ₹${request.totalAmount} for a ${request.testType} soil test on ${request.landSize} land.`,
+            relatedId: request._id,
+            relatedType: 'service',
+            pushData: {
+                type: 'soil_test_request',
+                requestId: request._id.toString(),
+                farmerName,
+                link: '/admin/soil-tests'
+            }
+        })));
+    } catch (noticeErr) {
+        console.error('[SoilTest] Notification error:', noticeErr);
+    }
+};
 
 /**
- * User: Create Soil Test Request
+ * User: Soil test prices set by admin
+ */
+const getSoilTestPrices = async (req, res) => {
+    try {
+        const { basicPrice, advancedPrice } = await getSoilTestPricing();
+        res.status(200).json({ success: true, data: { basicPrice, advancedPrice } });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * User: Pay & submit a soil test request.
+ * Wallet: debited and submitted in one call. Online: returns a Razorpay order;
+ * the request stays hidden (awaitingPayment) until verifySoilTestPayment succeeds.
  */
 const createSoilTestRequest = async (req, res) => {
     try {
-        const { landSize, location, latitude, longitude, cropType, testType, phoneNumber } = req.body;
+        const { landSize, location, latitude, longitude, cropType, testType, phoneNumber, paymentMethod } = req.body;
+        if (!['wallet', 'online'].includes(paymentMethod)) {
+            return res.status(400).json({ success: false, message: 'Please choose a payment method' });
+        }
 
-        const newRequest = new SoilTestRequest({
+        // Price always comes from admin settings, never from the client
+        const pricing = await getSoilTestPricing();
+        const totalAmount = testType === 'Advanced' ? pricing.advancedPrice : pricing.basicPrice;
+        if (!(totalAmount > 0)) {
+            return res.status(400).json({ success: false, message: 'Soil testing is not available right now. Please try again later.' });
+        }
+        const { adminCommission, vendorEarning } = splitSoilTestAmount(totalAmount, pricing.commissionPercentage);
+
+        const request = new SoilTestRequest({
             userId: req.user.id,
             landSize,
             location,
             latitude,
             longitude,
             cropType,
-            testType,
-            phoneNumber
+            testType: testType === 'Advanced' ? 'Advanced' : 'Basic',
+            phoneNumber,
+            totalAmount,
+            commissionPercentage: pricing.commissionPercentage,
+            adminCommission,
+            vendorEarning,
+            paymentMethod
         });
+        await request.validate();
 
-        await newRequest.save();
+        if (paymentMethod === 'wallet') {
+            const user = await User.findOneAndUpdate(
+                { _id: req.user.id, 'wallet.balance': { $gte: totalAmount } },
+                { $inc: { 'wallet.balance': -totalAmount } },
+                { new: true }
+            );
+            if (!user) {
+                return res.status(400).json({ success: false, message: 'Insufficient wallet balance', needsOnlinePayment: true });
+            }
 
-        // Notify Admins
-        try {
-            const admins = await Admin.find({ isActive: true });
-            const notifications = admins.map(admin => createNotification({
-                adminId: admin._id,
-                type: 'soil_test_request',
-                title: '🌾 New Soil Test Request',
-                message: `Farmer ${req.user.name || 'A user'} has requested a soil test for ${landSize} land.`,
-                relatedId: newRequest._id,
-                relatedType: 'service',
-                pushData: {
-                    type: 'soil_test_request',
-                    requestId: newRequest._id.toString(),
-                    farmerName: req.user.name,
-                    link: '/admin/soil-tests'
-                }
-            }));
-            await Promise.all(notifications);
-        } catch (noticeErr) {
-            console.error('[SoilTest] Notification error:', noticeErr);
+            request.paymentStatus = 'paid';
+            request.transactionId = `WLT_${Date.now()}`;
+            try {
+                await request.save();
+            } catch (saveErr) {
+                await User.updateOne({ _id: user._id }, { $inc: { 'wallet.balance': totalAmount } });
+                throw saveErr;
+            }
+
+            await Transaction.create({
+                userId: user._id,
+                type: 'debit',
+                amount: totalAmount,
+                status: 'completed',
+                paymentMethod: 'wallet',
+                description: `Paid for ${request.testType} Soil Test`,
+                balanceBefore: user.wallet.balance + totalAmount,
+                balanceAfter: user.wallet.balance,
+                referenceId: request._id.toString()
+            }).catch(err => console.error('[SoilTest] User txn error:', err));
+
+            await notifyAdminsOfNewRequest(request, req.user.name);
+            return res.status(201).json({ success: true, paid: true, message: 'Payment successful. Soil test request submitted!', data: request });
         }
 
-        res.status(201).json({
+        // Online (Razorpay)
+        request.awaitingPayment = true;
+        await request.save();
+
+        const orderResult = await createOrder(totalAmount, 'INR', `SOIL_${request._id.toString().slice(-6)}_${Date.now()}`, {
+            userId: req.user.id.toString(),
+            requestId: request._id.toString()
+        });
+        if (!orderResult.success) {
+            await SoilTestRequest.deleteOne({ _id: request._id });
+            return res.status(500).json({ success: false, message: 'Failed to create payment order: ' + (orderResult.error || 'Unknown error') });
+        }
+
+        return res.status(200).json({
             success: true,
-            message: 'Soil test request submitted successfully!',
-            data: newRequest
+            data: {
+                requestId: request._id,
+                orderId: orderResult.orderId,
+                amount: orderResult.amount / 100,
+                currency: orderResult.currency,
+                key: process.env.RAZORPAY_KEY_ID
+            }
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(status).json({ success: false, message: error.message });
     }
 };
 
@@ -63,7 +146,7 @@ const createSoilTestRequest = async (req, res) => {
  */
 const getMySoilTestRequests = async (req, res) => {
     try {
-        const requests = await SoilTestRequest.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        const requests = await SoilTestRequest.find({ userId: req.user.id, awaitingPayment: { $ne: true } }).sort({ createdAt: -1 });
         res.status(200).json({
             success: true,
             data: requests
@@ -74,142 +157,7 @@ const getMySoilTestRequests = async (req, res) => {
 };
 
 /**
- * User: Pay for Soil Test Report
- */
-const payForSoilTestReport = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { paymentMethod } = req.body; // 'wallet' or 'online'
-        const userId = req.user.id;
-
-        const request = await SoilTestRequest.findById(id);
-        if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
-        if (request.paymentStatus === 'paid') return res.status(400).json({ success: false, message: 'Already paid' });
-        if (request.reportStatus !== 'approved') return res.status(400).json({ success: false, message: 'Report is not approved yet' });
-
-        const amount = request.totalAmount || 0;
-        if (amount === 0) {
-            // Free report
-            request.paymentStatus = 'paid';
-            request.paymentMethod = 'free';
-            await request.save();
-            return res.status(200).json({ success: true, message: 'Report is free. Access granted.', isFree: true });
-        }
-
-        if (paymentMethod === 'wallet') {
-            try {
-                const user = await User.findById(userId);
-                const currentBalance = user.wallet?.balance || 0;
-
-                if (currentBalance < amount) {
-                    return res.status(400).json({ success: false, message: 'Insufficient wallet balance', needsOnlinePayment: true });
-                }
-
-                // Initialize wallet if missing
-                if (!user.wallet) user.wallet = { balance: 0 };
-                
-                user.wallet.balance = currentBalance - amount;
-                await user.save();
-
-                // Record User Txn
-                await Transaction.create({
-                    userId: user._id, 
-                    type: 'debit', 
-                    amount: amount, 
-                    status: 'completed',
-                    paymentMethod: 'wallet', 
-                    description: 'Paid for Soil Test Report',
-                    balanceBefore: currentBalance,
-                    balanceAfter: user.wallet.balance, 
-                    referenceId: request._id.toString()
-                });
-
-                // Credit Vendor Wallet
-                if (request.vendorId && request.vendorEarning > 0) {
-                    const vendor = await Vendor.findById(request.vendorId);
-                    if (vendor) {
-                        const vendorPrevEarnings = vendor.wallet?.earnings || 0;
-                        if (!vendor.wallet) vendor.wallet = { earnings: 0, dues: 0 };
-                        
-                        vendor.wallet.earnings = vendorPrevEarnings + request.vendorEarning;
-                        await vendor.save();
-
-                        // Record Vendor Txn
-                        await Transaction.create({
-                            vendorId: vendor._id, 
-                            type: 'credit', 
-                            amount: request.vendorEarning, 
-                            status: 'completed',
-                            paymentMethod: 'system', 
-                            description: 'Earnings from Soil Test Report',
-                            balanceBefore: vendorPrevEarnings,
-                            balanceAfter: vendor.wallet.earnings, 
-                            referenceId: request._id.toString()
-                        });
-
-                        // Push Notification: Notify Vendor about credit
-                        try {
-                            await createNotification({
-                                vendorId: vendor._id,
-                                type: 'soil_test_payment_received',
-                                title: '💰 Payment Received',
-                                message: `You have earned ₹${request.vendorEarning} for the completed soil test (ID: ${request._id.toString().slice(-6)}).`,
-                                relatedId: request._id,
-                                relatedType: 'service',
-                                pushData: {
-                                    type: 'soil_test_payment_received',
-                                    requestId: request._id.toString(),
-                                    amount: request.vendorEarning,
-                                    link: '/vendor/soil-tests'
-                                }
-                            });
-                        } catch (noticeErr) {
-                            console.error('Notification error (Vendor Credit):', noticeErr);
-                        }
-                    }
-                }
-
-                request.paymentStatus = 'paid';
-                request.paymentMethod = 'wallet';
-                request.transactionId = `WLT_${Date.now()}`;
-                await request.save();
-
-                return res.status(200).json({ success: true, message: 'Payment successful via Wallet', paid: true });
-            } catch (wErr) {
-                console.error("Wallet Payment Error:", wErr);
-                return res.status(500).json({ success: false, message: 'Wallet payment failed: ' + wErr.message });
-            }
-        }
-
-        // Online (Razorpay)
-        try {
-            const shortId = request._id.toString().slice(-6);
-            const orderResult = await createOrder(amount, 'INR', `SOIL_${shortId}_${Date.now()}`, { userId: userId.toString(), requestId: request._id.toString() });
-            
-            if (!orderResult.success) {
-                return res.status(500).json({ success: false, message: 'Failed to create payment order: ' + (orderResult.error || 'Unknown Razorpay Error') });
-            }
-
-            return res.status(200).json({
-                success: true,
-                data: {
-                    orderId: orderResult.orderId,
-                    amount: orderResult.amount / 100,
-                    currency: orderResult.currency,
-                    key: process.env.RAZORPAY_KEY_ID
-                }
-            });
-        } catch (oErr) {
-            console.error("Online Payment Init Error:", oErr);
-            return res.status(500).json({ success: false, message: 'Online payment init failed: ' + oErr.message });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
-
-/**
- * User: Verify Razorpay Payment for Soil Test
+ * User: Verify Razorpay payment — submits the request
  */
 const verifySoilTestPayment = async (req, res) => {
     try {
@@ -229,89 +177,35 @@ const verifySoilTestPayment = async (req, res) => {
         }
 
         request.paymentStatus = 'paid';
+        request.awaitingPayment = false;
         request.paymentMethod = 'online';
         request.transactionId = razorpay_payment_id;
-
-        // Record User Txn
-        const user = await User.findById(userId);
-        
-        try {
-            await Transaction.create({
-                userId: user._id, 
-                type: 'debit', 
-                amount: request.totalAmount, 
-                status: 'completed',
-                paymentMethod: 'online', 
-                description: 'Paid for Soil Test Report via Online',
-                balanceBefore: user.wallet?.balance || 0,
-                balanceAfter: user.wallet?.balance || 0, 
-                referenceId: request._id.toString(),
-                metadata: { orderId: razorpay_order_id, paymentId: razorpay_payment_id }
-            });
-        } catch (txnErr) {
-            console.error("User Txn Error:", txnErr);
-        }
-
-        // Credit Vendor Wallet
-        try {
-            if (request.vendorId && request.vendorEarning > 0) {
-                const vendor = await Vendor.findById(request.vendorId);
-                if (vendor) {
-                    const vendorPrevEarnings = vendor.wallet?.earnings || 0;
-                    if (!vendor.wallet) vendor.wallet = { earnings: 0, dues: 0 };
-                    
-                    vendor.wallet.earnings = vendorPrevEarnings + request.vendorEarning;
-                    await vendor.save();
-
-                    await Transaction.create({
-                        vendorId: vendor._id, 
-                        type: 'credit', 
-                        amount: request.vendorEarning, 
-                        status: 'completed',
-                        paymentMethod: 'system', 
-                        description: 'Earnings from Soil Test Report (Online payment routed)',
-                        balanceBefore: vendorPrevEarnings,
-                        balanceAfter: vendor.wallet.earnings, 
-                        referenceId: request._id.toString()
-                    });
-
-                    // Push Notification: Notify Vendor about credit
-                    try {
-                        await createNotification({
-                            vendorId: vendor._id,
-                            type: 'soil_test_payment_received',
-                            title: '💰 Payment Received',
-                            message: `You have earned ₹${request.vendorEarning} for the completed soil test (ID: ${request._id.toString().slice(-6)}).`,
-                            relatedId: request._id,
-                            relatedType: 'service',
-                            pushData: {
-                                type: 'soil_test_payment_received',
-                                requestId: request._id.toString(),
-                                amount: request.vendorEarning,
-                                link: '/vendor/soil-tests'
-                            }
-                        });
-                    } catch (noticeErr) {
-                        console.error('Notification error (Vendor Credit):', noticeErr);
-                    }
-                }
-            }
-        } catch (vErr) {
-            console.error("Vendor Credit Error:", vErr);
-        }
-
         try {
             await request.save();
-        } catch (reqSaveErr) {
-            console.error("Request Save Error:", reqSaveErr);
+        } catch (saveErr) {
+            await releasePayment(razorpay_payment_id);
+            throw saveErr;
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Payment verified successfully and report unlocked!'
-        });
+        const user = await User.findById(userId).select('wallet');
+        await Transaction.create({
+            userId,
+            type: 'debit',
+            amount: request.totalAmount,
+            status: 'completed',
+            paymentMethod: 'online',
+            description: `Paid for ${request.testType} Soil Test via Online`,
+            balanceBefore: user?.wallet?.balance || 0,
+            balanceAfter: user?.wallet?.balance || 0,
+            referenceId: request._id.toString(),
+            metadata: { orderId: razorpay_order_id, paymentId: razorpay_payment_id }
+        }).catch(err => console.error('[SoilTest] User txn error:', err));
+
+        await notifyAdminsOfNewRequest(request, req.user.name);
+
+        res.status(200).json({ success: true, message: 'Payment successful. Soil test request submitted!' });
     } catch (error) {
-        console.error("Payment Verify Catch Err:", error);
+        console.error('Payment Verify Catch Err:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -319,11 +213,12 @@ const verifySoilTestPayment = async (req, res) => {
 const updateSoilTestRequest = async (req, res) => {
     try {
         const { id } = req.params;
-        const { landSize, location, latitude, longitude, cropType, testType, phoneNumber } = req.body;
+        // testType is not editable: it decides the price the farmer already paid
+        const { landSize, location, latitude, longitude, cropType, phoneNumber } = req.body;
 
         const request = await SoilTestRequest.findById(id);
         if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
-        
+
         if (request.userId.toString() !== req.user.id) {
             return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
@@ -337,7 +232,6 @@ const updateSoilTestRequest = async (req, res) => {
         request.latitude = latitude !== undefined ? latitude : request.latitude;
         request.longitude = longitude !== undefined ? longitude : request.longitude;
         request.cropType = cropType !== undefined ? cropType : request.cropType;
-        request.testType = testType !== undefined ? testType : request.testType;
         request.phoneNumber = phoneNumber !== undefined ? phoneNumber : request.phoneNumber;
 
         await request.save();
@@ -352,37 +246,10 @@ const updateSoilTestRequest = async (req, res) => {
     }
 };
 
-const deleteSoilTestRequest = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const request = await SoilTestRequest.findById(id);
-        if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
-
-        if (request.userId.toString() !== req.user.id) {
-            return res.status(403).json({ success: false, message: 'Unauthorized' });
-        }
-
-        if (request.status !== 'pending' || request.vendorId) {
-            return res.status(400).json({ success: false, message: 'Cannot delete request as it has already been assigned to a lab.' });
-        }
-
-        await SoilTestRequest.findByIdAndDelete(id);
-
-        res.status(200).json({
-            success: true,
-            message: 'Soil test request deleted successfully!'
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
-
 module.exports = {
+    getSoilTestPrices,
     createSoilTestRequest,
     getMySoilTestRequests,
-    payForSoilTestReport,
     verifySoilTestPayment,
-    updateSoilTestRequest,
-    deleteSoilTestRequest
+    updateSoilTestRequest
 };

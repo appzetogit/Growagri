@@ -28,6 +28,7 @@ const Plans = lazy(() => import('../pages/Plans/Plans'));
 const Settlements = lazy(() => import('../pages/Settlements'));
 const VendorWallets = lazy(() => import('../pages/VendorWallets'));
 const AdminRevenue = lazy(() => import('../pages/AdminRevenue'));
+const SoilTestingRevenue = lazy(() => import('../pages/SoilTestingRevenue'));
 const Reviews = lazy(() => import('../pages/Reviews'));
 const Products = lazy(() => import('../pages/Products'));
 const EcommerceOrders = lazy(() => import('../pages/Products/Orders'));
@@ -35,7 +36,6 @@ const Marketplace = lazy(() => import('../pages/Products/EcommerceManager'));
 const StoreApprovals = lazy(() => import('../pages/Products/StoreApprovals'));
 const RegisteredShops = lazy(() => import('../pages/Products/RegisteredShops'));
 const SoilTesting = lazy(() => import('../pages/SoilTesting'));
-const Disputes = lazy(() => import('../pages/Disputes'));
 const SchemeManagement = lazy(() => import('../pages/Schemes'));
 const WebsiteSettings = lazy(() => import('../pages/WebsiteSettings'));
 const EquipmentApproval = lazy(() => import('../pages/EquipmentApproval'));
@@ -90,11 +90,11 @@ const AdminRoutes = () => {
           <Route path="marketplace/store-approvals" element={<StoreApprovals />} />
           <Route path="marketplace/registered-shops" element={<RegisteredShops />} />
           <Route path="soil-tests" element={<SoilTesting />} />
-          <Route path="disputes" element={<Disputes />} />
           <Route path="schemes" element={<SchemeManagement />} />
           <Route path="settlements/*" element={<Settlements />} />
           <Route path="vendor-wallets" element={<VendorWallets />} />
           <Route path="admin-revenue" element={<AdminRevenue />} />
+          <Route path="soil-testing-revenue" element={<SoilTestingRevenue />} />
           <Route path="manage-website/*" element={<WebsiteSettings />} />
           <Route path="settings/*" element={<Settings />} />
         </Route>

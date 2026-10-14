@@ -93,8 +93,14 @@ exports.uploadReport = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Request not found or not assigned to you' });
         }
 
+        // First upload, or re-upload after admin rejected it
+        if (!['pending', 'rejected'].includes(request.reportStatus)) {
+            return res.status(400).json({ success: false, message: 'Report is already submitted' });
+        }
+
         request.reportUrl = reportUrl;
         request.reportStatus = 'uploaded';
+        request.reportRejectionReason = '';
         request.reportDate = Date.now();
 
         if (request.status === 'sample_collected' || request.status === 'assigned') {
@@ -153,32 +159,12 @@ exports.rejectRequest = async (req, res) => {
         if (!request.rejectedByVendors) request.rejectedByVendors = [];
         request.rejectedByVendors.push(req.user._id);
 
-        // Update status for visibility to Admin & User
-        request.status = 'cancelled';
+        // The farmer has already paid, so the request goes back to admin for re-assignment
+        request.status = 'pending';
+        request.vendorId = null;
         request.rejectionReason = reason || 'No reason provided';
 
         await request.save();
-
-        // Push Notification: Notify the User that their request was rejected
-        try {
-            if (request.userId) {
-                await createNotification({
-                    userId: request.userId,
-                    type: 'soil_test_rejected',
-                    title: 'Soil Test Request Cancelled',
-                    message: `Your soil test request has been cancelled by the assigned lab. Reason: ${reason || 'Not specified'}.`,
-                    relatedId: request._id,
-                    relatedType: 'service',
-                    pushData: {
-                        type: 'soil_test_rejected',
-                        requestId: request._id.toString(),
-                        link: '/user/soil-testing'
-                    }
-                });
-            }
-        } catch (noticeErr) {
-            console.error('Notification error (User Rejection Update):', noticeErr);
-        }
 
         // Push Notification: Notify Admins that request is rejected
         try {

@@ -145,6 +145,8 @@ const vendorSchema = new mongoose.Schema({
       enum: ['pending', 'approved', 'rejected', 'not_submitted'],
       default: 'not_submitted'
     },
+    // Admin's reason when the shop registration is rejected
+    remarks: { type: String, default: '' },
     deliveryRadius: {
       type: Number,
       default: 50

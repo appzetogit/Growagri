@@ -370,21 +370,6 @@ const Account = () => {
 
           {/* Menu Groups */}
 
-          {/* Shopping */}
-          <motion.div variants={itemVariants}>
-            <MenuItem
-              icon={FiShield}
-              label="My Subscription"
-              badge={userProfile.plans?.isActive ? "Active" : null}
-              onClick={() => navigate('/user/my-subscription')}
-            />
-            <MenuItem
-              icon={FiZap}
-              label="Explore Plans"
-              onClick={() => navigate('/user/my-plan')}
-            />
-          </motion.div>
-
           {/* Activity */}
           <motion.div variants={itemVariants}>
             <MenuItem
@@ -405,12 +390,6 @@ const Account = () => {
               icon={FiMapPin}
               label="Manage Addresses"
               onClick={() => navigate('/user/manage-addresses')}
-            />
-
-            <MenuItem
-              icon={FiSettings}
-              label={t('Settings')}
-              onClick={() => navigate('/user/settings')}
             />
 
             <MenuItem
@@ -442,6 +421,11 @@ const Account = () => {
               </div>
               <FiChevronRight className="w-5 h-5 text-gray-300 group-hover:text-teal-500 transition-colors" />
             </motion.button>
+            <MenuItem
+              icon={FiSettings}
+              label={t('Settings')}
+              onClick={() => navigate('/user/settings')}
+            />
             <div className="h-4"></div>
             <motion.button
               whileTap={{ scale: 0.98 }}

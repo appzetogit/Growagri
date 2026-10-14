@@ -480,11 +480,14 @@ module.exports = {
   updateVendorServices,
   deleteVendor,
   // Agri-Marketplace Shop Management
+  // ?status=pending (default) | approved | rejected | all
   getPendingShopApprovals: async (req, res) => {
     try {
+      const reviewable = ['pending', 'approved', 'rejected'];
+      const { status = 'pending' } = req.query;
       const vendors = await Vendor.find({
-        'shopDetails.storeApprovalStatus': 'pending'
-      }).select('name businessName phone shopDetails email');
+        'shopDetails.storeApprovalStatus': status === 'all' ? { $in: reviewable } : (reviewable.includes(status) ? status : 'pending')
+      }).select('name businessName phone shopDetails email updatedAt').sort({ updatedAt: -1 });
       res.status(200).json({ success: true, data: vendors });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -499,7 +502,8 @@ module.exports = {
       }
       const updateData = {
         'shopDetails.storeApprovalStatus': status,
-        'shopDetails.isStoreApproved': status === 'approved'
+        'shopDetails.isStoreApproved': status === 'approved',
+        'shopDetails.remarks': status === 'rejected' ? (remarks || '').trim() : ''
       };
       const vendor = await Vendor.findByIdAndUpdate(id, { $set: updateData }, { new: true });
       if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });

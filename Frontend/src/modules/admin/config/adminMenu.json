@@ -112,14 +112,6 @@
     "children": []
   },
   {
-    "title": "Plans",
-    "route": "/admin/plans",
-    "allowedRoles": [
-      "super_admin"
-    ],
-    "children": []
-  },
-  {
     "title": "Agri Marketplace",
     "route": "/admin/marketplace",
     "allowedRoles": [
@@ -127,24 +119,15 @@
       "admin"
     ],
     "children": [
-      "Marketplace Manager",
-      "Global Orders",
       "Store Approvals",
+      "Marketplace Manager",
+      "Agri Orders",
       "Registered Shops"
     ]
   },
   {
     "title": "Soil Testing",
     "route": "/admin/soil-tests",
-    "allowedRoles": [
-      "super_admin",
-      "admin"
-    ],
-    "children": []
-  },
-  {
-    "title": "Disputes",
-    "route": "/admin/disputes",
     "allowedRoles": [
       "super_admin",
       "admin"
@@ -189,6 +172,14 @@
   {
     "title": "Admin Revenue",
     "route": "/admin/admin-revenue",
+    "allowedRoles": [
+      "super_admin"
+    ],
+    "children": []
+  },
+  {
+    "title": "Admin Soil Testing Revenue",
+    "route": "/admin/soil-testing-revenue",
     "allowedRoles": [
       "super_admin"
     ],

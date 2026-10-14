@@ -16,7 +16,7 @@ const getAllProducts = async (req, res) => {
         .populate('categoryId', 'title')
         .populate({ 
             path: 'vendorId', 
-            select: 'name businessName phone profilePhoto cityId',
+            select: 'name businessName phone profilePhoto cityId shopDetails.shopName',
             populate: { path: 'cityId', select: 'name' }
         })
         .sort({ createdAt: -1 });
@@ -40,7 +40,7 @@ const getVendorProducts = async (req, res) => {
             .populate('categoryId', 'title')
             .populate({ 
                 path: 'vendorId', 
-                select: 'name businessName phone profilePhoto cityId',
+                select: 'name businessName phone profilePhoto cityId shopDetails.shopName',
                 populate: { path: 'cityId', select: 'name' }
             })
             .sort({ createdAt: -1 });

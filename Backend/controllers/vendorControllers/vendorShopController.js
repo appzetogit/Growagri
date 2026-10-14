@@ -18,7 +18,8 @@ const registerShop = async (req, res) => {
             'shopDetails.shopLicense': shopLicense,
             'shopDetails.licenseDocument': licenseDocument,
             'shopDetails.storeApprovalStatus': 'pending',
-            'shopDetails.isStoreApproved': false
+            'shopDetails.isStoreApproved': false,
+            'shopDetails.remarks': ''
         };
 
         if (deliveryRadius) {

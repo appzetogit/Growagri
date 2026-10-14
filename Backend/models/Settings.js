@@ -85,6 +85,23 @@ const settingsSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  // Soil testing: what the farmer pays per test type, and the admin's cut (rest goes to the lab vendor)
+  soilTestBasicPrice: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  soilTestAdvancedPrice: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  soilTestCommissionPercentage: {
+    type: Number,
+    default: 10,
+    min: 0,
+    max: 100
+  },
   // Razorpay Settings
   razorpayKeyId: {
     type: String,

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    FiPackage, 
-    FiTruck, 
-    FiClock, 
-    FiCheckCircle, 
+import {
+    FiPackage,
+    FiTruck,
+    FiClock,
+    FiCheckCircle,
     FiSearch,
     FiFilter,
     FiChevronLeft,
@@ -58,16 +58,6 @@ const EcommerceOrders = () => {
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen">
-            <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => navigate(-1)} className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-                    <FiChevronLeft className="w-5 h-5 text-slate-800" />
-                </button>
-                <div>
-                    <h1 className="text-2xl font-black text-slate-800">Global Ecommerce Orders</h1>
-                    <p className="text-sm text-slate-500 font-medium">Monitor all physical product sales & fulfillment</p>
-                </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600"><FiPackage /></div>
@@ -78,9 +68,9 @@ const EcommerceOrders = () => {
                 </div>
                 <div className="md:col-span-2 bg-white px-6 py-2 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-3">
                     <FiSearch className="text-slate-400 w-5 h-5" />
-                    <input 
-                        type="text" 
-                        placeholder="Search by Order ID, Farmer Name, or Vendor Shop..." 
+                    <input
+                        type="text"
+                        placeholder="Search by Order ID, Farmer Name, or Vendor Shop..."
                         className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 placeholder:text-slate-300"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -144,9 +134,8 @@ const EcommerceOrders = () => {
                                         <div className="space-y-1">
                                             <p className="text-[11px] font-black text-slate-800">Total: ₹{order.pricing?.itemsTotal}</p>
                                             <div className="flex gap-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${
-                                                    order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                                                }`}>
+                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                                    }`}>
                                                     Fee: ₹{order.pricing?.platformFee} ({order.paymentStatus})
                                                 </span>
                                                 <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[8px] font-black uppercase">
@@ -157,10 +146,9 @@ const EcommerceOrders = () => {
                                     </td>
                                     <td className="px-6 py-5">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${
-                                                order.deliveryStatus === 'delivered' ? 'bg-green-500' : 
-                                                order.deliveryStatus === 'shipped' ? 'bg-blue-500' : 'bg-orange-500'
-                                            }`} />
+                                            <div className={`w-2 h-2 rounded-full ${order.deliveryStatus === 'delivered' ? 'bg-green-500' :
+                                                    order.deliveryStatus === 'shipped' ? 'bg-blue-500' : 'bg-orange-500'
+                                                }`} />
                                             <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{order.deliveryStatus}</p>
                                         </div>
                                         {order.trackingDetails?.courierName && (
@@ -170,7 +158,7 @@ const EcommerceOrders = () => {
                                         )}
                                     </td>
                                     <td className="px-6 py-5 text-center">
-                                        <button 
+                                        <button
                                             onClick={() => setSelectedOrder(order)}
                                             className="px-4 py-2 bg-[#2E7D32]/10 hover:bg-[#2E7D32]/25 text-[#2E7D32] rounded-xl font-bold text-xs active:scale-95 transition-all whitespace-nowrap"
                                         >
@@ -190,7 +178,7 @@ const EcommerceOrders = () => {
                             </p>
                             <div className="flex items-center gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rows per page:</label>
-                                <select 
+                                <select
                                     className="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg outline-none cursor-pointer py-1 px-2"
                                     value={itemsPerPage}
                                     onChange={(e) => {
@@ -206,14 +194,14 @@ const EcommerceOrders = () => {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button 
+                            <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
                                 className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 disabled:opacity-50 transition-all"
                             >
                                 Prev
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
                                 className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 disabled:opacity-50 transition-all"
@@ -254,10 +242,9 @@ const EcommerceOrders = () => {
                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Delivery Status</p>
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-2.5 h-2.5 rounded-full ${
-                                            selectedOrder.deliveryStatus === 'delivered' ? 'bg-green-500' :
-                                            selectedOrder.deliveryStatus === 'shipped' ? 'bg-blue-500' : 'bg-orange-500'
-                                        }`} />
+                                        <div className={`w-2.5 h-2.5 rounded-full ${selectedOrder.deliveryStatus === 'delivered' ? 'bg-green-500' :
+                                                selectedOrder.deliveryStatus === 'shipped' ? 'bg-blue-500' : 'bg-orange-500'
+                                            }`} />
                                         <p className="font-extrabold text-slate-800 uppercase text-xs">{selectedOrder.deliveryStatus}</p>
                                     </div>
                                     {!['delivered', 'cancelled'].includes(selectedOrder.deliveryStatus) && (
@@ -284,9 +271,8 @@ const EcommerceOrders = () => {
                                 </div>
                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Payment Status</p>
-                                    <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
-                                        selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                                    }`}>
+                                    <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                        }`}>
                                         {selectedOrder.paymentStatus} ({selectedOrder.paymentMethod || 'wallet'})
                                     </span>
                                 </div>

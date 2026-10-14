@@ -11,17 +11,16 @@ import {
     FiUploadCloud,
     FiUser,
     FiImage,
-    FiEye
+    FiEye,
+    FiX
 } from 'react-icons/fi';
 import adminProductService from '../../../../services/adminProductService';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { configService } from '../../../../services/configService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 
 const EcommerceManager = () => {
-    const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [pendingProducts, setPendingProducts] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -33,7 +32,7 @@ const EcommerceManager = () => {
     const [currentProduct, setCurrentProduct] = useState(null);
     const [activeTab, setActiveTab] = useState('marketplace'); // 'marketplace' or 'pending'
     const [platformGst, setPlatformGst] = useState(18); // Settings se aayegi GST
-    
+
     const [formData, setFormData] = useState({
         title: '',
         categoryId: '',
@@ -99,7 +98,7 @@ const EcommerceManager = () => {
             for (const file of files) {
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', file);
-                
+
                 const res = await fetch(`${baseUrl}/admin/upload`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
@@ -112,8 +111,8 @@ const EcommerceManager = () => {
             }
 
             if (uploadedUrls.length > 0) {
-                setFormData(prev => ({ 
-                    ...prev, 
+                setFormData(prev => ({
+                    ...prev,
                     imageUrl: prev.imageUrl || uploadedUrls[0],
                     images: [...(prev.images || []), ...uploadedUrls]
                 }));
@@ -140,27 +139,18 @@ const EcommerceManager = () => {
         }
     };
 
-    const [showApprovalModal, setShowApprovalModal] = useState(false);
-    const [approvalData, setApprovalData] = useState({ id: null, commissionPercentage: 10, gstPercentage: 18 });
-
-    const handleApproveClick = (product) => {
-        // Settings se fetched platformGst use karo (default 18 nahi)
-        setApprovalData({ id: product._id, commissionPercentage: 10, gstPercentage: platformGst });
-        setShowApprovalModal(true);
-    };
-
-    const handleConfirmApprove = async () => {
+    // Approve straight away with the product's own commission/GST (editable via View before approving)
+    const handleApproveClick = async (product) => {
         try {
-            const res = await adminProductService.approveProduct(approvalData.id, {
-                commissionPercentage: approvalData.commissionPercentage,
-                gstPercentage: approvalData.gstPercentage
+            const res = await adminProductService.approveProduct(product._id, {
+                commissionPercentage: product.commissionPercentage ?? 10,
+                gstPercentage: product.gstPercentage ?? platformGst
             });
             if (res.success) {
-                toast.success("Platform entry approved and live!");
-                setShowApprovalModal(false);
+                toast.success("Product approved and live!");
                 fetchData();
             }
-        } catch (err) {
+        } catch {
             toast.error("Approval failed");
         }
     };
@@ -185,12 +175,15 @@ const EcommerceManager = () => {
             const res = await adminProductService.delete(id);
             if (res.success) {
                 setProducts(products.filter(p => p._id !== id));
-                toast.success("Product uda diya gaya");
+                toast.success("Product Deleted");
             }
         } catch (err) {
             toast.error("Delete nahi ho paya");
         }
     };
+
+    const inputCls = 'w-full bg-white border border-slate-200 rounded-lg py-2.5 px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition';
+    const labelCls = 'block text-sm font-medium text-slate-700 mb-1.5';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -262,7 +255,7 @@ const EcommerceManager = () => {
 
     const currentList = activeTab === 'marketplace' ? products : pendingProducts;
     const trimmedSearch = searchTerm.trim().toLowerCase();
-    
+
     const filteredProducts = currentList.filter(p =>
         p.title?.toLowerCase().includes(trimmedSearch) ||
         p.brandName?.toLowerCase().includes(trimmedSearch)
@@ -275,20 +268,6 @@ const EcommerceManager = () => {
                 <div>
                     <h1 className="text-2xl font-black text-slate-800">Marketplace Management</h1>
                     <p className="text-sm text-slate-500 font-medium">Manage Seeds, Fertilizers & Crop Inputs</p>
-                </div>
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => navigate('/admin/products/orders')}
-                        className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-800 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95"
-                    >
-                        <FiPackage className="w-5 h-5" /> Global Orders
-                    </button>
-                    <button
-                        onClick={() => { resetForm(); setShowModal(true); }}
-                        className="flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
-                    >
-                        <FiPlus className="w-5 h-5" /> Add Product
-                    </button>
                 </div>
             </div>
 
@@ -318,9 +297,8 @@ const EcommerceManager = () => {
             <div className="flex gap-4 mb-6 border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab('marketplace')}
-                    className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative ${
-                        activeTab === 'marketplace' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative ${activeTab === 'marketplace' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'
+                        }`}
                 >
                     Store Catalog ({products.length})
                     {activeTab === 'marketplace' && (
@@ -329,11 +307,10 @@ const EcommerceManager = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('pending')}
-                    className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative flex items-center gap-2 ${
-                        activeTab === 'pending' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                    className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative flex items-center gap-2 ${activeTab === 'pending' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
+                        }`}
                 >
-                    Marketplace Approvals 
+                    Marketplace Approvals
                     {pendingProducts.length > 0 && (
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${activeTab === 'pending' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
                             {pendingProducts.length}
@@ -399,8 +376,8 @@ const EcommerceManager = () => {
                                                     <FiUser className="w-3 h-3 text-teal-600" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-slate-700 text-xs leading-tight">{product.vendorId?.businessName || product.vendorId?.name || 'Vendor'}</p>
-                                                    <p className="text-[9px] text-teal-600 font-bold uppercase">Shop</p>
+                                                    <p className="font-black text-slate-700 text-xs leading-tight">{product.vendorId?.name || 'Vendor'}</p>
+                                                    <p className="text-[10px] text-teal-600 font-bold">{product.vendorId?.shopDetails?.shopName || product.vendorId?.businessName || 'Shop'}</p>
                                                 </div>
                                             </div>
                                         ) : (
@@ -408,14 +385,13 @@ const EcommerceManager = () => {
                                         )}
                                     </td>
                                     <td className="px-6 py-4">
-                                         <p className="font-black text-emerald-600 text-sm">₹{product.discountPrice > 0 ? product.discountPrice : product.price}</p>
-                                         {product.discountPrice > 0 && (
+                                        <p className="font-black text-emerald-600 text-sm">₹{product.discountPrice > 0 ? product.discountPrice : product.price}</p>
+                                        {product.discountPrice > 0 && (
                                             <p className="text-[10px] text-slate-300 line-through font-bold">₹{product.price}</p>
-                                         )}
-                                         <div className="flex gap-1.5 mt-1 text-[9px] font-black uppercase text-slate-400">
-                                             <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">GST: {product.gstPercentage ?? 18}%</span>
-                                             <span className="bg-slate-100 px-1.5 py-0.5 rounded text-teal-600">COM: {product.commissionPercentage ?? 10}%</span>
-                                         </div>
+                                        )}
+                                        <div className="flex gap-1.5 mt-1 text-[9px] font-black uppercase text-slate-400">
+                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-teal-600">COM: {product.commissionPercentage ?? 10}%</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <p className={`font-black text-sm ${product.stock > 10 ? 'text-slate-700' : product.stock > 0 ? 'text-amber-600' : 'text-rose-600'}`}>
@@ -455,125 +431,116 @@ const EcommerceManager = () => {
             <AnimatePresence>
                 {showModal && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative bg-white w-full max-w-3xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 40px)' }}>
-                            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/50" />
+                        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
+                            className="relative bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 40px)' }}>
+                            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-xl font-black text-slate-800">{activeTab === 'pending' ? 'Review Submission' : (editMode ? 'Edit Product' : 'New Marketplace Item')}</h2>
-                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Catalog Entry</p>
+                                    <h2 className="text-lg font-semibold text-slate-900">{activeTab === 'pending' ? 'Review Submission' : (editMode ? 'Edit Product' : 'New Marketplace Item')}</h2>
+                                    <p className="text-sm text-slate-500">Check the details and pricing before it goes live</p>
                                 </div>
-                                <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-800 transition-colors">✕</button>
+                                <button onClick={() => setShowModal(false)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                    <FiX className="w-5 h-5" />
+                                </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                                <div className="p-8 overflow-y-auto flex-1 custom-scrollbar space-y-6">
-                                    {/* Vendor Info Banner */}
+                            <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                                <div className="px-6 py-5 overflow-y-auto flex-1 space-y-6">
+                                    {/* Vendor */}
                                     {currentProduct?.vendorId && (
-                                        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-center justify-between">
+                                        <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
                                             <div>
-                                                <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest leading-none">Submitted By Vendor</p>
-                                                <p className="text-sm font-black text-slate-800 mt-2">{currentProduct.vendorId.businessName || currentProduct.vendorId.name}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-1">{currentProduct.vendorId.phoneNumber || currentProduct.vendorId.email}</p>
+                                                <p className="text-xs text-slate-500">Submitted by</p>
+                                                <p className="text-sm font-medium text-slate-900">
+                                                    {currentProduct.vendorId.name || 'Vendor'}
+                                                    {(currentProduct.vendorId.shopDetails?.shopName || currentProduct.vendorId.businessName) && <span className="font-normal text-slate-500"> · {currentProduct.vendorId.shopDetails?.shopName || currentProduct.vendorId.businessName}</span>}
+                                                </p>
                                             </div>
-                                            <span className="px-3 py-1 bg-teal-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider">Vendor Product</span>
+                                            <p className="text-sm text-slate-500">{currentProduct.vendorId.phone || currentProduct.vendorId.phoneNumber || currentProduct.vendorId.email}</p>
                                         </div>
                                     )}
 
-                                    {/* Image Upload */}
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Product Photos</label>
-                                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                                    {/* Photos */}
+                                    <div>
+                                        <p className={labelCls}>Product Photos</p>
+                                        <div className="flex gap-3 overflow-x-auto pb-1">
                                             {(formData.images || []).map((img, idx) => (
-                                                <div key={idx} className="relative w-24 h-24 flex-shrink-0 rounded-[28px] bg-slate-50 border border-slate-100 overflow-hidden group">
+                                                <div key={idx} className="relative w-20 h-20 flex-shrink-0 rounded-lg border border-slate-200 overflow-hidden group">
                                                     <img src={img} alt="" className="w-full h-full object-cover" />
-                                                    <button type="button" onClick={() => setFormData({...formData, images: formData.images.filter((_, i) => i !== idx)})}
-                                                        className="absolute inset-0 bg-rose-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <FiTrash2 className="text-white w-5 h-5" />
+                                                    <button type="button" onClick={() => setFormData({ ...formData, images: formData.images.filter((_, i) => i !== idx) })}
+                                                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" title="Remove photo">
+                                                        <FiTrash2 className="text-red-500 w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
                                             ))}
-                                            <div className="w-24 h-24 flex-shrink-0 rounded-[28px] bg-slate-50 border-2 border-dashed border-slate-200 relative flex flex-col items-center justify-center">
-                                                <FiImage className="w-6 h-6 text-slate-300" />
+                                            <label className="w-20 h-20 flex-shrink-0 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors">
                                                 {uploading ? (
-                                                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div></div>
+                                                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                                                 ) : (
-                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageUpload} accept="image/*" multiple />
+                                                    <>
+                                                        <FiImage className="w-5 h-5 text-slate-400" />
+                                                        <span className="text-[11px] text-slate-500">Add</span>
+                                                        <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" multiple />
+                                                    </>
                                                 )}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Product details */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-sm font-semibold text-slate-900">Product Details</h3>
+                                        <div>
+                                            <label className={labelCls}>Title <span className="text-red-500">*</span></label>
+                                            <input required className={inputCls} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className={labelCls}>Brand</label>
+                                                <input className={inputCls} value={formData.brandName} onChange={e => setFormData({ ...formData, brandName: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Unit <span className="text-red-500">*</span></label>
+                                                <input required className={inputCls} placeholder="bag, kg" value={formData.unit} onChange={e => setFormData({ ...formData, unit: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Stock</label>
+                                                <input type="number" min="0" className={inputCls} value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Description</label>
+                                            <textarea rows="3" className={`${inputCls} resize-none`} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+                                        </div>
+                                    </div>
+
+                                    {/* Pricing */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-sm font-semibold text-slate-900">Pricing</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className={labelCls}>Base Price (₹) <span className="text-red-500">*</span></label>
+                                                <input type="number" min="0" required className={inputCls} value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Admin Commission (%)</label>
+                                                <input type="number" min="0" className={inputCls} value={formData.commissionPercentage} onChange={e => setFormData({ ...formData, commissionPercentage: e.target.value })} />
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-1 md:col-span-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Title</label>
-                                            <input required className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand</label>
-                                            <input className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.brandName} onChange={e => setFormData({...formData, brandName: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1 text-sm font-bold">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Base Price</label>
-                                            <input type="number" min="0" required className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1 text-sm font-bold">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Discount Price</label>
-                                            <input type="number" min="0" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-emerald-600 outline-none" value={formData.discountPrice} onChange={e => setFormData({...formData, discountPrice: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock</label>
-                                            <input type="number" min="0" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit (e.g. bag, kg)</label>
-                                            <input className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GST Percentage (%)</label>
-                                            <input type="number" min="0" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.gstPercentage} onChange={e => setFormData({...formData, gstPercentage: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Admin Commission (%)</label>
-                                            <input type="number" min="0" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none" value={formData.commissionPercentage} onChange={e => setFormData({...formData, commissionPercentage: e.target.value})} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
-                                        <textarea rows="3" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-medium text-slate-700 outline-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                                    </div>
                                 </div>
-                                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-                                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-8 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-100 transition-all">Cancel</button>
-                                    <button type="submit" className="flex-[2] px-8 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-xl shadow-slate-200">{editMode ? 'Update Product' : 'Add to Marketplace'}</button>
+
+                                <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                                    <button type="button" onClick={() => setShowModal(false)}
+                                        className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" disabled={uploading}
+                                        className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                        {editMode ? 'Save Changes' : 'Add to Marketplace'}
+                                    </button>
                                 </div>
                             </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* Approval Modal */}
-            <AnimatePresence>
-                {showApprovalModal && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl flex flex-col gap-6">
-                            <div>
-                                <h3 className="text-xl font-black text-slate-800">Finalize Approval</h3>
-                                <p className="text-sm text-slate-500 font-bold mt-1">Set platform fees and taxes for this product</p>
-                            </div>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Admin Commission (%)</label>
-                                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-black text-slate-700 outline-none" value={approvalData.commissionPercentage} onChange={e => setApprovalData({...approvalData, commissionPercentage: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GST Percentage (%)</label>
-                                    <input type="number" className="w-full bg-slate-50 border-none rounded-2xl py-3 px-4 font-black text-slate-700 outline-none" value={approvalData.gstPercentage} onChange={e => setApprovalData({...approvalData, gstPercentage: e.target.value})} />
-                                </div>
-                            </div>
-                            <div className="flex gap-4">
-                                <button onClick={() => setShowApprovalModal(false)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-800 rounded-2xl font-black text-xs uppercase tracking-widest">Cancel</button>
-                                <button onClick={handleConfirmApprove} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100">Confirm & Live</button>
-                            </div>
                         </motion.div>
                     </div>
                 )}

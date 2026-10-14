@@ -66,8 +66,8 @@ const PaymentOverview = () => {
           search: debouncedSearch,
           status: filters.status,
           type: filters.type,
-          // Vendor wallet credits are internal bookkeeping, not money in/out of the platform
-          excludeTypes: 'earnings_credit,wallet_adjustment'
+          // Vendor wallet credits are internal bookkeeping; wallet debits and vendor withdrawals aren't shown here
+          excludeTypes: 'earnings_credit,wallet_adjustment,debit,withdrawal'
         })
       ]);
 
@@ -239,7 +239,6 @@ const PaymentOverview = () => {
           >
             <option value="all">All Types</option>
             <option value="credit">Credit (Platform)</option>
-            <option value="debit">Debit (Wallet)</option>
             <option value="payment">Online Payment</option>
             <option value="cash_collected">Cash Collected</option>
             <option value="refund">Refund</option>
@@ -320,8 +319,8 @@ const PaymentOverview = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`text-sm font-semibold ${['credit', 'payment', 'cash_collected'].includes(tx.type) ? 'text-green-600' : 'text-gray-800'}`}>
-                        {['credit', 'payment', 'cash_collected'].includes(tx.type) ? '+' : '-'}{formatCurrency(tx.amount)}
+                      <span className={`text-sm font-semibold ${['credit', 'payment', 'cash_collected', 'settlement'].includes(tx.type) ? 'text-green-600' : 'text-gray-800'}`}>
+                        {['credit', 'payment', 'cash_collected', 'settlement'].includes(tx.type) ? '+' : '-'}{formatCurrency(tx.amount)}
                       </span>
                     </td>
                     <td className="py-3 px-4">
