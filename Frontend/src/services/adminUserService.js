@@ -21,16 +21,6 @@ export const adminUserService = {
     }
   },
 
-  // Get all user bookings
-  getAllUserBookings: async (params) => {
-    try {
-      const response = await api.get('/admin/users/bookings', { params });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Failed to fetch user bookings' };
-    }
-  },
-
   // Get user details
   getUserDetails: async (id) => {
     try {
@@ -92,22 +82,4 @@ export const adminUserService = {
   },
 
   // Get all users with KYC documents submitted (Equipment Owners)
-  getUsersWithKyc: async (params) => {
-    try {
-      const response = await api.get('/admin/users', { params: { ...params, hasKyc: true } });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Failed to fetch KYC users' };
-    }
-  },
-
-  // Update KYC status - approve or reject
-  updateKycStatus: async (userId, status) => {
-    try {
-      const response = await api.put(`/admin/users/${userId}/kyc-status`, { status });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Failed to update KYC status' };
-    }
-  }
 };

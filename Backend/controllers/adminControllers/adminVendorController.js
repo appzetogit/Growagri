@@ -365,90 +365,6 @@ const getVendorEarnings = async (req, res) => {
 };
 
 /**
- * Get all vendor bookings (global)
- */
-const getAllVendorBookings = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 20, search } = req.query;
-
-    const query = { vendorId: { $exists: true, $ne: null } };
-    if (status) {
-      query.status = status;
-    }
-
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // If search is provided, we need to find vendors by business name or name first
-    if (search) {
-      const vendors = await Vendor.find({
-        $or: [
-          { businessName: { $regex: search, $options: 'i' } },
-          { name: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
-        ]
-      }).select('_id');
-
-      const vendorIds = vendors.map(v => v._id);
-      query.vendorId = { $in: vendorIds };
-    }
-
-    const bookings = await Booking.find(query)
-      .populate('vendorId', 'name businessName phone profileImage')
-      .populate('userId', 'name phone')
-      .populate('serviceId', 'title iconUrl')
-      .populate('workerId', 'name phone')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Booking.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: bookings,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Get all vendor bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch all vendor bookings.'
-    });
-  }
-};
-
-/**
- * Get vendor payments summary
- */
-const getVendorPaymentsSummary = async (req, res) => {
-  try {
-    // Return vendors with their wallet balances and earnings
-    const vendors = await Vendor.find({
-      'wallet.balance': { $exists: true }
-    })
-      .select('name businessName phone wallet email approvalStatus')
-      .sort({ 'wallet.balance': -1 });
-
-    res.status(200).json({
-      success: true,
-      data: vendors
-    });
-  } catch (error) {
-    console.error('Get vendor payments summary error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch vendor payments summary.'
-    });
-  }
-};
-
-/**
  * Toggle vendor active status (approve/disable login)
  */
 const toggleVendorStatus = async (req, res) => {
@@ -560,8 +476,6 @@ module.exports = {
   suspendVendor,
   getVendorBookings,
   getVendorEarnings,
-  getAllVendorBookings,
-  getVendorPaymentsSummary,
   toggleVendorStatus,
   updateVendorServices,
   deleteVendor,

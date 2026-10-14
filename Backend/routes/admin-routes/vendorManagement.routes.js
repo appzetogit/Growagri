@@ -11,8 +11,6 @@ const {
   suspendVendor,
   getVendorBookings,
   getVendorEarnings,
-  getAllVendorBookings,
-  getVendorPaymentsSummary,
   toggleVendorStatus,
   deleteVendor,
   updateVendorServices,
@@ -35,8 +33,6 @@ router.post('/vendors/:id/shop', authenticate, isAdmin, addVendorShop);
 router.get('/vendors/approved-shops', authenticate, isAdmin, getApprovedShops);
 router.get('/vendors', authenticate, isAdmin, getAllVendors);
 router.post('/vendors', authenticate, isAdmin, addVendor);
-router.get('/vendors/bookings', authenticate, isAdmin, getAllVendorBookings);
-router.get('/vendors/payments', authenticate, isAdmin, getVendorPaymentsSummary);
 router.get('/vendors/:id', authenticate, isAdmin, getVendorDetails);
 router.post('/vendors/:id/approve', authenticate, isAdmin, approveVendor);
 router.post('/vendors/:id/reject', authenticate, isAdmin, rejectVendorValidation, rejectVendor);

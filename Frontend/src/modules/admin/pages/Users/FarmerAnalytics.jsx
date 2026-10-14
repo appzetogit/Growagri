@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import {
-  FiPieChart,
-  FiTrendingUp,
-  FiUsers,
-  FiShoppingBag,
-  FiDollarSign,
-  FiActivity,
-  FiLoader
-} from 'react-icons/fi';
+import { FiPieChart, FiTrendingUp, FiLoader } from 'react-icons/fi';
 import {
   AreaChart,
   Area,
@@ -67,58 +58,10 @@ const FarmerAnalytics = () => {
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <FiUsers className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Farmers</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.totalUsers}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg text-green-600">
-              <FiShoppingBag className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Bookings</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.totalBookings}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600">
-              <FiTrendingUp className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Growth</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.growth ?? '0%'}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-              <FiActivity className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Retention</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.retentionRate ?? '0%'}</h3>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Verification Status Distribution */}
         <CardShell icon={FiPieChart} title="Farmer Verification" className="p-3">
-          <div className="h-[220px]">
+          <div className="h-[170px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -127,8 +70,8 @@ const FarmerAnalytics = () => {
                   nameKey="_id"
                   cx="50%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
+                  innerRadius={38}
+                  outerRadius={58}
                 >
                   {data.verificationStatus.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -143,14 +86,14 @@ const FarmerAnalytics = () => {
 
         {/* Top Users by Spending */}
         <CardShell icon={FiTrendingUp} title="Top Farmers" className="p-3">
-          <div className="h-[220px]">
+          <div className="h-[170px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.topUsers} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} />
                 <Tooltip />
-                <Bar dataKey="bookingCount" fill="#3B82F6" radius={[0, 4, 4, 0]} barSize={16} />
+                <Bar dataKey="bookingCount" fill="#3B82F6" radius={[0, 4, 4, 0]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -159,7 +102,7 @@ const FarmerAnalytics = () => {
 
       {/* Monthly User Registration Trend */}
       <CardShell icon={FiTrendingUp} title="Farmer Registration Trend" className="p-3">
-        <div className="h-[250px]">
+        <div className="h-[180px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.monthlyTrend}>
               <defs>

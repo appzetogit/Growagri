@@ -1,5 +1,6 @@
 const Booking = require('../../models/Booking');
 const Vendor = require('../../models/Vendor');
+const VendorEquipment = require('../../models/VendorEquipment');
 const Worker = require('../../models/Worker');
 const User = require('../../models/User');
 const Service = require('../../models/Service');
@@ -117,6 +118,62 @@ exports.getVendorReport = async (req, res) => {
       }
     ]);
 
+    // Owner Analytics ranking: who gets the most bookings, and which equipment is booked most
+    const liveBookings = {
+      vendorId: { $ne: null },
+      status: { $nin: [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.REJECTED] }
+    };
+    const isCompleted = { $eq: ['$status', BOOKING_STATUS.COMPLETED] };
+
+    const vendorRanking = await Booking.aggregate([
+      { $match: liveBookings },
+      {
+        $group: {
+          _id: '$vendorId',
+          bookingCount: { $sum: 1 },
+          completedCount: { $sum: { $cond: [isCompleted, 1, 0] } },
+          totalRevenue: { $sum: { $cond: [isCompleted, '$finalAmount', 0] } }
+        }
+      },
+      { $sort: { bookingCount: -1, totalRevenue: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: Vendor.collection.name, localField: '_id', foreignField: '_id', as: 'vendor' } },
+      { $unwind: '$vendor' },
+      {
+        $project: {
+          businessName: '$vendor.businessName',
+          name: '$vendor.name',
+          bookingCount: 1,
+          completedCount: 1,
+          totalRevenue: 1
+        }
+      }
+    ]);
+
+    const topEquipment = await Booking.aggregate([
+      { $match: { ...liveBookings, equipmentId: { $ne: null } } },
+      {
+        $group: {
+          _id: '$equipmentId',
+          vendorId: { $first: '$vendorId' },
+          serviceName: { $first: '$serviceName' },
+          bookingCount: { $sum: 1 }
+        }
+      },
+      { $sort: { bookingCount: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: VendorEquipment.collection.name, localField: '_id', foreignField: '_id', as: 'equipment' } },
+      { $lookup: { from: Vendor.collection.name, localField: 'vendorId', foreignField: '_id', as: 'vendor' } },
+      {
+        $project: {
+          name: { $ifNull: [{ $arrayElemAt: ['$equipment.name', 0] }, '$serviceName'] },
+          serviceName: 1,
+          ownerName: { $ifNull: [{ $arrayElemAt: ['$vendor.businessName', 0] }, { $arrayElemAt: ['$vendor.name', 0] }] },
+          bookingCount: 1
+        }
+      }
+    ]);
+
     // Vendor status distribution
     const statusDistribution = await Vendor.aggregate([
       { $group: { _id: '$approvalStatus', count: { $sum: 1 } } }
@@ -160,6 +217,8 @@ exports.getVendorReport = async (req, res) => {
         totalVendors,
         totalBookings,
         topVendors,
+        vendorRanking,
+        topEquipment,
         statusDistribution,
         categoryDistribution,
         monthlyTrend,

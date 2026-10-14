@@ -30,6 +30,8 @@ import dashboardService from "../../services/dashboardService";
 const iconMap = {
   Dashboard: FiHome,
   Farmers: FiUsers,
+  "Farmer Analytics": FiActivity,
+  "Owner Analytics": FiAward,
   "Equipment Owners": FiBriefcase,
   Workers: FiUser,
   Bookings: FiShoppingBag,
@@ -54,19 +56,6 @@ const iconMap = {
 // Helper function to convert child name to route path
 const getChildRoute = (parentRoute, childName) => {
   const routeMap = {
-    "/admin/users": {
-      "All Farmers": "/admin/users/all",
-      "Farmer Bookings": "/admin/users/bookings",
-      "Farmer Analytics": "/admin/users/analytics",
-      "Farmer Transactions": "/admin/users/transactions",
-      "KYC Verification": "/admin/users/kyc",
-    },
-    "/admin/vendors": {
-      "All Owners": "/admin/vendors/all",
-      "Owner Bookings": "/admin/vendors/bookings",
-      "Owner Analytics": "/admin/vendors/analytics",
-      "Owner Payments": "/admin/vendors/payments",
-    },
 
     "/admin/equipment-catalog": {
       "Home": "/admin/equipment-catalog/home",
@@ -208,7 +197,8 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     });
 
     // 2. Fall back to prefix matching if no explicit child route matched
-    if (!activeItem) {
+    //    (skip when the path is itself a top-level item, e.g. /admin/vendors/analytics)
+    if (!activeItem && !filteredMenu.some((item) => item.route === location.pathname)) {
       activeItem = filteredMenu.find((item) => {
         if (item.route === "/admin/dashboard") {
           return location.pathname === "/admin/dashboard";

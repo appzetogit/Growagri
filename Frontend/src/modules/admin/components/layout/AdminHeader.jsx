@@ -47,15 +47,11 @@ const AdminHeader = ({ onMenuClick }) => {
   const getPageInfo = (pathname) => {
     const mappings = [
       { path: '/admin/dashboard', title: 'Dashboard', description: "Welcome back! Here's your business overview." },
-      { path: '/admin/users/all', title: 'All Farmers', description: 'Manage registered farmers and their activity' },
-      { path: '/admin/users/bookings', title: 'Farmer Bookings', description: 'Track farmer booking history' },
+      { path: '/admin/users/all', title: 'Farmers', description: 'Manage registered farmers and their activity' },
       { path: '/admin/users/analytics', title: 'Farmer Analytics', description: 'Analyze farmer behavior and growth' },
-      { path: '/admin/users/transactions', title: 'Farmer Transactions', description: 'Monitor farmer financial transactions' },
       { path: '/admin/users', title: 'Farmers', description: 'Manage registered farmers and their activity' },
-      { path: '/admin/vendors/all', title: 'All Equipment Owners', description: 'Manage equipment owners and their activity' },
-      { path: '/admin/vendors/analytics', title: 'Owner Analytics', description: 'Analyze equipment owner performance' },
-      { path: '/admin/vendors/bookings', title: 'Owner Bookings', description: 'Track equipment owner booking history' },
-      { path: '/admin/vendors/payments', title: 'Owner Payments', description: 'Manage equipment owner earnings and payouts' },
+      { path: '/admin/vendors/all', title: 'Equipment Owners', description: 'Manage equipment owners and their activity' },
+      { path: '/admin/vendors/analytics', title: 'Owner Analytics', description: 'Top owners and most booked equipment' },
       { path: '/admin/vendors', title: 'Equipment Owners', description: 'Manage equipment owner registrations and performance' },
       { path: '/admin/bookings', title: 'Bookings', description: 'Track and manage agriculture equipment bookings' },
       { path: '/admin/bookings/notifications', title: 'Order Notifications', description: 'Track booking alerts and updates' },

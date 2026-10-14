@@ -74,26 +74,10 @@ const adminVendorService = {
   },
 
   /**
-   * Get all vendor bookings (across all vendors)
-   */
-  getAllBookings: async (params = {}) => {
-    const response = await api.get('/admin/vendors/bookings', { params });
-    return response.data;
-  },
-
-  /**
    * Get vendor earnings and analytics
    */
   getVendorEarnings: async (id, params = {}) => {
     const response = await api.get(`/admin/vendors/${id}/earnings`, { params });
-    return response.data;
-  },
-
-  /**
-   * Get vendor payments summary
-   */
-  getVendorPayments: async (params = {}) => {
-    const response = await api.get('/admin/vendors/payments', { params });
     return response.data;
   },
 

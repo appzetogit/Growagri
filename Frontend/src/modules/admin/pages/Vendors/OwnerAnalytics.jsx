@@ -1,55 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import {
-  FiPieChart,
-  FiTrendingUp,
-  FiUsers,
-  FiBriefcase,
-  FiDollarSign,
-  FiActivity,
-  FiLoader
-} from 'react-icons/fi';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
-} from 'recharts';
+import { FiAward, FiPackage, FiBarChart2, FiDollarSign, FiLoader } from 'react-icons/fi';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast } from 'react-hot-toast';
 import CardShell from '../UserCategories/components/CardShell';
 import adminReportService from '../../../../services/adminReportService';
+
+const BAR_COLOR = '#3B82F6';
+const RANK_STYLES = ['bg-amber-100 text-amber-700', 'bg-gray-200 text-gray-700', 'bg-orange-100 text-orange-700'];
+const rupees = (n) => `₹${(n || 0).toLocaleString('en-IN')}`;
+const shorten = (s) => (s && s.length > 16 ? `${s.slice(0, 15)}…` : s);
+
+const Empty = () => <p className="py-8 text-center text-xs text-gray-500">No bookings yet</p>;
+
+// Horizontal single-series bar chart; height grows with the number of rows
+const RankChart = ({ data, dataKey, nameKey, format = (v) => v, tooltipLabel }) => {
+  if (!data.length) return <Empty />;
+  return (
+    <div style={{ height: Math.max(140, data.length * 36) }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+          <XAxis type="number" allowDecimals={false} tickFormatter={format} tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+          <YAxis dataKey={nameKey} type="category" width={110} tickFormatter={shorten} tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+          <Tooltip
+            cursor={{ fill: '#F1F5F9' }}
+            formatter={(v) => [format(v), tooltipLabel]}
+            labelFormatter={(label, payload) => payload?.[0]?.payload?.tooltipTitle || label}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+          />
+          <Bar dataKey={dataKey} fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={14} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 const OwnerAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await adminReportService.getVendorReport();
+        if (res.success) setData(res.data);
+      } catch (error) {
+        console.error('Owner analytics error:', error);
+        toast.error('Failed to load owner analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchData();
   }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const res = await adminReportService.getVendorReport();
-      if (res.success) {
-        setData(res.data);
-      }
-    } catch (error) {
-      console.error('Owner analytics error:', error);
-      toast.error('Failed to load owner analytics');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -61,131 +64,68 @@ const OwnerAnalytics = () => {
 
   if (!data) return null;
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+  const owners = (data.vendorRanking || []).map(o => ({
+    ...o,
+    label: o.businessName || o.name || 'Unknown owner',
+    tooltipTitle: o.businessName || o.name || 'Unknown owner'
+  }));
+  const earners = [...owners].sort((a, b) => b.totalRevenue - a.totalRevenue);
+  const equipment = (data.topEquipment || []).map(e => ({
+    ...e,
+    label: e.name || e.serviceName || 'Equipment',
+    tooltipTitle: `${e.name || e.serviceName || 'Equipment'} (${e.ownerName || 'Unknown owner'})`
+  }));
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <FiUsers className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Equipment Owners</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.totalVendors}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg text-green-600">
-              <FiBriefcase className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Bookings</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.totalBookings}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600">
-              <FiTrendingUp className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Growth</p>
-              <h3 className="text-lg font-bold text-gray-900">{data.growth || '0%'}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-              <FiActivity className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Active Rate</p>
-              <h3 className="text-lg font-bold text-gray-900">
-                {data.totalVendors > 0 
-                  ? Math.round(((data.statusDistribution.find(s => s._id === 'approved')?.count || 0) / data.totalVendors) * 100) 
-                  : 0}%
-              </h3>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CardShell icon={FiBarChart2} title="Bookings by Owner" subtitle="Who gets the most orders">
+          <RankChart data={owners} dataKey="bookingCount" nameKey="label" tooltipLabel="Bookings" />
+        </CardShell>
+
+        <CardShell icon={FiPackage} title="Most Booked Equipment" subtitle="Which owner's equipment is in demand">
+          <RankChart data={equipment} dataKey="bookingCount" nameKey="label" tooltipLabel="Bookings" />
+        </CardShell>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Status Distribution */}
-        <CardShell icon={FiPieChart} title="Status Distribution" className="p-3">
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data.statusDistribution}
-                  dataKey="count"
-                  nameKey="_id"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                >
-                  {data.statusDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        <CardShell icon={FiDollarSign} title="Earnings by Owner" subtitle="From completed bookings">
+          <RankChart data={earners} dataKey="totalRevenue" nameKey="label" format={rupees} tooltipLabel="Earned" />
         </CardShell>
 
-        {/* Top Owners */}
-        <CardShell icon={FiTrendingUp} title="Top Performers" className="p-3">
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.topVendors} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="businessName" type="category" width={70} tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="bookingCount" fill="#3B82F6" radius={[0, 4, 4, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <CardShell icon={FiAward} title="Owner Leaderboard" subtitle="Ranked by number of bookings">
+          {owners.length === 0 ? <Empty /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="py-2 pr-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">#</th>
+                    <th className="py-2 pr-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Owner</th>
+                    <th className="py-2 pr-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Bookings</th>
+                    <th className="py-2 pr-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Completed</th>
+                    <th className="py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Earned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {owners.map((o, i) => (
+                    <tr key={o._id}>
+                      <td className="py-2 pr-2">
+                        <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-[11px] font-bold ${RANK_STYLES[i] || 'bg-blue-50 text-blue-600'}`}>
+                          {i + 1}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-2 text-xs font-semibold text-gray-900">{o.label}</td>
+                      <td className="py-2 pr-2 text-xs font-bold text-gray-900 text-right">{o.bookingCount}</td>
+                      <td className="py-2 pr-2 text-xs text-gray-600 text-right">{o.completedCount}</td>
+                      <td className="py-2 text-xs text-gray-600 text-right">{rupees(o.totalRevenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardShell>
       </div>
-
-      {/* Monthly Registration Trend */}
-      <CardShell icon={FiTrendingUp} title="Registration Trend" className="p-3">
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.monthlyTrend}>
-              <defs>
-                <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-              <XAxis dataKey="_id" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="count"
-                stroke="#3B82F6"
-                fillOpacity={1}
-                fill="url(#colorTrend)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </CardShell>
     </div>
   );
 };

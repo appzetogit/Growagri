@@ -9,33 +9,49 @@
     "children": []
   },
   {
-    "title": "Farmers",
-    "route": "/admin/users",
+    "title": "Farmer Analytics",
+    "route": "/admin/users/analytics",
     "allowedRoles": [
       "super_admin",
       "admin"
     ],
-    "children": [
-      "All Farmers",
-      "Farmer Bookings",
-      "Farmer Analytics",
-      "Farmer Transactions",
-      "KYC Verification"
-    ]
+    "children": []
+  },
+  {
+    "title": "Owner Analytics",
+    "route": "/admin/vendors/analytics",
+    "allowedRoles": [
+      "super_admin",
+      "admin"
+    ],
+    "children": []
+  },
+  {
+    "title": "Farmers",
+    "route": "/admin/users/all",
+    "allowedRoles": [
+      "super_admin",
+      "admin"
+    ],
+    "children": []
   },
   {
     "title": "Equipment Owners",
-    "route": "/admin/vendors",
+    "route": "/admin/vendors/all",
     "allowedRoles": [
       "super_admin",
       "admin"
     ],
-    "children": [
-      "All Owners",
-      "Owner Bookings",
-      "Owner Analytics",
-      "Owner Payments"
-    ]
+    "children": []
+  },
+  {
+    "title": "Machinery Management",
+    "route": "/admin/products",
+    "allowedRoles": [
+      "super_admin",
+      "admin"
+    ],
+    "children": []
   },
   {
     "title": "Workers",
@@ -137,15 +153,6 @@
       "Store Approvals",
       "Registered Shops"
     ]
-  },
-  {
-    "title": "Machinery Management",
-    "route": "/admin/products",
-    "allowedRoles": [
-      "super_admin",
-      "admin"
-    ],
-    "children": []
   },
   {
     "title": "Soil Testing",

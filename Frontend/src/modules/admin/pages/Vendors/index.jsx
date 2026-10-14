@@ -3,27 +3,20 @@ import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   FiUsers,
-  FiBriefcase,
   FiActivity,
-  FiDollarSign,
   FiChevronRight
 } from 'react-icons/fi';
 
 // Import sub-components
-// Import sub-components
 import AllOwners from './AllOwners';
-import OwnerBookings from './OwnerBookings';
 import OwnerAnalytics from './OwnerAnalytics';
-import OwnerPayments from './OwnerPayments';
 
 const Vendors = () => {
   const location = useLocation();
 
   const navTabs = [
     { name: 'All Owners', path: '/admin/vendors/all', icon: FiUsers },
-    { name: 'Owner Bookings', path: '/admin/vendors/bookings', icon: FiBriefcase },
     { name: 'Owner Analytics', path: '/admin/vendors/analytics', icon: FiActivity },
-    { name: 'Owner Payments', path: '/admin/vendors/payments', icon: FiDollarSign },
   ];
 
   const getPageTitle = () => {
@@ -43,9 +36,9 @@ const Vendors = () => {
         <Routes>
           <Route path="/" element={<Navigate to="all" replace />} />
           <Route path="all" element={<AllOwners />} />
-          <Route path="bookings" element={<OwnerBookings />} />
+          <Route path="bookings" element={<Navigate to="/admin/vendors/all" replace />} />
           <Route path="analytics" element={<OwnerAnalytics />} />
-          <Route path="payments" element={<OwnerPayments />} />
+          <Route path="payments" element={<Navigate to="/admin/vendors/all" replace />} />
         </Routes>
       </motion.div>
     </div>

@@ -369,94 +369,6 @@ const getUserWalletTransactions = async (req, res) => {
 };
 
 /**
- * Get all user bookings with filters and pagination
- */
-const getAllUserBookings = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 20, search } = req.query;
-
-    const query = {};
-
-    if (status) {
-      query.status = status;
-    }
-
-    // Search by user name or phone
-    if (search) {
-      const users = await User.find({
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
-        ]
-      }).select('_id');
-
-      const userIds = users.map(u => u._id);
-      query.userId = { $in: userIds };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const bookings = await Booking.find(query)
-      .populate('userId', 'name phone email')
-      .populate('workerId', 'name phone')
-      .populate('serviceId', 'title')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Booking.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: bookings,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Get all user bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch user bookings'
-    });
-  }
-};
-
-/**
- * Update User KYC Status (for Equipment Owners)
- */
-const updateKycStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!['pending', 'verified', 'rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    user.kyc_status = status;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: `KYC status updated to ${status}`,
-      data: user
-    });
-  } catch (error) {
-    console.error('Update KYC status error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update KYC status' });
-  }
-};
-
-/**
  * Add a new user directly (Admin)
  */
 const addUser = async (req, res) => {
@@ -510,7 +422,5 @@ module.exports = {
   bulkDeleteUsers,
   getUserBookings,
   getUserWalletTransactions,
-  getAllUserBookings,
-  updateKycStatus,
   addUser
 };

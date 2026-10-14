@@ -19,7 +19,6 @@ const BookingTracking = lazy(() => import('../pages/Bookings/Tracking'));
 const BookingNotifications = lazy(() => import('../pages/Bookings/BookingNotifications'));
 const BookingKmPhotos = lazy(() => import('../pages/Bookings/BookingKmPhotos'));
 const BookingDetailsPage = lazy(() => import('../pages/Bookings/BookingDetailsPage'));
-const KycVerification = lazy(() => import('../pages/Users/KycVerification'));
 const Payments = lazy(() => import('../pages/Payments'));
 const Reports = lazy(() => import('../pages/Reports'));
 const Notifications = lazy(() => import('../pages/Notifications'));
@@ -76,7 +75,7 @@ const AdminRoutes = () => {
           <Route path="bookings/:id" element={<BookingDetailsPage />} />
           <Route path="bookings/tracking" element={<Navigate to="/admin/bookings" replace />} />
           <Route path="bookings/km-photos" element={<Navigate to="/admin/bookings" replace />} />
-          <Route path="users/kyc" element={<KycVerification />} />
+          <Route path="users/kyc" element={<Navigate to="/admin/users/all" replace />} />
           <Route path="equipment-catalog/*" element={<UserCategories />} />
           <Route path="equipment-approvals/*" element={<Navigate to="/admin/products?tab=pending" replace />} />
           <Route path="payments/*" element={<Payments />} />

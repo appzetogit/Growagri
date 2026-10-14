@@ -57,7 +57,7 @@ const NotificationWindow = ({
     } else if (type.includes('payment')) {
       navigate('/admin/payments');
     } else if (type.includes('kyc') || type.includes('verification')) {
-      navigate('/admin/users/kyc');
+      navigate('/admin/vendors/all'); // owner KYC is reviewed on the owners page
     } else if (type.includes('withdraw') || type.includes('settlement')) {
       navigate('/admin/settlements');
     } else if (type.includes('store') || type.includes('shop')) {

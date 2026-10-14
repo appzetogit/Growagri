@@ -11,8 +11,6 @@ const {
   bulkDeleteUsers,
   getUserBookings,
   getUserWalletTransactions,
-  getAllUserBookings,
-  updateKycStatus,
   addUser
 } = require('../../controllers/adminControllers/adminUserController');
 
@@ -23,14 +21,12 @@ const toggleStatusValidation = [
 
 // Routes
 router.get('/users', authenticate, isAdmin, getAllUsers);
-router.get('/users/bookings', authenticate, isAdmin, getAllUserBookings);
 router.get('/users/:id', authenticate, isAdmin, getUserDetails);
 router.put('/users/:id/status', authenticate, isAdmin, toggleStatusValidation, toggleUserStatus);
 router.post('/users/bulk-delete', authenticate, isAdmin, bulkDeleteUsers);
 router.delete('/users/:id', authenticate, isAdmin, deleteUser);
 router.get('/users/:id/bookings', authenticate, isAdmin, getUserBookings);
 router.get('/users/:id/wallet', authenticate, isAdmin, getUserWalletTransactions);
-router.put('/users/:id/kyc-status', authenticate, isAdmin, updateKycStatus);
 router.post('/users', authenticate, isAdmin, addUser);
 
 module.exports = router;
