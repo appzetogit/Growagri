@@ -58,22 +58,24 @@ const HINGLISH_MARKERS = [
  * Detect language from user text
  */
 function detectLanguage(text, preferredLang = null) {
-  if (preferredLang && preferredLang !== 'auto' && preferredLang !== 'Auto') {
-    return preferredLang;
-  }
-  if (!text || typeof text !== 'string') return 'Hindi';
+  // Only accept known languages: this value ends up inside the LLM prompt
+  const preferred = Object.hasOwn(GREETINGS, preferredLang || '') ? preferredLang : null;
+  if (!text || typeof text !== 'string') return preferred || 'Hindi';
 
-  // Check script regexes
+  // The script the user actually typed in wins over the UI language,
+  // unless both share a script (Hindi/Marathi, Bengali/Assamese) where the UI choice is more reliable
   for (const rule of SCRIPT_DETECTION_RULES) {
-    if (rule.regex && rule.regex.test(text)) {
-      return rule.lang;
-    }
-    if (rule.test && rule.test(text)) {
+    if ((rule.regex && rule.regex.test(text)) || (rule.test && rule.test(text))) {
+      if (preferred && SHARED_SCRIPT[preferred] && SHARED_SCRIPT[preferred] === SHARED_SCRIPT[rule.lang]) {
+        return preferred;
+      }
       return rule.lang;
     }
   }
 
-  // Check Hinglish vs English
+  // Latin text: keep the UI language, except English UI + Hinglish typing
+  if (preferred && preferred !== 'English') return preferred;
+
   const lower = text.toLowerCase();
   const words = lower.split(/\s+/);
   const hinglishMatchCount = words.filter(w => HINGLISH_MARKERS.includes(w)).length;
@@ -83,6 +85,8 @@ function detectLanguage(text, preferredLang = null) {
 
   return 'English';
 }
+
+const SHARED_SCRIPT = { Hindi: 'devanagari', Marathi: 'devanagari', Bengali: 'bengali', Assamese: 'bengali' };
 
 /**
  * Cultural Greetings & Honorifics for All 14 Languages
@@ -139,8 +143,8 @@ function generateFallbackResponse(userMessage, preferredLanguage = 'Hindi') {
   }
 
   // 2. GrooAgri Soil Testing Intent
-  if (/(soil|test|mitti|jaanch|parikshan|card|ମାଟି|মাটি|ਮਿੱਟੀ|నేల|மண்|ಮಣ್ಣು|മണ്ണ്|જમીન|مٹی)/i.test(msgLower) &&
-      /(test|sample|jaanch|book|parikshan|report|card|ପରୀକ୍ଷା|পরীক্ষা|ਪਰਖ|పరీక్ష|பரிசோதனை|ಪರೀಕ್ಷೆ|പരിശോധന|ચકાસણી|معائنہ)/i.test(msgLower)) {
+  if (/(soil|mitti|mati\b|mrida|मिट्टी|मृदा|माती|ମାଟି|মাটি|ਮਿੱਟੀ|నేల|மண்|ಮಣ್ಣು|മണ്ണ്|જમીન|مٹی)/i.test(msgLower) &&
+      /(test|sample|jaanch|janch|book|parikshan|report|card|जांच|जाँच|परीक्षण|ପରୀକ୍ଷା|পরীক্ষা|ਪਰਖ|పరీక్ష|பரிசோதனை|ಪರೀಕ್ಷೆ|പരിശോധന|ચકાસણી|معائنہ)/i.test(msgLower)) {
     return handleSoilTestingIntent(lang, greeting, signOff);
   }
 
@@ -197,7 +201,7 @@ function generateFallbackResponse(userMessage, preferredLanguage = 'Hindi') {
   }
 
   // 13. Smart Farming, Drones, IoT & Modern AgriTech
-  if (/(drone|iot|sensor|smart farm|ai|precision|satellite|polyhouse|hydroponic|automation|स्मार्ट|ड्रोन|સેન્સર|డ్రోన్|ட்ரோன்|ಡ್ರೋನ್|ڈرون)/i.test(msgLower)) {
+  if (/(drone|\biot\b|sensor|smart farm|\bai\b|precision|satellite|polyhouse|hydroponic|automation|स्मार्ट|ड्रोन|સેન્સર|డ్రోన్|ட்ரோன்|ಡ್ರೋನ್|ڈرون)/i.test(msgLower)) {
     return handleSmartAgriTechIntent(lang, greeting, signOff);
   }
 

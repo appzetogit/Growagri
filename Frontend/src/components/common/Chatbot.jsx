@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BsRobot } from 'react-icons/bs';
@@ -20,6 +20,9 @@ import { useLanguage } from '../../context/LanguageContext';
 import { getVoiceLocale } from '../../utils/languageUtils';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SpeechRecognitionAPI = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+const MAX_MESSAGE_CHARS = 1000; // matches backend cap
+const timeNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 /**
  * Localized Initial Greetings & Quick Prompts
@@ -320,7 +323,7 @@ const FormattedMessage = ({ text, onNavigate }) => {
  */
 const renderInlineMarkdown = (line, onNavigate) => {
   // Regex to match [Label](url) and **bold**
-  const regex = /(\[[^\]]+\]\([^\)]+\)|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  const regex = /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*)/g;
   const parts = line.split(regex);
 
   return parts.map((part, idx) => {
@@ -330,7 +333,6 @@ const renderInlineMarkdown = (line, onNavigate) => {
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (linkMatch) {
       const [, label, url] = linkMatch;
-      const isInternal = url.startsWith('/') || url.startsWith('#');
 
       return (
         <button
@@ -368,14 +370,10 @@ const renderInlineMarkdown = (line, onNavigate) => {
 };
 
 const Chatbot = () => {
-  const location = useLocation();
+  // Mounted only on home pages by AppRoutes
   const navigate = useNavigate();
-  const { language: appLanguage, changeLanguage: setAppLanguage } = useLanguage();
+  const { language: appLanguage, changeLanguage: setAppLanguage, t } = useLanguage();
 
-  const isHomePage = ['/', '/user', '/user/', '/home', '/user/home'].includes(location.pathname);
-  if (!isHomePage) return null;
-
-  const isAuthPage = location.pathname.includes('/login') || location.pathname.includes('/signup');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState(appLanguage || 'Hindi');
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
@@ -399,7 +397,7 @@ const Chatbot = () => {
     {
       text: activeContent.greeting,
       sender: 'bot',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: timeNow()
     }
   ]);
 
@@ -410,7 +408,7 @@ const Chatbot = () => {
         {
           text: activeContent.greeting,
           sender: 'bot',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          timestamp: timeNow()
         }
       ]);
     }
@@ -421,11 +419,15 @@ const Chatbot = () => {
   const [isListening, setIsListening] = useState(false);
   const [lastUsedVoice, setLastUsedVoice] = useState(false);
   const messagesEndRef = useRef(null);
+  const abortRef = useRef(null);
+  const recognitionRef = useRef(null);
 
-  // Cleanup speech synthesis on unmount
+  // Cleanup speech, mic and in-flight request on unmount
   useEffect(() => {
     return () => {
       if (window.speechSynthesis) window.speechSynthesis.cancel();
+      recognitionRef.current?.abort();
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -436,7 +438,7 @@ const Chatbot = () => {
     if (setAppLanguage && langKey !== 'Hinglish') {
       try {
         setAppLanguage(langKey);
-      } catch (e) {
+      } catch {
         // Silently continue if language not in global list
       }
     }
@@ -478,17 +480,14 @@ const Chatbot = () => {
 
   // Speech-To-Text
   const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("माफ़ करें, आपका ब्राउज़र वॉइस इनपुट सपोर्ट नहीं करता है। (Voice recognition is not supported in this browser).");
-      return;
-    }
-
+    // Second tap stops listening
     if (isListening) {
+      recognitionRef.current?.stop();
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionAPI();
+    recognitionRef.current = recognition;
     recognition.lang = getVoiceLocale(selectedLanguage);
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -538,7 +537,7 @@ const Chatbot = () => {
   // Copy message to clipboard
   const handleCopyMessage = (text, idx) => {
     const cleanText = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-    navigator.clipboard.writeText(cleanText);
+    navigator.clipboard?.writeText(cleanText).catch(() => {});
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 2000);
   };
@@ -546,36 +545,36 @@ const Chatbot = () => {
   // Reset / Clear Chat
   const handleResetChat = () => {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    abortRef.current?.abort(); // drop a reply still on its way to the old conversation
+    setIsLoading(false);
     setCurrentlySpeakingIdx(null);
-    setMessages([
-      {
-        text: activeContent.greeting,
-        sender: 'bot',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
+    setMessages([{ text: activeContent.greeting, sender: 'bot', timestamp: timeNow() }]);
   };
 
   // Send message
   const handleSend = async (customMessage = null) => {
     const messageToSend = typeof customMessage === 'string' ? customMessage : input;
-    if (!messageToSend || !messageToSend.trim()) return;
+    if (isLoading || !messageToSend || !messageToSend.trim()) return;
 
-    const userMessage = messageToSend.trim();
+    const userMessage = messageToSend.trim().slice(0, MAX_MESSAGE_CHARS);
     setInput('');
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // Append user message
     const updatedMessages = [
       ...messages,
-      { text: userMessage, sender: 'user', timestamp: timeStr }
+      { text: userMessage, sender: 'user', timestamp: timeNow() }
     ];
     setMessages(updatedMessages);
     setIsLoading(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const pushError = (text) => setMessages(prev => [...prev, { text, sender: 'bot', isError: true, timestamp: timeNow() }]);
+
     try {
-      // Build conversation history for multi-turn context
-      const conversationHistory = updatedMessages
+      // Prior turns only (current message is sent separately); error bubbles are not conversation
+      const conversationHistory = messages
+        .filter(m => !m.isError)
         .slice(-8)
         .map(m => ({ sender: m.sender, text: m.text }));
 
@@ -583,45 +582,34 @@ const Chatbot = () => {
         message: userMessage,
         language: selectedLanguage,
         conversationHistory: conversationHistory
-      });
+      }, { signal: controller.signal, timeout: 45000 });
 
       if (response.data && response.data.success) {
         const botReply = response.data.reply;
         if (response.data.language && response.data.language !== selectedLanguage && LOCALIZED_CONTENT[response.data.language]) {
           setSelectedLanguage(response.data.language);
         }
-        const newBotMsg = {
-          text: botReply,
-          sender: 'bot',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setMessages(prev => [...prev, newBotMsg]);
+        setMessages(prev => [...prev, { text: botReply, sender: 'bot', timestamp: timeNow() }]);
 
         if (autoSpeechEnabled || lastUsedVoice) {
           speakText(botReply, updatedMessages.length);
         }
       } else {
-        const errorMsg = "माफ़ करें, सेवा में अस्थायी रुकावट आई है। कृपया कुछ पलों बाद पुनः प्रयास करें या हमारे हेल्पलाइन +91 91177 04450 पर संपर्क करें।";
-        setMessages(prev => [
-          ...prev,
-          { text: errorMsg, sender: 'bot', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-        ]);
+        pushError(t('Sorry, the service is temporarily unavailable. Please try again in a moment or call our helpline +91 91177 04450.'));
       }
     } catch (error) {
+      if (axios.isCancel(error)) return; // chat was reset or closed
       console.error("Chatbot API error:", error);
-      const errorMsg = "माफ़ करें, सर्वर से संपर्क स्थापित नहीं हो पाया। कृपया अपना इंटरनेट कनेक्शन जांचें या पुनः प्रयास करें।";
-      setMessages(prev => [
-        ...prev,
-        { text: errorMsg, sender: 'bot', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-      ]);
+      pushError(error.response?.status === 429
+        ? t('You are sending messages too fast. Please wait a minute and try again.')
+        : t('Could not reach the server. Please check your internet connection and try again.'));
     } finally {
-      setIsLoading(false);
-      setLastUsedVoice(false);
+      if (abortRef.current === controller) {
+        setIsLoading(false);
+        setLastUsedVoice(false);
+      }
     }
   };
-
-  const isCheckoutPage = location.pathname.includes('/checkout');
-  if (isAuthPage || isCheckoutPage) return null;
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999] flex justify-center">
@@ -681,33 +669,33 @@ const Chatbot = () => {
               <div className="bg-white w-full h-full sm:w-[410px] sm:h-[600px] sm:rounded-3xl shadow-2xl flex flex-col sm:border border-emerald-100 overflow-hidden transform transition-all">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-emerald-700 via-green-600 to-teal-700 text-white p-3.5 sm:p-4 shadow-md z-20 relative">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="relative bg-white/15 p-2 rounded-2xl backdrop-blur-md border border-white/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0 bg-white/15 p-2 rounded-2xl backdrop-blur-md border border-white/20">
                         <BsRobot size={22} className="text-white" />
                         <span className="absolute bottom-0.5 right-0.5 w-2 h-2 bg-emerald-400 border border-white rounded-full"></span>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-bold text-sm sm:text-base leading-tight tracking-tight">
-                            {activeContent.name}
-                          </h3>
-                        </div>
-                        <p className="text-[11px] text-emerald-100/90 font-medium">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">
+                          {activeContent.name}
+                        </h3>
+                        <p className="text-[11px] text-emerald-100/90 font-medium truncate">
                           {activeContent.tagline}
                         </p>
                       </div>
                     </div>
 
                     {/* Header Action Buttons */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {/* Language Selector Button */}
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setShowLanguagePicker(!showLanguagePicker)}
                           className="flex items-center gap-1 bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-full text-xs font-medium text-white backdrop-blur-sm border border-white/20 transition-all duration-200"
-                          title="भाषा बदलें (Change Language)"
+                          title={t('Change Language')}
+                          aria-label={t('Change Language')}
+                          aria-expanded={showLanguagePicker}
                         >
                           <FiGlobe size={13} />
                           <span>{ALL_LANGUAGES.find(l => l.key === selectedLanguage)?.label || selectedLanguage}</span>
@@ -717,7 +705,7 @@ const Chatbot = () => {
                         {showLanguagePicker && (
                           <div className="absolute right-0 top-9 w-44 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-50 text-gray-800 text-xs max-h-60 overflow-y-auto">
                             <div className="px-3 py-1 font-semibold text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                              भाषा चुनें (Select Language)
+                              {t('Select Language')}
                             </div>
                             {ALL_LANGUAGES.map(lang => (
                               <button
@@ -754,7 +742,9 @@ const Chatbot = () => {
                         className={`p-1.5 rounded-full text-white transition-all ${
                           autoSpeechEnabled ? 'bg-emerald-500/40' : 'bg-white/10 hover:bg-white/20'
                         }`}
-                        title={autoSpeechEnabled ? "आवाज़ बंद करें (Mute Audio)" : "बोलकर सुनाएं (Read Aloud)"}
+                        title={autoSpeechEnabled ? t('Mute Audio') : t('Read Aloud')}
+                        aria-label={autoSpeechEnabled ? t('Mute Audio') : t('Read Aloud')}
+                        aria-pressed={autoSpeechEnabled}
                       >
                         {autoSpeechEnabled ? <IoVolumeHighOutline size={18} /> : <IoVolumeMuteOutline size={18} />}
                       </button>
@@ -764,7 +754,8 @@ const Chatbot = () => {
                         type="button"
                         onClick={handleResetChat}
                         className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"
-                        title="नई बातचीत (Reset Chat)"
+                        title={t('New Chat')}
+                        aria-label={t('New Chat')}
                       >
                         <IoRefreshOutline size={18} />
                       </button>
@@ -774,6 +765,8 @@ const Chatbot = () => {
                         type="button"
                         onClick={toggleChat}
                         className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"
+                        title={t('Close')}
+                        aria-label={t('Close')}
                       >
                         <IoClose size={20} />
                       </button>
@@ -796,7 +789,7 @@ const Chatbot = () => {
                               ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-tr-none ml-8'
                               : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none mr-4 shadow-sm'
                           }`}
-                          dir={selectedLanguage === 'Urdu' ? 'rtl' : 'ltr'}
+                          dir="auto"
                         >
                           {isUser ? (
                             <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
@@ -816,7 +809,8 @@ const Chatbot = () => {
                                 className={`hover:text-emerald-700 transition-colors p-0.5 ${
                                   currentlySpeakingIdx === idx ? 'text-emerald-600 animate-pulse font-bold' : ''
                                 }`}
-                                title="सुनें (Listen)"
+                                title={t('Listen')}
+                                aria-label={t('Listen')}
                               >
                                 <IoVolumeHighOutline size={14} />
                               </button>
@@ -824,7 +818,8 @@ const Chatbot = () => {
                                 type="button"
                                 onClick={() => handleCopyMessage(msg.text, idx)}
                                 className="hover:text-emerald-700 transition-colors p-0.5"
-                                title="कॉपी करें (Copy)"
+                                title={t('Copy')}
+                                aria-label={t('Copy')}
                               >
                                 {copiedIdx === idx ? (
                                   <IoCheckmarkOutline size={14} className="text-emerald-600" />
@@ -844,7 +839,7 @@ const Chatbot = () => {
                     <div className="flex items-start gap-2">
                       <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
                         <span className="text-xs text-emerald-800 font-medium mr-1">
-                          कृषि मित्र उत्तर तैयार कर रहा है
+                          {t('Krishi Mitra is typing')}
                         </span>
                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"></div>
                         <div
@@ -864,7 +859,7 @@ const Chatbot = () => {
                     <div className="mt-2 pt-2 border-t border-emerald-100/60">
                       <p className="text-[11px] font-semibold text-emerald-800 mb-2 flex items-center gap-1">
                         <IoSparkles size={12} className="text-emerald-600" />
-                        सुझाए गए विषय (Suggested Topics):
+                        {t('Suggested Topics')}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {activeContent.chips.map((chip, chipIdx) => (
@@ -894,19 +889,23 @@ const Chatbot = () => {
                     }}
                     className="flex items-center gap-2"
                   >
-                    {/* Voice Mic Button */}
-                    <button
-                      type="button"
-                      onClick={startListening}
-                      className={`p-2.5 rounded-full transition-all duration-200 ${
-                        isListening
-                          ? 'bg-red-500 text-white animate-pulse ring-4 ring-red-100'
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                      title={isListening ? "सुन रहे हैं... (Listening...)" : "बोलकर पूछें (Voice input)"}
-                    >
-                      {isListening ? <IoMic size={20} /> : <IoMicOutline size={20} />}
-                    </button>
+                    {/* Voice Mic Button (only where the browser supports speech input) */}
+                    {SpeechRecognitionAPI && (
+                      <button
+                        type="button"
+                        onClick={startListening}
+                        className={`p-2.5 rounded-full transition-all duration-200 ${
+                          isListening
+                            ? 'bg-red-500 text-white animate-pulse ring-4 ring-red-100'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        }`}
+                        title={isListening ? t('Listening... tap to stop') : t('Voice input')}
+                        aria-label={isListening ? t('Listening... tap to stop') : t('Voice input')}
+                        aria-pressed={isListening}
+                      >
+                        {isListening ? <IoMic size={20} /> : <IoMicOutline size={20} />}
+                      </button>
+                    )}
 
                     {/* Text Input */}
                     <input
@@ -917,8 +916,10 @@ const Chatbot = () => {
                         setLastUsedVoice(false);
                       }}
                       placeholder={activeContent.inputPlaceholder}
-                      dir={selectedLanguage === 'Urdu' ? 'rtl' : 'ltr'}
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-sm text-gray-800 transition-all placeholder:text-gray-400"
+                      aria-label={activeContent.inputPlaceholder}
+                      maxLength={MAX_MESSAGE_CHARS}
+                      dir="auto"
+                      className="flex-1 min-w-0 text-ellipsis bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-sm text-gray-800 transition-all placeholder:text-gray-400"
                     />
 
                     {/* Send Button */}
@@ -926,7 +927,8 @@ const Chatbot = () => {
                       type="submit"
                       disabled={isLoading || !input.trim()}
                       className="bg-gradient-to-r from-emerald-600 to-green-600 text-white p-2.5 rounded-full hover:from-emerald-700 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-sm hover:shadow transition-all duration-200 active:scale-95"
-                      title="भेजें (Send)"
+                      title={t('Send')}
+                      aria-label={t('Send')}
                     >
                       <IoSend size={18} />
                     </button>
@@ -935,7 +937,7 @@ const Chatbot = () => {
                   {/* Micro Footer Notice */}
                   <div className="text-center mt-1.5">
                     <span className="text-[10px] text-gray-400 font-medium">
-                      GrooAgri Krishi Mitra • 14 भारतीय भाषाओं में 24/7 कृषि व सहायता साथी
+                      {t('AI answers can be wrong. Never share OTP, Aadhaar or bank details.')}
                     </span>
                   </div>
                 </div>
