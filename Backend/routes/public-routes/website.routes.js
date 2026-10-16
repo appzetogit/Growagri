@@ -8,5 +8,6 @@ const publicOnly = (req, res, next) => { req.publicOnly = true; next(); };
 router.get('/blogs', publicOnly, websiteController.getBlogs);
 router.get('/articles', publicOnly, websiteController.getArticles);
 router.get('/reviews', publicOnly, websiteController.getReviews);
+router.get('/banners', publicOnly, websiteController.getBanners);
 
 module.exports = router;

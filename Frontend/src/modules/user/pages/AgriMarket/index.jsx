@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { 
     FiSearch, 
-    FiFilter, 
     FiChevronLeft,
     FiPackage,
     FiArrowRight,
     FiShoppingCart,
-    FiPlus
+    FiPlus,
+    FiMapPin,
+    FiChevronDown
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import ecommerceService from '../../../../services/ecommerceService';
 import { publicCatalogService } from '../../../../services/catalogService';
 import { useEcommerceCart } from '../../../../context/EcommerceCartContext';
 import { toast } from 'react-hot-toast';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useCity } from '../../../../context/CityContext';
 import CitySelectorModal from '../../components/common/CitySelectorModal';
 

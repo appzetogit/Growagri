@@ -11,7 +11,8 @@ const {
   bulkDeleteUsers,
   getUserBookings,
   getUserWalletTransactions,
-  addUser
+  addUser,
+  updateUser
 } = require('../../controllers/adminControllers/adminUserController');
 
 // Validation rules
@@ -22,6 +23,7 @@ const toggleStatusValidation = [
 // Routes
 router.get('/users', authenticate, isAdmin, getAllUsers);
 router.get('/users/:id', authenticate, isAdmin, getUserDetails);
+router.put('/users/:id', authenticate, isAdmin, updateUser);
 router.put('/users/:id/status', authenticate, isAdmin, toggleStatusValidation, toggleUserStatus);
 router.post('/users/bulk-delete', authenticate, isAdmin, bulkDeleteUsers);
 router.delete('/users/:id', authenticate, isAdmin, deleteUser);

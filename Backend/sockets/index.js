@@ -84,24 +84,27 @@ const initializeSocket = (server) => {
     });
 
     // Join user-specific room for notifications
-    if (socket.userRole === 'USER') {
-      socket.join(`user_${socket.userId.toString()}`);
-    } else if (socket.userRole === 'VENDOR') {
-      socket.join(`vendor_${socket.userId.toString()}`);
-      // Update vendor online status
-      updateVendorOnlineStatus(socket.userId, true, socket.id);
-    } else if (socket.userRole === 'WORKER') {
-      socket.join(`worker_${socket.userId.toString()}`);
-      // Update worker online status
-      updateWorkerOnlineStatus(socket.userId, true, socket.id);
-    } else if (socket.userRole === 'ADMIN') {
-      socket.join(`admin_${socket.userId.toString()}`);
+    if (socket.userId) {
+      const uid = socket.userId.toString();
+      if (socket.userRole === 'USER') {
+        socket.join(`user_${uid}`);
+      } else if (socket.userRole === 'VENDOR') {
+        socket.join(`vendor_${uid}`);
+        // Update vendor online status
+        updateVendorOnlineStatus(socket.userId, true, socket.id);
+      } else if (socket.userRole === 'WORKER') {
+        socket.join(`worker_${uid}`);
+        // Update worker online status
+        updateWorkerOnlineStatus(socket.userId, true, socket.id);
+      } else if (socket.userRole === 'ADMIN') {
+        socket.join(`admin_${uid}`);
+      }
     }
 
     // Explicit Room Join Events (Fallback/Frontend Initiated)
     socket.on('join_vendor_room', (vendorId) => {
       // Security check: ensure the socket user actually IS this vendor
-      if (socket.userRole === 'VENDOR' && socket.userId.toString() === vendorId.toString()) {
+      if (socket.userRole === 'VENDOR' && socket.userId && vendorId && socket.userId.toString() === vendorId.toString()) {
         socket.join(`vendor_${vendorId.toString()}`);
         console.log(`Socket ${socket.id} explicitly joined room vendor_${vendorId}`);
       }
@@ -109,7 +112,7 @@ const initializeSocket = (server) => {
 
     socket.on('join_user_room', (userId) => {
       // Ensure strings for comparison
-      if (socket.userRole === 'USER' && socket.userId.toString() === userId.toString()) {
+      if (socket.userRole === 'USER' && socket.userId && userId && socket.userId.toString() === userId.toString()) {
         socket.join(`user_${userId.toString()}`);
         console.log(`Socket ${socket.id} explicitly joined room user_${userId}`);
       }

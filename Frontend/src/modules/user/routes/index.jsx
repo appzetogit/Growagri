@@ -72,7 +72,6 @@ const SoilTesting = lazyLoad(() => import('../pages/SoilTesting'));
 const AgriMarket = lazyLoad(() => import('../pages/AgriMarket'));
 const AgriProductDetail = lazyLoad(() => import('../pages/AgriMarket/ProductDetail'));
 const MyAgriOrders = lazyLoad(() => import('../pages/AgriMarket/MyOrders'));
-const AgriOrderPayment = lazyLoad(() => import('../pages/AgriMarket/OrderPayment'));
 const AgriCart = lazyLoad(() => import('../pages/AgriMarket/AgriCart'));
 const SchemeDetails = lazyLoad(() => import('../pages/Schemes/SchemeDetails'));
 
@@ -160,7 +159,7 @@ const UserRoutes = () => {
               <Route path="/agri-marketplace" element={<ProtectedRoute userType="user"><AgriMarket /></ProtectedRoute>} />
               <Route path="/agri-marketplace/:id" element={<ProtectedRoute userType="user"><AgriProductDetail /></ProtectedRoute>} />
               <Route path="/my-agri-orders" element={<ProtectedRoute userType="user"><MyAgriOrders /></ProtectedRoute>} />
-              <Route path="/order-payment/:id" element={<ProtectedRoute userType="user"><AgriOrderPayment /></ProtectedRoute>} />
+              <Route path="/order-payment/:id" element={<Navigate to="/user/my-agri-orders" replace />} />
               <Route path="/agri-cart" element={<ProtectedRoute userType="user"><AgriCart /></ProtectedRoute>} />
               <Route path="/schemes/:id" element={<SchemeDetails />} />
             </Routes>

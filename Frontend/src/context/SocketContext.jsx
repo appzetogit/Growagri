@@ -131,20 +131,21 @@ export const SocketProvider = ({ children }) => {
 
     // Use HTTP URL for socket.io client - it handles WS upgrade automatically
     const socketBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
+    const isHttps = typeof window !== 'undefined' && (window.location.protocol === 'https:' || socketBaseUrl.startsWith('https:'));
 
     const newSocket = io(socketBaseUrl, {
       auth: {
         token: token || ''
       },
-      transports: ['websocket', 'polling'], // WebSocket first for instant real-time alerts
+      transports: ['polling', 'websocket'], // Reliable handshake via polling, seamless automatic upgrade to WebSocket
       path: '/socket.io/',
-      secure: true,
+      secure: isHttps,
       rejectUnauthorized: false,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 3000,
-      timeout: 10000,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
       autoConnect: true
     });
 

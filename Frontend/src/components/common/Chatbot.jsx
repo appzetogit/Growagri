@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { BsRobot } from 'react-icons/bs';
 import { 
   IoClose, 
@@ -514,6 +514,29 @@ const Chatbot = () => {
     recognition.start();
   };
 
+  const constraintsRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const windowDragControls = useDragControls();
+
+  const handleDragStart = () => {
+    isDraggingRef.current = true;
+  };
+
+  const handleDragEnd = () => {
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 150);
+  };
+
+  const handleLauncherClick = (e) => {
+    if (isDraggingRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      return;
+    }
+    toggleChat();
+  };
+
   const toggleChat = () => setIsOpen(!isOpen);
 
   const scrollToBottom = () => {
@@ -612,78 +635,103 @@ const Chatbot = () => {
   };
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[9999] flex justify-center">
-      <div className="w-full sm:max-w-md h-full relative">
-        {/* Floating Draggable Launcher */}
-        {!isOpen && (
+    <div
+      ref={constraintsRef}
+      className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden"
+    >
+      {/* Floating Draggable Launcher (Remains mounted to preserve drag position, smoothly hidden when chat is open) */}
+      <motion.div
+        drag
+        dragConstraints={constraintsRef}
+        dragElastic={0.08}
+        dragMomentum={false}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        whileDrag={{ scale: 1.06 }}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{
+          scale: isOpen ? 0.7 : 1,
+          opacity: isOpen ? 0 : 1,
+        }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        className={`fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-[9999] touch-none select-none ${
+          isOpen ? 'pointer-events-none' : 'pointer-events-auto'
+        }`}
+      >
+        <div className="relative group">
+          {/* Animated Glow Halo */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 rounded-full blur-sm opacity-70 group-hover:opacity-100 transition duration-500 animate-pulse pointer-events-none" />
+          
+          <button
+            type="button"
+            onClick={handleLauncherClick}
+            className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 text-white p-3.5 sm:p-4 rounded-full shadow-2xl flex items-center gap-2.5 focus:outline-none cursor-grab active:cursor-grabbing border-2 border-white/40 hover:scale-105 active:scale-95 transition-all duration-200 select-none touch-none"
+            style={{ boxShadow: '0 10px 30px rgba(16, 185, 129, 0.45)' }}
+            title={t('Drag to move anywhere, click to chat')}
+            aria-label="Open GrooAgri Krishi AI Assistant"
+          >
+            <div className="relative pointer-events-none">
+              <BsRobot size={26} className="text-white drop-shadow" />
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+              </span>
+            </div>
+            <div className="hidden sm:flex flex-col text-left pr-1 pointer-events-none">
+              <span className="text-xs font-bold tracking-wide text-white leading-tight">
+                {activeContent.name}
+              </span>
+              <span className="text-[10px] text-emerald-100 flex items-center gap-1 font-medium">
+                <IoSparkles size={10} className="text-yellow-300" />
+                AI Assistant
+              </span>
+            </div>
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Chatbot Window */}
+      <AnimatePresence>
+        {isOpen && (
           <motion.div
             drag
-            dragConstraints={{ left: -320, right: 0, top: -520, bottom: 0 }}
-            whileDrag={{ scale: 1.08 }}
-            className="absolute bottom-24 right-5 pointer-events-auto"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            dragListener={false}
+            dragControls={windowDragControls}
+            dragConstraints={constraintsRef}
+            dragMomentum={false}
+            dragElastic={0.05}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 pointer-events-auto z-[10000] flex justify-center sm:block"
           >
-            <div className="relative group">
-              {/* Animated Glow Halo */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 rounded-full blur-sm opacity-70 group-hover:opacity-100 transition duration-500 animate-pulse" />
-              
-              <button
-                onClick={toggleChat}
-                className="relative bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 text-white p-3.5 sm:p-4 rounded-full shadow-2xl flex items-center gap-2.5 focus:outline-none cursor-grab active:cursor-grabbing border-2 border-white/40 hover:scale-105 transition-all duration-200"
-                style={{ boxShadow: '0 10px 30px rgba(16, 185, 129, 0.45)' }}
-                aria-label="Open GrooAgri Krishi AI Assistant"
-              >
-                <div className="relative">
-                  <BsRobot size={26} className="text-white drop-shadow" />
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-                  </span>
-                </div>
-                <div className="hidden sm:flex flex-col text-left pr-1">
-                  <span className="text-xs font-bold tracking-wide text-white leading-tight">
-                    {activeContent.name}
-                  </span>
-                  <span className="text-[10px] text-emerald-100 flex items-center gap-1 font-medium">
-                    <IoSparkles size={10} className="text-yellow-300" />
-                    AI Assistant
-                  </span>
-                </div>
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Chatbot Window */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="absolute font-sans inset-0 sm:inset-auto sm:bottom-6 sm:right-6 pointer-events-auto"
-            >
-              <div className="bg-white w-full h-full sm:w-[410px] sm:h-[600px] sm:rounded-3xl shadow-2xl flex flex-col sm:border border-emerald-100 overflow-hidden transform transition-all">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-emerald-700 via-green-600 to-teal-700 text-white p-3.5 sm:p-4 shadow-md z-20 relative">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0 bg-white/15 p-2 rounded-2xl backdrop-blur-md border border-white/20">
-                        <BsRobot size={22} className="text-white" />
-                        <span className="absolute bottom-0.5 right-0.5 w-2 h-2 bg-emerald-400 border border-white rounded-full"></span>
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">
-                          {activeContent.name}
-                        </h3>
-                        <p className="text-[11px] text-emerald-100/90 font-medium truncate">
-                          {activeContent.tagline}
-                        </p>
-                      </div>
+            <div className="bg-white w-full h-full sm:w-[410px] sm:h-[600px] sm:rounded-3xl shadow-2xl flex flex-col sm:border border-emerald-100 overflow-hidden transform transition-all">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-700 via-green-600 to-teal-700 text-white p-3.5 sm:p-4 shadow-md z-20 relative">
+                <div className="flex items-center justify-between gap-2">
+                  <div
+                    onPointerDown={(e) => {
+                      if (typeof window !== 'undefined' && window.innerWidth >= 640) {
+                        windowDragControls.start(e);
+                      }
+                    }}
+                    className="flex items-center gap-3 min-w-0 sm:cursor-grab sm:active:cursor-grabbing select-none"
+                    title={t('Drag header to move chat')}
+                  >
+                    <div className="relative shrink-0 bg-white/15 p-2 rounded-2xl backdrop-blur-md border border-white/20">
+                      <BsRobot size={22} className="text-white" />
+                      <span className="absolute bottom-0.5 right-0.5 w-2 h-2 bg-emerald-400 border border-white rounded-full"></span>
                     </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">
+                        {activeContent.name}
+                      </h3>
+                      <p className="text-[11px] text-emerald-100/90 font-medium truncate">
+                        {activeContent.tagline}
+                      </p>
+                    </div>
+                  </div>
 
                     {/* Header Action Buttons */}
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -945,7 +993,6 @@ const Chatbot = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
     </div>
   );
 };

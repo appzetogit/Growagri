@@ -14,6 +14,7 @@ import ecommerceService from '../../../../services/ecommerceService';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { startEcommercePayment } from '../../../../utils/razorpay';
 
 const MyAgriOrders = () => {
     const navigate = useNavigate();
@@ -48,7 +49,7 @@ const MyAgriOrders = () => {
     };
 
     const handleCancelOrder = async (orderId) => {
-        if (!window.confirm("Are you sure you want to cancel this order? If paid, your platform fee will be refunded to your wallet.")) return;
+        if (!window.confirm("Are you sure you want to cancel this order? If paid, your refund will be credited directly to your GrooAgri wallet.")) return;
         
         try {
             const res = await ecommerceService.cancelOrder(orderId);
@@ -60,6 +61,20 @@ const MyAgriOrders = () => {
             }
         } catch (err) {
             toast.error("Internal error. Please try again.");
+        }
+    };
+
+    const handlePayNow = async (orderId) => {
+        try {
+            await startEcommercePayment(orderId);
+            toast.success("Payment Successful! Order Confirmed.");
+            fetchOrders();
+        } catch (payErr) {
+            if (payErr?.dismissed) {
+                toast("Payment cancelled.", { icon: 'ℹ️' });
+            } else {
+                toast.error(payErr?.message || "Payment failed");
+            }
         }
     };
 
@@ -127,79 +142,115 @@ const MyAgriOrders = () => {
                                     <div className="flex items-center gap-2">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Order ID: #{order._id.slice(-6)}</p>
                                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${
-                                            order.deliveryStatus === 'cancelled' ? 'bg-red-50 text-red-600' :
+                                            order.paymentStatus === 'refunded' ? 'bg-purple-50 text-purple-600 border border-purple-200' :
+                                            order.deliveryStatus === 'cancelled' ? 'bg-red-50 text-red-600 border border-red-200' :
                                             order.paymentStatus === 'paid' || order.paymentType === 'cod' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
                                         }`}>
-                                            {order.deliveryStatus === 'cancelled' ? 'Cancelled' : 
+                                            {order.paymentStatus === 'refunded' ? 'Refunded' :
+                                             order.deliveryStatus === 'cancelled' ? 'Cancelled' : 
                                              order.paymentStatus === 'paid' || order.paymentType === 'cod' ? 'Confirmed' : 'Payment Pending'}
                                         </span>
                                     </div>
-                                    <h3 className="font-black text-slate-800 mt-1">{order.items[0].name}</h3>
+                                    <h3 className="font-black text-slate-800 mt-1">{order.items[0]?.name || 'Item'}</h3>
                                     <p className="text-[10px] font-bold text-slate-400 mt-0.5">{format(new Date(order.createdAt), 'dd MMM, hh:mm a')}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Grand Total</p>
-                                    <p className="font-black text-slate-800">₹{order.pricing.orderTotal || order.pricing.itemsTotal}</p>
-                                    <p className="text-[8px] font-bold text-teal-600 uppercase tracking-tighter mt-1">
-                                        Paid: ₹{order.paymentType === 'online_full' ? order.pricing.orderTotal : order.paymentType === 'cod' ? 0 : order.pricing.platformFee}
-                                    </p>
-                                    <p className="text-[8px] font-bold text-orange-600 uppercase tracking-tighter">
-                                        COD: ₹{order.paymentType === 'online_full' ? 0 : order.paymentType === 'cod' ? order.pricing.orderTotal : order.pricing.vendorBalance}
-                                    </p>
+                                    <p className="font-black text-slate-800">₹{order.pricing?.orderTotal || order.pricing?.itemsTotal}</p>
+                                    {order.paymentStatus === 'refunded' ? (
+                                        <p className="text-[8px] font-black text-purple-600 uppercase tracking-tighter mt-1">
+                                            Refunded to Wallet: ₹{(order.pricing?.orderTotal || order.pricing?.itemsTotal || 0).toLocaleString()}
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <p className="text-[8px] font-bold text-teal-600 uppercase tracking-tighter mt-1">
+                                                Paid ({order.paymentMethod === 'wallet' || order.paymentType === 'wallet' ? 'Wallet' : 'Online'}): ₹{order.paymentType === 'online_full' || order.paymentType === 'wallet' || order.paymentMethod === 'wallet' ? (order.pricing?.orderTotal || order.pricing?.itemsTotal) : order.paymentType === 'cod' ? 0 : order.pricing?.platformFee}
+                                            </p>
+                                            <p className="text-[8px] font-bold text-orange-600 uppercase tracking-tighter">
+                                                COD: ₹{order.paymentType === 'online_full' || order.paymentType === 'wallet' || order.paymentMethod === 'wallet' ? 0 : order.paymentType === 'cod' ? (order.pricing?.orderTotal || order.pricing?.itemsTotal) : order.pricing?.vendorBalance}
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Tracking View */}
-                            <div className="relative pt-4 pb-2 px-2">
-                                <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-slate-100" />
-                                <div className="space-y-6">
-                                    <div className="flex gap-4 relative">
-                                        <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
-                                            order.deliveryStatus === 'ordered' ? 'bg-teal-600 scale-125' : 'bg-green-500'
-                                        }`} />
-                                        <div className="flex-1">
-                                            <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'ordered' ? 'text-teal-600' : 'text-slate-400'}`}>Order Placed</p>
-                                            <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">Awaiting vendor packing</p>
-                                        </div>
+                            {/* Tracking View vs Cancelled/Refunded Banner */}
+                            {order.deliveryStatus === 'cancelled' ? (
+                                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+                                    order.paymentStatus === 'refunded' 
+                                        ? 'bg-purple-50/70 border-purple-200 text-purple-900' 
+                                        : 'bg-rose-50/70 border-rose-200 text-rose-900'
+                                }`}>
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                        order.paymentStatus === 'refunded' ? 'bg-purple-100 text-purple-600' : 'bg-rose-100 text-rose-600'
+                                    }`}>
+                                        {order.paymentStatus === 'refunded' ? <FiCheckCircle className="w-4 h-4" /> : <FiAlertCircle className="w-4 h-4" />}
                                     </div>
-                                    <div className="flex gap-4 relative">
-                                        <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
-                                            order.deliveryStatus === 'packed' ? 'bg-teal-600 scale-125' : 
-                                            ['shipped', 'delivered'].includes(order.deliveryStatus) ? 'bg-green-500' : 'bg-slate-200'
-                                        }`} />
-                                        <div className="flex-1">
-                                            <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'packed' ? 'text-teal-600' : 'text-slate-400'}`}>Packed</p>
-                                            <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">Vendor is ready to ship</p>
-                                        </div>
+                                    <div className="flex-1">
+                                        <p className="text-xs font-black uppercase tracking-wider">
+                                            {order.paymentStatus === 'refunded' ? 'Order Cancelled & Refunded to Wallet' : 'Order Cancelled'}
+                                        </p>
+                                        <p className="text-[10px] font-bold leading-relaxed mt-0.5 opacity-90">
+                                            {order.paymentStatus === 'refunded'
+                                                ? `Full refund of ₹${(order.pricing?.orderTotal || order.pricing?.itemsTotal || 0).toLocaleString()} has been credited back to your GrooAgri wallet.`
+                                                : order.paymentType === 'cod'
+                                                    ? 'This Cash on Delivery order was cancelled. No payment was charged.'
+                                                    : 'This order was cancelled. Any refund has been credited to your wallet.'}
+                                        </p>
                                     </div>
-                                    <div className="flex gap-4 relative">
-                                        <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
-                                            order.deliveryStatus === 'shipped' ? 'bg-teal-600 scale-125' : 
-                                            order.deliveryStatus === 'delivered' ? 'bg-green-500' : 'bg-slate-200'
-                                        }`} />
-                                        <div className="flex-1">
-                                            <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'shipped' ? 'text-teal-600' : 'text-slate-400'}`}>On the way</p>
-                                            {order.trackingDetails?.courierName && (
-                                                <p className="text-[8px] font-black text-slate-800 mt-1 p-2 bg-slate-50 rounded-xl inline-block border border-slate-100">
-                                                    {order.trackingDetails.courierName}: {order.trackingDetails.trackingNumber}
-                                                </p>
-                                            )}
+                                </div>
+                            ) : (
+                                <div className="relative pt-4 pb-2 px-2">
+                                    <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-slate-100" />
+                                    <div className="space-y-6">
+                                        <div className="flex gap-4 relative">
+                                            <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
+                                                order.deliveryStatus === 'ordered' ? 'bg-teal-600 scale-125' : 'bg-green-500'
+                                            }`} />
+                                            <div className="flex-1">
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'ordered' ? 'text-teal-600' : 'text-slate-400'}`}>Order Placed</p>
+                                                <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">Awaiting vendor packing</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 relative">
+                                            <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
+                                                order.deliveryStatus === 'packed' ? 'bg-teal-600 scale-125' : 
+                                                ['shipped', 'delivered'].includes(order.deliveryStatus) ? 'bg-green-500' : 'bg-slate-200'
+                                            }`} />
+                                            <div className="flex-1">
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'packed' ? 'text-teal-600' : 'text-slate-400'}`}>Packed</p>
+                                                <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">Vendor is ready to ship</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 relative">
+                                            <div className={`w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${
+                                                order.deliveryStatus === 'shipped' ? 'bg-teal-600 scale-125' : 
+                                                order.deliveryStatus === 'delivered' ? 'bg-green-500' : 'bg-slate-200'
+                                            }`} />
+                                            <div className="flex-1">
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${order.deliveryStatus === 'shipped' ? 'text-teal-600' : 'text-slate-400'}`}>On the way</p>
+                                                {order.trackingDetails?.courierName && (
+                                                    <p className="text-[8px] font-black text-slate-800 mt-1 p-2 bg-slate-50 rounded-xl inline-block border border-slate-100">
+                                                        {order.trackingDetails.courierName}: {order.trackingDetails.trackingNumber}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Alert/Action */}
-                            {order.paymentStatus !== 'paid' && order.paymentType !== 'cod' ? (
+                            {/* Alert/Action: ONLY for active non-cancelled non-refunded orders */}
+                            {order.deliveryStatus !== 'cancelled' && order.paymentStatus !== 'paid' && order.paymentStatus !== 'refunded' && order.paymentType !== 'cod' ? (
                                 <div className="pt-2">
                                     <button 
-                                        onClick={() => navigate(`/user/order-payment/${order._id}`)}
-                                        className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all"
+                                        onClick={() => handlePayNow(order._id)}
+                                        className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all cursor-pointer"
                                     >
-                                        {order.paymentType === 'online_full' ? `Pay Total Amount (₹${order.pricing.orderTotal})` : `Pay Confirm Fee (₹${order.pricing.platformFee})`}
+                                        {order.paymentType === 'online_full' ? `Pay Total Amount (₹${order.pricing?.orderTotal || order.pricing?.itemsTotal})` : `Pay Confirm Fee (₹${order.pricing?.platformFee})`}
                                     </button>
                                 </div>
-                            ) : order.deliveryStatus !== 'delivered' && order.deliveryStatus !== 'cancelled' && (
+                            ) : order.deliveryStatus !== 'delivered' && order.deliveryStatus !== 'cancelled' ? (
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
                                     <FiAlertCircle className="text-slate-400 mt-0.5" />
                                     <div className="flex-1">
@@ -212,8 +263,8 @@ const MyAgriOrders = () => {
                                                     {order.paymentType === 'online_full' 
                                                         ? 'This order is fully paid. Nothing to pay on delivery.' 
                                                         : order.paymentType === 'cod'
-                                                            ? `Keep ₹${order.pricing.orderTotal} ready to pay the vendor when items arrive.`
-                                                            : `Keep ₹${order.pricing.vendorBalance} ready to pay the vendor when items arrive.`
+                                                            ? `Keep ₹${order.pricing?.orderTotal || order.pricing?.itemsTotal} ready to pay the vendor when items arrive.`
+                                                            : `Keep ₹${order.pricing?.vendorBalance} ready to pay the vendor when items arrive.`
                                                     }
                                                 </p>
                                             </div>
@@ -221,7 +272,7 @@ const MyAgriOrders = () => {
                                             {['pending', 'ordered', 'packed'].includes(order.deliveryStatus) && (
                                                 <button 
                                                     onClick={() => handleCancelOrder(order._id)}
-                                                    className="px-3 py-2 bg-red-50 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest border border-red-100 active:scale-95 transition-all"
+                                                    className="px-3 py-2 bg-red-50 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest border border-red-100 active:scale-95 transition-all cursor-pointer"
                                                 >
                                                     Cancel
                                                 </button>
@@ -235,7 +286,7 @@ const MyAgriOrders = () => {
                                         )}
                                     </div>
                                 </div>
-                            )}
+                            ) : null}
 
                             {order.deliveryStatus === 'delivered' && (
                                 <div className="flex items-center justify-center gap-2 text-green-600 py-3 bg-green-50 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-green-100">

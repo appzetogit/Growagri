@@ -33,4 +33,13 @@ router.route('/review/:id')
   .put(websiteController.updateReview)
   .delete(websiteController.deleteReview);
 
+// WebsiteBanner CRUD
+router.route('/banner')
+  .get(websiteController.getBanners)
+  .post(websiteController.createBanner);
+
+router.route('/banner/:id')
+  .put(websiteController.updateBanner)
+  .delete(websiteController.deleteBanner);
+
 module.exports = router;

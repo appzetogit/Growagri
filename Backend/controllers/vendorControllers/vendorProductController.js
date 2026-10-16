@@ -109,6 +109,9 @@ const getMyOrders = async (req, res) => {
     const updateOrderStatus = async (req, res) => {
         try {
             const { status, trackingNumber, courierName, deliveryOtp } = req.body;
+            if (status === 'refunded') {
+                return refundOrder(req, res);
+            }
             const allowedStatuses = ['packed', 'shipped', 'delivered', 'cancelled'];
             
             if (!allowedStatuses.includes(status)) {
@@ -175,28 +178,39 @@ const getMyOrders = async (req, res) => {
             
             if (status === 'cancelled') {
                 const Transaction = require('../../models/Transaction');
-                // If it was already paid, refund the correct amount to the user's wallet
+                // If it was already paid, refund directly to customer's wallet
                 if (order.paymentStatus === 'paid') {
                     const user = await User.findById(order.userId);
                     if (user) {
-                        let refundAmount = order.pricing.platformFee;
-                        if (order.paymentType === 'online_full') {
-                            refundAmount = order.pricing.orderTotal;
+                        let refundAmount = order.pricing?.orderTotal || 0;
+                        if (order.paymentType === 'split') {
+                            refundAmount = order.pricing?.platformFee || 0;
                         }
-                        
-                        user.wallet.balance += refundAmount;
-                        await user.save();
 
-                        await Transaction.create({
-                            userId: user._id,
-                            type: 'refund',
-                            amount: refundAmount,
-                            status: 'completed',
-                            paymentMethod: 'system',
-                            description: `Refund for Vendor-Cancelled Ecommerce Order: ${order._id.toString().slice(-8)}`,
-                            metadata: { orderId: order._id, reason: 'vendor_cancelled' }
-                        });
+                        if (refundAmount > 0) {
+                            const oldBal = user.wallet?.balance || 0;
+                            const newBal = oldBal + refundAmount;
+                            if (!user.wallet) {
+                                user.wallet = { balance: newBal, penalty: 0 };
+                            } else {
+                                user.wallet.balance = newBal;
+                            }
+                            await user.save();
+
+                            await Transaction.create({
+                                userId: user._id,
+                                type: 'refund',
+                                amount: refundAmount,
+                                status: 'completed',
+                                paymentMethod: 'wallet',
+                                balanceBefore: oldBal,
+                                balanceAfter: newBal,
+                                description: `Refund for Cancelled Ecommerce Order: #${order._id.toString().slice(-8)} (Credited to Wallet)`,
+                                metadata: { orderId: order._id, reason: 'vendor_or_admin_cancelled', originalPaymentMethod: order.paymentMethod || 'wallet' }
+                            });
+                        }
                     }
+                    order.paymentStatus = 'refunded';
                 }
 
                 // Return items to stock
@@ -253,25 +267,9 @@ const getMyOrders = async (req, res) => {
 
                     await Vendor.findByIdAndUpdate(vendor._id, updateQuery);
 
-                    // Transaction 1: Total cash collected from customer
-                    await Transaction.create({
-                        vendorId: vendor._id,
-                        bookingId: null, // Ecommerce
-                        type: 'cash_collected',
-                        amount: orderTotal,
-                        status: 'completed',
-                        paymentMethod: 'cash',
-                        description: `Cash ₹${orderTotal} collected for COD Order #${order._id.toString().slice(-8)} (Admin Commission: ₹${platformFee}).`,
-                        metadata: {
-                            type: 'dues_increase',
-                            orderId: order._id.toString(),
-                            companyRevenue: platformFee
-                        }
-                    });
-
-                    // Transaction 2: Earnings credited to vendor
+                    // Single Transaction: Earnings credited to vendor (settled directly in cash)
                     const shippingCharges = order.pricing.shippingCharges || 0;
-                    const totalVendorCredit = vendorBalance + shippingCharges;
+                    const totalVendorCredit = order.pricing.vendorBalance;
                     if (totalVendorCredit > 0) {
                         await Transaction.create({
                             vendorId: vendor._id,
@@ -279,22 +277,24 @@ const getMyOrders = async (req, res) => {
                             type: 'earnings_credit',
                             amount: totalVendorCredit,
                             status: 'completed',
-                            paymentMethod: 'system',
-                            description: `Earnings ₹${totalVendorCredit} settled directly in cash for COD Order #${order._id.toString().slice(-8)} (includes ₹${shippingCharges} shipping).`,
+                            paymentMethod: 'cash',
+                            description: `Earnings ₹${totalVendorCredit} settled directly in cash for COD Order #${order._id.toString().slice(-8)} (Total Paid: ₹${orderTotal}, Admin Commission: ₹${platformFee}).`,
                             metadata: {
                                 type: 'earnings_increase',
-                                orderId: order._id.toString()
+                                orderId: order._id.toString(),
+                                orderTotal,
+                                companyRevenue: platformFee,
+                                shippingCharges
                             }
                         });
                     }
                 }
-            } else if (status === 'delivered' && order.paymentType === 'online_full') {
+            } else if (status === 'delivered' && (order.paymentType === 'online_full' || order.paymentType === 'wallet' || order.paymentMethod === 'wallet')) {
                 const Transaction = require('../../models/Transaction');
                 const vendor = await Vendor.findById(order.vendorId);
                 if (vendor) {
-                    const vendorBalance = order.pricing.vendorBalance;
                     const shippingCharges = order.pricing.shippingCharges || 0;
-                    const totalVendorCredit = vendorBalance + shippingCharges;
+                    const totalVendorCredit = order.pricing.vendorBalance;
                     
                     const updateQuery = {
                         $inc: { 'wallet.earnings': totalVendorCredit }
@@ -321,9 +321,7 @@ const getMyOrders = async (req, res) => {
                 const Transaction = require('../../models/Transaction');
                 const vendor = await Vendor.findById(order.vendorId);
                 if (vendor) {
-                    const vendorBalance = order.pricing.vendorBalance;
-                    const shippingCharges = order.pricing.shippingCharges || 0;
-                    const totalCashCollectedByVendor = vendorBalance + shippingCharges;
+                    const totalCashCollectedByVendor = order.pricing.vendorBalance;
 
                     const updateQuery = {
                         $inc: { 
@@ -333,23 +331,8 @@ const getMyOrders = async (req, res) => {
 
                     await Vendor.findByIdAndUpdate(vendor._id, updateQuery);
 
-                    // Transaction 1: Total cash collected from customer (retained by vendor, no dues to admin)
-                    await Transaction.create({
-                        vendorId: vendor._id,
-                        bookingId: null, // Ecommerce
-                        type: 'cash_collected',
-                        amount: totalCashCollectedByVendor,
-                        status: 'completed',
-                        paymentMethod: 'cash',
-                        description: `Cash ₹${totalCashCollectedByVendor} collected directly by vendor for Split Order #${order._id.toString().slice(-8)} (No Admin Dues, includes ₹${shippingCharges} shipping).`,
-                        metadata: {
-                            type: 'dues_increase', // Keeps metadata format consistent
-                            orderId: order._id.toString(),
-                            companyRevenue: 0 // Platform fee was already paid online to admin
-                        }
-                    });
-
-                    // Transaction 2: Earnings credited to vendor (retained by vendor, no payout pending)
+                    // Single Transaction: Earnings credited to vendor (settled directly in cash)
+                    const shippingCharges = order.pricing.shippingCharges || 0;
                     if (totalCashCollectedByVendor > 0) {
                         await Transaction.create({
                             vendorId: vendor._id,
@@ -357,11 +340,13 @@ const getMyOrders = async (req, res) => {
                             type: 'earnings_credit',
                             amount: totalCashCollectedByVendor,
                             status: 'completed',
-                            paymentMethod: 'system',
-                            description: `Earnings ₹${totalCashCollectedByVendor} settled directly in cash for Split Order #${order._id.toString().slice(-8)} (includes ₹${shippingCharges} shipping).`,
+                            paymentMethod: 'cash',
+                            description: `Earnings ₹${totalCashCollectedByVendor} settled directly in cash for Split Order #${order._id.toString().slice(-8)} (includes ₹${shippingCharges} shipping, No Admin Dues).`,
                             metadata: {
                                 type: 'earnings_increase',
-                                orderId: order._id.toString()
+                                orderId: order._id.toString(),
+                                companyRevenue: 0,
+                                shippingCharges
                             }
                         });
                     }
@@ -390,11 +375,114 @@ const getMyOrders = async (req, res) => {
     }
 };
 
+/**
+ * Admin: Refund Online Order to User Wallet
+ */
+const refundOrder = async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const order = await EcommerceOrder.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        if (order.paymentType === 'cod') {
+            return res.status(400).json({ success: false, message: 'Cash on Delivery orders cannot be refunded.' });
+        }
+
+        if (order.paymentStatus === 'refunded') {
+            return res.status(400).json({ success: false, message: 'This order is already marked as refunded.' });
+        }
+
+        // Calculate refund amount
+        let refundAmount = order.pricing?.orderTotal || (order.pricing?.itemsTotal + (order.pricing?.shippingCharges || 0));
+        if (order.paymentType === 'split') {
+            refundAmount = order.pricing?.platformFee || 0;
+        }
+
+        const Transaction = require('../../models/Transaction');
+        const User = require('../../models/User');
+
+        // Check if user has already received a refund transaction for this order
+        const existingRefundTx = await Transaction.findOne({
+            userId: order.userId,
+            type: 'refund',
+            $or: [
+                { 'metadata.orderId': order._id },
+                { description: new RegExp(order._id.toString().slice(-8), 'i') }
+            ]
+        });
+
+        // Record refund transaction and credit wallet directly
+        if (!existingRefundTx && refundAmount > 0) {
+            const user = await User.findById(order.userId);
+            if (user) {
+                const oldBal = user.wallet?.balance || 0;
+                const newBal = oldBal + refundAmount;
+                if (!user.wallet) {
+                    user.wallet = { balance: newBal, penalty: 0 };
+                } else {
+                    user.wallet.balance = newBal;
+                }
+                await user.save();
+
+                await Transaction.create({
+                    userId: user._id,
+                    type: 'refund',
+                    amount: refundAmount,
+                    status: 'completed',
+                    paymentMethod: 'wallet',
+                    balanceBefore: oldBal,
+                    balanceAfter: newBal,
+                    description: `Refund for Cancelled Ecommerce Order: #${order._id.toString().slice(-8)} (Credited to Wallet by Admin)`,
+                    metadata: { orderId: order._id, reason: 'admin_refunded', originalPaymentMethod: order.paymentMethod || 'wallet' }
+                });
+            }
+        }
+
+        // Return stock back if order was not cancelled yet
+        if (order.deliveryStatus !== 'cancelled') {
+            const Product = require('../../models/Product');
+            for (const item of order.items) {
+                await Product.findByIdAndUpdate(item.productId, { $inc: { stock: item.quantity } });
+            }
+        }
+
+        order.paymentStatus = 'refunded';
+        order.deliveryStatus = 'cancelled';
+        if (!order.trackingDetails) order.trackingDetails = {};
+        order.trackingDetails.cancelledAt = new Date();
+
+        await order.save();
+
+        // Notify user about refund
+        try {
+            await createNotification({
+                userId: order.userId,
+                title: 'Order Refunded',
+                message: `Your order #${order._id.toString().slice(-6).toUpperCase()} has been refunded (₹${refundAmount.toLocaleString()}) to your account.`,
+                type: 'ecommerce_order_update',
+                metadata: { orderId: order._id, status: 'refunded' }
+            });
+        } catch (nErr) { console.error('Push notification error:', nErr); }
+
+        res.status(200).json({
+            success: true,
+            message: `Order successfully marked as refunded (₹${refundAmount.toLocaleString()} to customer account).`,
+            data: order
+        });
+    } catch (error) {
+        console.error('Refund order error:', error);
+        res.status(500).json({ success: false, message: 'Failed to process refund: ' + error.message });
+    }
+};
+
 module.exports = {
     getMyProducts,
     addProduct,
     updateMyProduct,
     deleteMyProduct,
     getMyOrders,
-    updateOrderStatus
+    updateOrderStatus,
+    refundOrder
 };

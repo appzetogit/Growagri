@@ -18,6 +18,12 @@ const websiteService = {
   createReview: (data) => API.post("/admin/website/review", data),
   updateReview: (id, data) => API.put(`/admin/website/review/${id}`, data),
   deleteReview: (id) => API.delete(`/admin/website/review/${id}`),
+
+  // Website Banners
+  getBanners: () => API.get("/admin/website/banner"),
+  createBanner: (data) => API.post("/admin/website/banner", data),
+  updateBanner: (id, data) => API.put(`/admin/website/banner/${id}`, data),
+  deleteBanner: (id) => API.delete(`/admin/website/banner/${id}`),
 };
 
 export default websiteService;

@@ -75,7 +75,7 @@ const ecommerceOrderSchema = new mongoose.Schema({
     },
     paymentType: {
         type: String,
-        enum: ['split', 'online_full', 'cod'],
+        enum: ['split', 'online_full', 'cod', 'wallet'],
         default: 'split'
     },
     trackingDetails: {

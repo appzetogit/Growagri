@@ -6,6 +6,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import harvesterHero from '../landing_images/hero_premium.png';
 import TranslatedText from '../../../components/TranslatedText';
+import HeroBannerSlider from './HeroBannerSlider';
 
 // Register ScrollTrigger once with safe config.
 // ignoreMobileResize: true prevents GSAP from attaching a media-query listener
@@ -122,8 +123,9 @@ const Hero = () => {
       />
 
       {/* Main Content */}
-      <div ref={contentRef} className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-20 pt-36 pb-24">
-        <div className="max-w-3xl">
+      <div ref={contentRef} className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-20 pt-32 lg:pt-36 pb-20 lg:pb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 xl:gap-14 items-center">
+          <div className="lg:col-span-7">
 
           {/* Badge */}
           <motion.div
@@ -224,7 +226,13 @@ const Hero = () => {
             ))}
           </div>
         </div>
+
+        {/* Right Column: Dynamic Website Banner Container */}
+        <div className="lg:col-span-5 w-full">
+          <HeroBannerSlider />
+        </div>
       </div>
+    </div>
 
       {/* Scroll Indicator - fixed to bottom center */}
       <motion.div

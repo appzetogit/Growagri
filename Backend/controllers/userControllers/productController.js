@@ -100,7 +100,7 @@ const getApprovedProducts = async (req, res) => {
 
         let productsQuery = Product.find(filter)
             .populate('categoryId', 'title imageUrl')
-            .populate('vendorId', 'businessName name profilePhoto')
+            .populate('vendorId', 'businessName name profilePhoto shopDetails')
             .lean();
 
         if (!lat || !lng || lat === 'undefined' || lng === 'undefined') {
@@ -128,7 +128,7 @@ const getProductDetails = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id)
             .populate('categoryId', 'title')
-            .populate('vendorId', 'businessName phone profilePhoto');
+            .populate('vendorId', 'businessName phone profilePhoto shopDetails');
         if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
         res.status(200).json({ success: true, data: product });
     } catch (error) {
@@ -179,6 +179,35 @@ const placeOrder = async (req, res) => {
             isFromCart = true;
         }
 
+        // Wallet Balance Check & Pre-deduction if user pays via Wallet
+        if (paymentType === 'wallet') {
+            let totalAmountNeeded = 0;
+            for (const item of checkoutItems) {
+                totalAmountNeeded += ((item.product.price * item.quantity) + ((item.product.shippingCharge || 0) * item.quantity));
+            }
+
+            const currentUser = await User.findById(userId);
+            if (!currentUser || (currentUser.wallet?.balance || 0) < totalAmountNeeded) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient wallet balance. You have ₹${(currentUser?.wallet?.balance || 0).toLocaleString('en-IN')}, but order total is ₹${totalAmountNeeded.toLocaleString('en-IN')}. Please add money to your wallet.`
+                });
+            }
+
+            const updatedUser = await User.findOneAndUpdate(
+                { _id: userId, 'wallet.balance': { $gte: totalAmountNeeded } },
+                { $inc: { 'wallet.balance': -totalAmountNeeded } },
+                { new: true }
+            );
+
+            if (!updatedUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Insufficient wallet balance. Please add money to your wallet.'
+                });
+            }
+        }
+
         // Group items by vendorId
         const vendorGroups = {};
         for (const item of checkoutItems) {
@@ -201,8 +230,10 @@ const placeOrder = async (req, res) => {
             const orderItems = items.map(item => {
                 const subtotal = item.product.price * item.quantity;
                 itemsTotal += subtotal;
-                adminCommission += (subtotal * (item.product.commissionPercentage / 100));
-                gstAmount += (subtotal * (item.product.gstPercentage / 100));
+                const commPct = typeof item.product.commissionPercentage === 'number' ? item.product.commissionPercentage : 10;
+                adminCommission += (subtotal * (commPct / 100));
+                // GST is removed (0)
+                gstAmount = 0;
                 shippingCharges += ((item.product.shippingCharge || 0) * item.quantity);
 
                 return {
@@ -215,9 +246,11 @@ const placeOrder = async (req, res) => {
                 };
             });
 
-            const platformFee = adminCommission + gstAmount;
-            const vendorBalance = itemsTotal;
-            const orderTotal = itemsTotal + platformFee + shippingCharges;
+            // Platform fee is solely the admin commission from items total
+            const platformFee = adminCommission;
+            // Shipping charges are earned by the vendor
+            const vendorBalance = Math.max(0, (itemsTotal - adminCommission) + shippingCharges);
+            const orderTotal = itemsTotal + shippingCharges;
 
             const order = new EcommerceOrder({
                 userId,
@@ -234,7 +267,7 @@ const placeOrder = async (req, res) => {
                 },
                 shippingAddress,
                 deliveryOtp: Math.floor(1000 + Math.random() * 9000).toString(),
-                paymentMethod: paymentMethod || 'wallet',
+                paymentMethod: paymentType === 'wallet' ? 'wallet' : (paymentMethod || (paymentType === 'cod' ? 'cash' : 'wallet')),
                 paymentType: paymentType || 'split'
             });
 
@@ -256,6 +289,43 @@ const placeOrder = async (req, res) => {
                         recipientModel: 'Vendor',
                         title: 'New COD Store Order!',
                         message: `You received a COD order for ${order.items[0].name}. Please pack it for shipping.`,
+                        type: 'ecommerce_order',
+                        metadata: { orderId: order._id }
+                    });
+                } catch (nErr) { console.error('Push notification error:', nErr); }
+
+            } else if (order.paymentType === 'wallet') {
+                order.deliveryStatus = 'ordered';
+                order.paymentStatus = 'paid';
+                order.paymentMethod = 'wallet';
+
+                // Record Transaction in ledger
+                const transaction = new Transaction({
+                    userId,
+                    type: 'ecommerce_full_payment',
+                    amount: order.pricing.orderTotal,
+                    status: 'completed',
+                    paymentMethod: 'wallet',
+                    description: `Full payment for Ecommerce Order: #${order._id.toString().slice(-8)} (Paid via Wallet)`,
+                    metadata: { orderId: order._id, paymentMode: 'wallet' }
+                });
+                await transaction.save();
+                order.adminTransactionId = transaction._id;
+                await order.save();
+
+                // Reduce Stock
+                for (const item of items) {
+                    await Product.findByIdAndUpdate(item.product._id, { $inc: { stock: -item.quantity } });
+                    await checkAndNotifyOutOfStock(item.product._id);
+                }
+
+                // Notify Vendor
+                try {
+                    await createNotification({
+                        recipientId: order.vendorId,
+                        recipientModel: 'Vendor',
+                        title: 'New Store Order (Paid via Wallet)!',
+                        message: `You received a new PREPAID (Wallet) order for ${order.items[0].name}. Please pack it for shipping.`,
                         type: 'ecommerce_order',
                         metadata: { orderId: order._id }
                     });
@@ -283,21 +353,23 @@ const placeOrder = async (req, res) => {
                 orders: createdOrders,
                 message: order.paymentType === 'cod' 
                     ? 'COD Order placed successfully.' 
-                    : (order.paymentType === 'online_full' ? 'Order created. Please pay full amount to confirm.' : 'Order created. Please pay Platform Fee to confirm.'),
-                amountToPay: order.paymentType === 'online_full' ? order.pricing.orderTotal : order.pricing.platformFee,
+                    : (order.paymentType === 'wallet' 
+                        ? 'Order placed and paid successfully via Wallet.' 
+                        : (order.paymentType === 'online_full' ? 'Order created. Please pay full amount to confirm.' : 'Order created. Please pay Platform Fee to confirm.')),
+                amountToPay: order.paymentType === 'online_full' || order.paymentType === 'wallet' ? order.pricing.orderTotal : order.pricing.platformFee,
                 paymentType: order.paymentType
             });
         }
 
         // Multi-vendor checkout response
         const totalAmountToPay = createdOrders.reduce((sum, order) => {
-            return sum + (order.paymentType === 'online_full' ? order.pricing.orderTotal : order.pricing.platformFee);
+            return sum + (order.paymentType === 'online_full' || order.paymentType === 'wallet' ? order.pricing.orderTotal : order.pricing.platformFee);
         }, 0);
 
         res.status(201).json({
             success: true,
             orders: createdOrders,
-            message: `Created ${createdOrders.length} orders for different vendors.`,
+            message: paymentType === 'wallet' ? `Created ${createdOrders.length} orders paid via Wallet.` : `Created ${createdOrders.length} orders for different vendors.`,
             amountToPay: totalAmountToPay,
             paymentType: paymentType
         });
@@ -499,7 +571,7 @@ const payPlatformFee = async (req, res) => {
 const getMyOrders = async (req, res) => {
     try {
         const orders = await EcommerceOrder.find({ userId: req.user._id })
-            .populate('vendorId', 'businessName phone')
+            .populate('vendorId', 'businessName phone name shopDetails')
             .populate('items.productId', 'unit bagWeight')
             .sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: orders });
@@ -512,7 +584,7 @@ const getMyOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
     try {
         const order = await EcommerceOrder.findById(req.params.id)
-            .populate('vendorId', 'businessName phone')
+            .populate('vendorId', 'businessName phone name shopDetails')
             .populate('items.productId', 'unit bagWeight');
         if (!order || order.userId.toString() !== req.user._id.toString()) {
             return res.status(404).json({ success: false, message: 'Order not found' });
@@ -551,27 +623,43 @@ const cancelOrder = async (req, res) => {
         }
         order.deliveryStatus = 'cancelled';
         
-        // If it was already paid, refund the correct amount to the user's wallet
+        // If it was already paid, refund directly to user wallet
         if (order.paymentStatus === 'paid') {
             const user = await User.findById(userId);
-            let refundAmount = order.pricing.platformFee;
-            if (order.paymentType === 'online_full') {
-                refundAmount = order.pricing.orderTotal;
+            let refundAmount = order.pricing?.orderTotal || 0;
+            if (order.paymentType === 'split') {
+                refundAmount = order.pricing.platformFee;
             }
-            
-            user.wallet.balance += refundAmount;
-            await user.save();
 
-            const transaction = new Transaction({
-                userId: user._id,
-                type: 'refund',
-                amount: refundAmount,
-                status: 'completed',
-                paymentMethod: 'system',
-                description: `Refund for Cancelled Ecommerce Order: ${order._id.toString().slice(-8)}`,
-                metadata: { orderId: order._id, reason: 'user_cancelled' }
-            });
-            await transaction.save();
+            if (user && refundAmount > 0) {
+                const oldBal = user.wallet?.balance || 0;
+                const newBal = oldBal + refundAmount;
+                if (!user.wallet) {
+                    user.wallet = { balance: newBal, penalty: 0 };
+                } else {
+                    user.wallet.balance = newBal;
+                }
+                await user.save();
+
+                const transaction = new Transaction({
+                    userId: user._id,
+                    type: 'refund',
+                    amount: refundAmount,
+                    status: 'completed',
+                    paymentMethod: 'wallet',
+                    balanceBefore: oldBal,
+                    balanceAfter: newBal,
+                    description: `Refund for Cancelled Ecommerce Order: #${order._id.toString().slice(-8)} (Credited to Wallet)`,
+                    metadata: { 
+                        orderId: order._id, 
+                        reason: 'user_cancelled', 
+                        originalPaymentMethod: order.paymentMethod || 'wallet'
+                    }
+                });
+                await transaction.save();
+            }
+
+            order.paymentStatus = 'refunded';
         }
 
         // Stock was reduced at placement for COD, or after payment for online orders
@@ -593,7 +681,7 @@ const generateInvoice = async (req, res) => {
     try {
         const order = await EcommerceOrder.findById(req.params.id)
             .populate('userId', 'name phone email')
-            .populate('vendorId', 'businessName phone name')
+            .populate('vendorId', 'businessName phone name shopDetails')
             .populate('items.productId', 'title price unit bagWeight gstPercentage commissionPercentage brandName');
 
         if (!order) {
@@ -621,7 +709,8 @@ const generateInvoice = async (req, res) => {
         // Details Row
         const yStart = doc.y;
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333').text('Seller Details:', 50, yStart);
-        doc.font('Helvetica').text(order.vendorId?.businessName || order.vendorId?.name || 'Local Seller', 50, yStart + 15);
+        const sellerShop = order.vendorId?.shopDetails?.shopName || order.vendorId?.businessName || order.vendorId?.name || 'Local Seller';
+        doc.font('Helvetica').text(sellerShop, 50, yStart + 15);
         doc.text(`Phone: ${order.vendorId?.phone || 'N/A'}`, 50, yStart + 30);
         
         doc.font('Helvetica-Bold').text('Customer Details:', 300, yStart);

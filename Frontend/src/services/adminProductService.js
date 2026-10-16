@@ -52,6 +52,11 @@ const adminProductService = {
     updateOrderStatus: async (id, status) => {
         const response = await api.patch(`/admin/orders/${id}/status`, { status });
         return response.data;
+    },
+
+    refundOrder: async (id) => {
+        const response = await api.post(`/admin/orders/${id}/refund`);
+        return response.data;
     }
 };
 

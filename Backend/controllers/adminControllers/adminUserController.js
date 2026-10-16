@@ -414,6 +414,80 @@ const addUser = async (req, res) => {
   }
 };
 
+/**
+ * Update farmer profile & wallet balance
+ */
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, isActive, walletBalance } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Farmer not found'
+      });
+    }
+
+    if (name !== undefined && name !== null) user.name = String(name).trim();
+    if (email !== undefined) user.email = email ? String(email).trim().toLowerCase() : null;
+    if (phone !== undefined && phone !== null) user.phone = String(phone).trim();
+    if (isActive !== undefined) user.isActive = Boolean(isActive);
+
+    // Handle wallet balance update if provided
+    if (walletBalance !== undefined && walletBalance !== null && !isNaN(Number(walletBalance))) {
+      const newBalance = Math.max(0, parseFloat(walletBalance));
+      const oldBalance = user.wallet?.balance || 0;
+
+      if (!user.wallet) {
+        user.wallet = { balance: newBalance, penalty: 0 };
+      } else {
+        user.wallet.balance = newBalance;
+      }
+
+      // Record a transaction audit record if balance changed
+      if (Math.abs(newBalance - oldBalance) > 0.001) {
+        try {
+          const Transaction = require('../../models/Transaction');
+          await Transaction.create({
+            userId: user._id,
+            type: 'wallet_adjustment',
+            amount: parseFloat(Math.abs(newBalance - oldBalance).toFixed(2)),
+            status: 'completed',
+            paymentMethod: 'system',
+            description: `Admin updated wallet balance from ₹${oldBalance} to ₹${newBalance}`,
+            balanceBefore: oldBalance,
+            balanceAfter: newBalance
+          });
+        } catch (tErr) {
+          console.warn('Transaction record warning (non-fatal):', tErr);
+        }
+      }
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Farmer updated successfully',
+      data: user
+    });
+  } catch (error) {
+    console.error('Update farmer error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number or email is already registered with another account.'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update farmer'
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserDetails,
@@ -422,5 +496,6 @@ module.exports = {
   bulkDeleteUsers,
   getUserBookings,
   getUserWalletTransactions,
-  addUser
+  addUser,
+  updateUser
 };

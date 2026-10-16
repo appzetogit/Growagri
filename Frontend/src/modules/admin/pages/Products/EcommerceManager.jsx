@@ -46,8 +46,9 @@ const EcommerceManager = () => {
         images: [],
         isFeatured: false,
         specifications: [],
-        gstPercentage: platformGst, // Settings se aata hai
-        commissionPercentage: 10
+        gstPercentage: platformGst,
+        commissionPercentage: 10,
+        shippingCharge: 0
     });
 
     useEffect(() => {
@@ -225,7 +226,8 @@ const EcommerceManager = () => {
             isFeatured: false,
             specifications: [],
             gstPercentage: 18,
-            commissionPercentage: 10
+            commissionPercentage: 10,
+            shippingCharge: 0
         });
         setEditMode(false);
         setCurrentProduct(null);
@@ -247,7 +249,8 @@ const EcommerceManager = () => {
             isFeatured: product.isFeatured || false,
             specifications: product.specifications || [],
             gstPercentage: product.gstPercentage ?? 18,
-            commissionPercentage: product.commissionPercentage ?? 10
+            commissionPercentage: product.commissionPercentage ?? 10,
+            shippingCharge: product.shippingCharge ?? 0
         });
         setEditMode(true);
         setShowModal(true);
@@ -525,6 +528,29 @@ const EcommerceManager = () => {
                                             <div>
                                                 <label className={labelCls}>Admin Commission (%)</label>
                                                 <input type="number" min="0" className={inputCls} value={formData.commissionPercentage} onChange={e => setFormData({ ...formData, commissionPercentage: e.target.value })} />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className={labelCls}>
+                                                    Shipping Charge (₹)
+                                                    {currentProduct?.vendorId && (
+                                                        <span className="ml-2 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Set by Vendor</span>
+                                                    )}
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className={`${inputCls} ${currentProduct?.vendorId ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                                                        value={formData.shippingCharge ?? 0}
+                                                        readOnly={!!currentProduct?.vendorId}
+                                                        onChange={e => !currentProduct?.vendorId && setFormData({ ...formData, shippingCharge: e.target.value })}
+                                                    />
+                                                    {currentProduct?.vendorId && (
+                                                        <p className="text-xs text-slate-400 mt-1">
+                                                            Shipping charge set by vendor. Only vendor can modify this.
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

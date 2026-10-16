@@ -309,12 +309,14 @@ if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
   initializeScheduler(getIO());
   console.log('[Server] Booking Scheduler initialized for wave-based alerting');
 
-  // Handle unhandled promise rejections
+  // Handle unhandled promise rejections without crashing server in development
   process.on('unhandledRejection', (err) => {
     console.error('Unhandled Promise Rejection:', err);
-    server.close(() => {
-      process.exit(1);
-    });
+    if (process.env.NODE_ENV === 'production') {
+      server.close(() => {
+        process.exit(1);
+      });
+    }
   });
 } else {
   // For Vercel, create HTTP server for Socket.io

@@ -31,6 +31,16 @@ export const adminUserService = {
     }
   },
 
+  // Update farmer details & wallet
+  updateUser: async (id, data) => {
+    try {
+      const response = await api.put(`/admin/users/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to update farmer' };
+    }
+  },
+
   // Block/Unblock user
   toggleUserStatus: async (id, isActive) => {
     try {

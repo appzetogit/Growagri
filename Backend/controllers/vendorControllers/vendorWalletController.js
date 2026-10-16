@@ -69,7 +69,7 @@ const getWallet = async (req, res) => {
       }
     ]);
 
-    const totalCashCollected = cashCollectedResult[0]?.total || 0;
+    const totalCashCollected = vendor.wallet?.totalCashCollected || cashCollectedResult[0]?.total || 0;
     const totalSettled = settledResult[0]?.total || 0;
 
     res.status(200).json({

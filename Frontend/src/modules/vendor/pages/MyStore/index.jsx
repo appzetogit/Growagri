@@ -41,6 +41,7 @@ const MyStore = () => {
         unit: 'bag',
         bagWeight: 50,
         stock: 1,
+        shippingCharge: 0,
         imageUrl: '',
         images: [],
         specifications: []
@@ -348,7 +349,7 @@ const MyStore = () => {
                             setEditMode(false);
                             setFormData({
                                 title: '', categoryId: '', brandName: '', description: '', price: '', unit: 'bag', bagWeight: 50, stock: 1,
-                                imageUrl: '', images: [], specifications: []
+                                shippingCharge: 0, imageUrl: '', images: [], specifications: []
                             });
                             setShowModal(true);
                         }}
@@ -528,7 +529,24 @@ const MyStore = () => {
                                                 <input required type="number" min="0" inputMode="numeric" className={inputClass} value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} />
                                             </div>
                                         </div>
-                                        <p className="text-xs text-slate-500 flex gap-1.5">
+                                        {/* Shipping Charge - full width */}
+                                        <div className="col-span-2">
+                                            <label className={labelClass}>Shipping Charge <span className="text-slate-400 font-normal">(optional)</span></label>
+                                            <div className="relative">
+                                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    inputMode="decimal"
+                                                    className={`${inputClass} pl-8`}
+                                                    placeholder="0"
+                                                    value={formData.shippingCharge ?? 0}
+                                                    onChange={e => setFormData({ ...formData, shippingCharge: e.target.value })}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-slate-400 mt-1 ml-0.5">Amount charged for delivery per unit sold.</p>
+                                        </div>
+                                        <p className="text-xs text-slate-500 flex gap-1.5 col-span-2">
                                             <FiInfo className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" />
                                             Admin adds GST and commission to your base price before the product goes live.
                                         </p>

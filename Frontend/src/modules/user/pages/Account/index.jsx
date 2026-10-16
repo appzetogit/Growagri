@@ -374,12 +374,17 @@ const Account = () => {
           <motion.div variants={itemVariants}>
             <MenuItem
               icon={FiClipboard}
-              label="My Bookings"
+              label={t('My Bookings') || "My Bookings"}
               onClick={() => navigate('/user/my-bookings')}
             />
             <MenuItem
+              icon={FiShoppingBag}
+              label={t('My Agri Orders') || "My Agri Orders"}
+              onClick={() => navigate('/user/my-agri-orders')}
+            />
+            <MenuItem
               icon={FiStar}
-              label="My Ratings"
+              label={t('My Ratings') || "My Ratings"}
               onClick={() => navigate('/user/my-rating')}
             />
           </motion.div>

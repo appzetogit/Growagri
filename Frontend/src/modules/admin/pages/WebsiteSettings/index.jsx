@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 // Lazy load sub-pages
+import Banners from './Banners';
 import Blogs from './Blogs';
 import Articles from './Articles';
 import Reviews from './Reviews';
@@ -23,7 +24,8 @@ const WebsiteSettings = () => {
         transition={{ duration: 0.3 }}
       >
         <Routes>
-          <Route path="/" element={<Navigate to="blogs" replace />} />
+          <Route path="/" element={<Navigate to="banners" replace />} />
+          <Route path="banners" element={<Banners />} />
           <Route path="blogs" element={<Blogs />} />
           <Route path="articles" element={<Articles />} />
           <Route path="reviews" element={<Reviews />} />
@@ -31,7 +33,7 @@ const WebsiteSettings = () => {
           <Route path="about-us" element={<AboutUs />} />
           <Route path="app-guide" element={<AppGuide />} />
           <Route path="policies" element={<Policies />} />
-          <Route path="*" element={<Navigate to="blogs" replace />} />
+          <Route path="*" element={<Navigate to="banners" replace />} />
         </Routes>
       </motion.div>
     </div>

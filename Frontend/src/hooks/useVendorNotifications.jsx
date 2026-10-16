@@ -21,7 +21,9 @@ export const useVendorNotifications = (vendorId, onNewBooking) => {
         token: localStorage.getItem('vendorAccessToken'),
         vendorId: vendorId
       },
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity
     });
 
     socketRef.current = socket;

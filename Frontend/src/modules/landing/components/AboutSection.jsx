@@ -12,14 +12,6 @@ import {
 import TranslatedText from '../../../components/TranslatedText';
 import axios from 'axios';
 
-const getYouTubeEmbedUrl = (url) => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11)
-      ? `https://www.youtube.com/embed/${match[2]}`
-      : null;
-};
 
 const AboutSection = () => {
     const [aboutContent, setAboutContent] = useState(null);
@@ -180,100 +172,7 @@ const AboutSection = () => {
                     </motion.div>
                 </div>
 
-                {/* Videos Section Distributed Below */}
-                {(aboutContent?.videos?.length > 0 || aboutContent?.videoUrl) && (
-                    <div className="mb-16 md:mb-24">
-                        <div className="text-center mb-8">
-                            <h3 className="text-2xl md:text-3xl font-black text-gray-900">
-                                <TranslatedText>Watch & Learn</TranslatedText>
-                            </h3>
-                        </div>
-                        <div className={`grid grid-cols-1 ${aboutContent?.videos?.length > 1 ? 'md:grid-cols-2 lg:grid-cols-2' : 'max-w-3xl mx-auto'} gap-8`}>
-                            {aboutContent?.videos?.length > 0 ? (
-                                aboutContent.videos.map((vid, idx) => (
-                                    <motion.div 
-                                        key={idx} 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }}
-                                        className="rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white flex flex-col h-full hover:shadow-3xl transition-shadow"
-                                    >
-                                        <div className="flex-grow">
-                                            {getYouTubeEmbedUrl(vid.url) ? (
-                                                <iframe
-                                                    width="100%"
-                                                    height="315"
-                                                    src={getYouTubeEmbedUrl(vid.url)}
-                                                    title={`YouTube video player ${idx + 1}`}
-                                                    frameBorder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                    allowFullScreen
-                                                    className="w-full aspect-video"
-                                                ></iframe>
-                                            ) : (
-                                                <video 
-                                                    width="100%" 
-                                                    height="315" 
-                                                    controls 
-                                                    className="w-full aspect-video object-cover"
-                                                    src={vid.url}
-                                                >
-                                                    Your browser does not support the video tag.
-                                                </video>
-                                            )}
-                                        </div>
-                                        {vid.description && (
-                                            <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-t border-gray-100 mt-auto">
-                                                <p className="text-gray-700 text-sm md:text-base text-center font-medium leading-relaxed">
-                                                    <TranslatedText>{vid.description}</TranslatedText>
-                                                </p>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                ))
-                            ) : (
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    viewport={{ once: true }}
-                                    className="rounded-3xl overflow-hidden shadow-2xl border border-gray-100 bg-white flex flex-col h-full hover:shadow-3xl transition-shadow"
-                                >
-                                    <div className="flex-grow">
-                                        {getYouTubeEmbedUrl(aboutContent.videoUrl) ? (
-                                            <iframe
-                                                width="100%"
-                                                height="315"
-                                                src={getYouTubeEmbedUrl(aboutContent.videoUrl)}
-                                                title="YouTube video player"
-                                                frameBorder="0"
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                allowFullScreen
-                                                className="w-full aspect-video"
-                                            ></iframe>
-                                        ) : (
-                                            <video 
-                                                width="100%" 
-                                                height="315" 
-                                                controls 
-                                                className="w-full aspect-video object-cover"
-                                                src={aboutContent.videoUrl}
-                                            >
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        )}
-                                    </div>
-                                    {aboutContent.videoDescription && (
-                                        <div className="p-5 bg-gradient-to-b from-gray-50 to-white border-t border-gray-100 mt-auto">
-                                            <p className="text-gray-700 text-sm md:text-base text-center font-medium leading-relaxed">
-                                                <TranslatedText>{aboutContent.videoDescription}</TranslatedText>
-                                            </p>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            )}
-                        </div>
-                    </div>
-                )}
+
 
                 <div>
                     <div className="text-center mb-8 md:mb-12">

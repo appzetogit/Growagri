@@ -17,6 +17,7 @@ import { useEcommerceCart } from '../../../../context/EcommerceCartContext';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import LocationPicker from '../Checkout/components/LocationPicker';
+import { startEcommercePayment } from '../../../../utils/razorpay';
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -96,8 +97,18 @@ const ProductDetail = () => {
                     toast.success("Order Placed Successfully!");
                     navigate('/user/my-agri-orders');
                 } else {
-                    toast.success("Order Placed! Please complete payment to confirm.");
-                    navigate(`/user/order-payment/${res.data._id}`);
+                    try {
+                        await startEcommercePayment(res.data._id);
+                        toast.success("Payment Successful! Order Confirmed.");
+                        navigate('/user/my-agri-orders');
+                    } catch (payErr) {
+                        if (payErr?.dismissed) {
+                            toast("Order placed. You can complete payment anytime from My Orders.", { icon: '📦' });
+                        } else {
+                            toast.error(payErr?.message || "Payment cancelled or failed");
+                        }
+                        navigate('/user/my-agri-orders');
+                    }
                 }
             }
         } catch (err) {
@@ -109,16 +120,13 @@ const ProductDetail = () => {
     if (!product) return <div className="p-20 text-center font-black text-slate-400">PRODUCT NOT FOUND</div>;
 
     const basePrice = product.price || 0;
+    const shippingCharge = (product.shippingCharge || 0) * quantity;
     const commissionPercentage = product.commissionPercentage || 0;
-    const gstPercentage = product.gstPercentage || 5;
 
     const commission = (basePrice * quantity) * (commissionPercentage / 100);
-    const gstTotal = (basePrice * quantity) * (gstPercentage / 100);
-    const calculatedPlatformFee = commission + gstTotal;
-
-    const adminFee = calculatedPlatformFee;
-    const vendorBalance = basePrice * quantity;
-    const totalPayable = adminFee + vendorBalance;
+    const adminFee = commission;
+    const vendorBalance = Math.max(0, (basePrice * quantity) - commission);
+    const totalPayable = (basePrice * quantity) + shippingCharge;
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -239,22 +247,17 @@ const ProductDetail = () => {
                                 <p className="text-2xl font-black text-teal-600 font-sans tracking-tight shrink-0 ml-2">₹{adminFee.toFixed(2)}</p>
                             </div>
                             
-                            <div className="pt-3 border-t border-dashed border-slate-200 space-y-2">
-                                <div className="flex justify-between items-center gap-2">
-                                    <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                                        <span className="whitespace-nowrap">Platform Commission</span> 
-                                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">{commissionPercentage}%</span>
-                                    </p>
-                                    <p className="text-xs font-black text-slate-800 font-sans shrink-0">₹{commission.toFixed(2)}</p>
+                            {commissionPercentage > 0 && (
+                                <div className="pt-3 border-t border-dashed border-slate-200">
+                                    <div className="flex justify-between items-center gap-2">
+                                        <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+                                            <span className="whitespace-nowrap">Platform Commission</span> 
+                                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">{commissionPercentage}%</span>
+                                        </p>
+                                        <p className="text-xs font-black text-slate-800 font-sans shrink-0">₹{commission.toFixed(2)}</p>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center gap-2">
-                                    <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-                                        <span className="whitespace-nowrap">GST (Taxes)</span> 
-                                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">{gstPercentage}%</span>
-                                    </p>
-                                    <p className="text-xs font-black text-slate-800 font-sans shrink-0">₹{gstTotal.toFixed(2)}</p>
-                                </div>
-                            </div>
+                            )}
                         </div>
                         
                         <div className="flex justify-between items-center p-4 pl-5 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm gap-2">

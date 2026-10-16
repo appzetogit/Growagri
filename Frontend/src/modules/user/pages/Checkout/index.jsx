@@ -457,7 +457,9 @@ const Checkout = () => {
     const socketUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
     const socket = io(socketUrl, {
       auth: { token: localStorage.getItem('accessToken') },
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity
     });
 
     let isHandled = false;
