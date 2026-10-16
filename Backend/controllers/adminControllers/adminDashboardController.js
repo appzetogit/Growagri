@@ -6,6 +6,11 @@ const Withdrawal = require('../../models/Withdrawal');
 const Settlement = require('../../models/Settlement');
 const SoilTestRequest = require('../../models/SoilTestRequest');
 const EcommerceOrder = require('../../models/EcommerceOrder');
+const VendorEquipment = require('../../models/VendorEquipment');
+const Product = require('../../models/Product');
+const Scheme = require('../../models/Scheme');
+const Service = require('../../models/Service');
+const Category = require('../../models/Category');
 
 const { BOOKING_STATUS, PAYMENT_STATUS, VENDOR_STATUS } = require('../../utils/constants');
 
@@ -41,10 +46,10 @@ const getDashboardStats = async (req, res) => {
       if (endDate) bookingMatch.completedAt.$lte = new Date(endDate);
     }
 
-    // Total counts (Users and Vendors now follow the date filter)
-    const totalUsers = await User.countDocuments({ isActive: true, ...dateFilter });
-    const totalVendors = await Vendor.countDocuments({ isActive: true, ...dateFilter });
-    const totalWorkers = await Worker.countDocuments({ isActive: true, ...dateFilter });
+    // Total counts (All registered platform users and equipment vendors)
+    const totalUsers = await User.countDocuments({ isActive: true });
+    const totalVendors = await Vendor.countDocuments();
+    const totalWorkers = await Worker.countDocuments({ isActive: true });
     const totalBookings = await Booking.countDocuments(dateFilter);
 
     // Booking stats
@@ -68,14 +73,20 @@ const getDashboardStats = async (req, res) => {
         $group: {
           _id: null,
           totalRevenue: { $sum: '$finalAmount' },
-          totalBookings: { $sum: 1 }
+          totalBasePrice: {
+            $sum: { $ifNull: ['$basePrice', { $subtract: ['$finalAmount', { $ifNull: ['$tax', 0] }] }] }
+          },
+          totalBookings: { $sum: 1 },
+          bookingGst: { $sum: { $ifNull: ['$tax', 0] } }
         }
       }
     ]);
 
-    const bookingRevData = revenueResult[0] || { totalRevenue: 0, totalBookings: 0 };
-    const bookingRevenue = bookingRevData.totalRevenue;
-    const bookingCommission = bookingRevenue * (await getCommissionRate());
+    const bookingRevData = revenueResult[0] || { totalRevenue: 0, totalBasePrice: 0, totalBookings: 0, bookingGst: 0 };
+    const commissionRate = await getCommissionRate();
+    const bookingCommission = parseFloat(((bookingRevData.totalBasePrice || 0) * commissionRate).toFixed(2));
+    const bookingRevenue = bookingCommission;
+    const bookingGst = bookingRevData.bookingGst || 0;
 
     // Soil Test Revenue
     const soilTestRevenueResult = await SoilTestRequest.aggregate([
@@ -139,6 +150,38 @@ const getDashboardStats = async (req, res) => {
     const pendingWithdrawals = await Withdrawal.countDocuments({ status: 'pending' });
     const pendingSettlementsCount = await Settlement.countDocuments({ status: 'pending' });
 
+    // Machinery count
+    const totalMachinery = await VendorEquipment.countDocuments();
+
+    // Agri Marketplace Stores requests pending & approved
+    const pendingStoreRequests = await Vendor.countDocuments({
+      'shopDetails.storeApprovalStatus': 'pending'
+    });
+    const approvedStores = await Vendor.countDocuments({
+      'shopDetails.storeApprovalStatus': 'approved'
+    });
+
+    // Agri Marketplace Products (live catalog count: admin + approved vendor physical goods)
+    const totalMarketplaceProducts = await Product.countDocuments({
+      type: 'physical_good',
+      $or: [
+        { vendorId: null },
+        { vendorId: { $ne: null }, approvalStatus: 'approved' }
+      ]
+    });
+
+    // Agri Orders (Only delivered ecommerce orders, excluding cancelled)
+    const totalAgriOrders = await EcommerceOrder.countDocuments({
+      deliveryStatus: 'delivered',
+      ...dateFilter
+    });
+
+    // Soil Testing Bookings (Requests)
+    const soilTestBookings = await SoilTestRequest.countDocuments(dateFilter);
+
+    // Total Schemes
+    const totalSchemes = await Scheme.countDocuments();
+
     // Recent activities (last 10 bookings)
     const recentActivityDocs = await Booking.find()
       .populate('userId', 'name phone')
@@ -175,6 +218,7 @@ const getDashboardStats = async (req, res) => {
           cancelledBookings,
           totalRevenue: totalRevenue,
           bookingRevenue: bookingCommission,
+          bookingGst: bookingGst,
           soilTestRevenue: soilTestCommission,
           ecommerceRevenue: ecommerceCommission,
           platformCommission: totalRevenue,
@@ -184,7 +228,14 @@ const getDashboardStats = async (req, res) => {
           pendingVendors,
           approvedVendors,
           pendingWithdrawals,
-          pendingSettlements: pendingSettlementsCount
+          pendingSettlements: pendingSettlementsCount,
+          totalMachinery,
+          pendingStoreRequests,
+          approvedStores,
+          totalMarketplaceProducts,
+          totalAgriOrders,
+          soilTestBookings,
+          totalSchemes
         },
         recentBookings
       }
@@ -240,7 +291,14 @@ const getRevenueAnalytics = async (req, res) => {
           },
           revenue: { $sum: '$finalAmount' },
           bookings: { $sum: 1 },
-          platformCommission: { $sum: { $multiply: ['$finalAmount', await getCommissionRate()] } }
+          platformCommission: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$basePrice', { $subtract: ['$finalAmount', { $ifNull: ['$tax', 0] }] }] },
+                await getCommissionRate()
+              ]
+            }
+          }
         }
       },
       { $sort: { _id: 1 } }

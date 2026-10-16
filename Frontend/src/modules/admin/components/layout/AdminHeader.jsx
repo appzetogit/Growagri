@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { FiMenu, FiBell, FiLogOut } from 'react-icons/fi';
+import { FiMenu, FiLogOut } from 'react-icons/fi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../Button';
-import NotificationWindow from './NotificationWindow';
 import { adminAuthService } from '../../../../services/authService';
 
 const AdminHeader = ({ onMenuClick }) => {
@@ -174,31 +173,7 @@ const AdminHeader = ({ onMenuClick }) => {
 
         {/* Right: Notifications & Logout */}
         <div className="flex items-center gap-3 md:gap-4">
-          {/* Notifications */}
-          <div className="relative">
-            <Button
-              data-notification-button
-              onClick={toggleNotifications}
-              variant="icon"
-              className="text-gray-700 hover:bg-gray-50"
-              icon={FiBell}
-            />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold border-2 border-white">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
 
-            <NotificationWindow
-              isOpen={showNotifications}
-              onClose={() => setShowNotifications(false)}
-              position="right"
-              notifications={notifications}
-              onMarkAsRead={handleMarkAsRead}
-              onMarkAllAsRead={handleMarkAllAsRead}
-              onDelete={handleDelete}
-            />
-          </div>
 
           {/* Admin Profile Section */}
           <div

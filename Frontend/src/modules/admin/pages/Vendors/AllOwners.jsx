@@ -507,14 +507,10 @@ const AllOwners = () => {
         subtitle="Manage and verify platform equipment owners"
       >
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <div className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Total Owners</div>
             <div className="text-xl font-bold text-blue-900">{analytics.totalVendors || owners.length}</div>
-          </div>
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
-            <div className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">Total Bookings</div>
-            <div className="text-xl font-bold text-purple-900">{analytics.totalBookings}</div>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
             <div className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">Pending</div>
@@ -555,13 +551,6 @@ const AllOwners = () => {
                 {status}
               </button>
             ))}
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-3 py-2 bg-[#347989] hover:bg-[#2c6573] text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm whitespace-nowrap ml-auto"
-            >
-              <FiPlus className="w-3.5 h-3.5" />
-              Add Owner
-            </button>
           </div>
         </div>
 
