@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiUser, FiMail, FiPhone, FiCheckCircle, FiChevronLeft, FiX } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { userAuthService } from '../../../services/authService';
@@ -22,6 +22,8 @@ const detailsSchema = z.object({
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref') || '';
   const [step, setStep] = useState('phone'); // 'phone', 'otp' or 'details' (new users only)
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -224,7 +226,8 @@ const Login = () => {
       const response = await userAuthService.register({
         name: name.trim(),
         email: email || null,
-        verificationToken
+        verificationToken,
+        referralCode: referralCode || undefined
       });
       if (response.success) {
         toast.success(

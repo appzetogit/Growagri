@@ -148,8 +148,40 @@ const userSchema = new mongoose.Schema({
     default: []
   },
 
+  // Refer & Earn
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true // auto-generated, allows null during creation
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  totalReferrals: {
+    type: Number,
+    default: 0
+  },
+
 }, {
   timestamps: true
+});
+
+// Auto-generate a short unique referral code on first save
+userSchema.pre('save', async function (next) {
+  if (this.isNew && !this.referralCode) {
+    const nameSlug = (this.name || 'USER').replace(/\s+/g, '').toUpperCase().slice(0, 4);
+    const phoneSuffix = (this.phone || '').slice(-4);
+    let code = `${nameSlug}${phoneSuffix}`;
+    // Ensure uniqueness
+    const exists = await mongoose.model('User').findOne({ referralCode: code });
+    if (exists) {
+      code = `${nameSlug}${phoneSuffix}${Math.floor(Math.random() * 90 + 10)}`;
+    }
+    this.referralCode = code;
+  }
+  next();
 });
 
 // Hash password before saving

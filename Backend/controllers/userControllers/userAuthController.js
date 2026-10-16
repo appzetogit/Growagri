@@ -165,6 +165,7 @@ const register = async (req, res) => {
     }
 
     const { name, email, verificationToken } = req.body;
+    const referralCode = (req.body.referralCode || '').toUpperCase().trim();
     let phone = req.body.phone;
 
     // Verify token if provided (New Flow)
@@ -197,14 +198,46 @@ const register = async (req, res) => {
       });
     }
 
+    // Look up referrer (if code provided)
+    let referrer = null;
+    if (referralCode) {
+      referrer = await User.findOne({ referralCode });
+    }
+
     // Create user
     const user = await User.create({
       name,
       email: email || null,
       phone,
       isPhoneVerified: true,
-      isEmailVerified: email ? false : true
+      isEmailVerified: email ? false : true,
+      referredBy: referrer ? referrer._id : null
     });
+
+    // Credit ₹100 referral reward to referrer immediately on signup
+    if (referrer) {
+      const Transaction = require('../../models/Transaction');
+      const prevBalance = referrer.wallet ? (referrer.wallet.balance || 0) : 0;
+      const newBalance = prevBalance + 100;
+
+      await User.findByIdAndUpdate(referrer._id, {
+        $inc: { 'wallet.balance': 100, totalReferrals: 1 }
+      });
+
+      await Transaction.create({
+        userId: referrer._id,
+        type: 'referral_reward',
+        amount: 100,
+        status: 'completed',
+        paymentMethod: 'system',
+        description: `Referral reward — ${name} joined using your referral code`,
+        balanceBefore: prevBalance,
+        balanceAfter: newBalance,
+        metadata: { referredUserId: user._id, referredUserName: name }
+      });
+
+      console.log(`[REFERRAL] ✅ ₹100 credited to referrer ${referrer._id} for referring ${user._id}`);
+    }
 
     // Send Welcome Email
     if (email) {
