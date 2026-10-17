@@ -2,17 +2,31 @@
  * Generate OTP and Token utilities
  */
 
+const TEST_NUMBERS = ['6268455485', '6260491554', '7610416911'];
+
+const isTestNumber = (phone) => {
+  if (!phone) return false;
+  const digitsOnly = String(phone).replace(/\D/g, '');
+  const last10 = digitsOnly.slice(-10);
+  return TEST_NUMBERS.includes(last10) || TEST_NUMBERS.includes(digitsOnly) || TEST_NUMBERS.includes(String(phone).trim());
+};
+
 /**
- * Generate a random OTP of specified length
- * @param {number} length - Length of OTP (default: 6)
+ * Generate a random OTP of specified length or default for test phone
+ * @param {number|string} lengthOrPhone - Length of OTP or phone number
  * @returns {string} - Generated OTP
  */
-const generateOTP = (length = 6) => {
+const generateOTP = (lengthOrPhone = 6) => {
+  if (typeof lengthOrPhone === 'string' && isTestNumber(lengthOrPhone)) {
+    return '123456';
+  }
+
   // In development mode, return default OTP for testing
   if (process.env.NODE_ENV === 'development' || process.env.USE_DEFAULT_OTP === 'true') {
     return '123456';
   }
 
+  const length = typeof lengthOrPhone === 'number' ? lengthOrPhone : 6;
   const digits = '0123456789';
   let OTP = '';
   for (let i = 0; i < length; i++) {

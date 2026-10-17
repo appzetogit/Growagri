@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { isTestNumber } = require('../utils/redisOtp.util');
 
 /**
  * Send SMS via SMS India Hub
@@ -9,7 +10,7 @@ const axios = require('axios');
 const sendSMS = async (phone, message) => {
   try {
     // Check for Test Mode or Specific Test Number
-    if (process.env.USE_DEFAULT_OTP === 'true' || phone === '6268455485') {
+    if (process.env.USE_DEFAULT_OTP === 'true' || isTestNumber(phone)) {
       console.log(`[SMS MOCK] To: ${phone}, Msg: ${message}`);
       return { success: true, data: 'Mock Success' };
     }

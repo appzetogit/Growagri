@@ -10,14 +10,25 @@ const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_SECONDS) || 300;
 const MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS) || 3;
 const RATE_LIMIT_COUNT = parseInt(process.env.OTP_RATE_LIMIT) || 3;
 const RATE_LIMIT_WINDOW = parseInt(process.env.OTP_RATE_WINDOW) || 600;
+// Test / Demo numbers that always get default OTP (123456)
+const TEST_NUMBERS = ['6268455485', '6260491554', '7610416911'];
+
+/**
+ * Check if phone is a designated test number
+ */
+const isTestNumber = (phone) => {
+  if (!phone) return false;
+  const digitsOnly = String(phone).replace(/\D/g, '');
+  const last10 = digitsOnly.slice(-10);
+  return TEST_NUMBERS.includes(last10) || TEST_NUMBERS.includes(digitsOnly) || TEST_NUMBERS.includes(String(phone).trim());
+};
 
 /**
  * Generate 6-digit OTP
  */
 const generateOTP = (phone) => {
-  // iOS Test Numbers - Always return fixed OTP for App Store review
-  const TEST_NUMBERS = ['6268455485', '6260491554'];
-  if (TEST_NUMBERS.includes(phone)) {
+  // Test Numbers - Always return fixed OTP (123456)
+  if (isTestNumber(phone)) {
     return '123456';
   }
   if (process.env.USE_DEFAULT_OTP === 'true') {
@@ -25,6 +36,7 @@ const generateOTP = (phone) => {
   }
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
+
 
 /**
  * Hash OTP using SHA-256
@@ -41,10 +53,9 @@ const hashOTP = (otp) => {
  * For now: Fail-open for simple rate limiting if Redis is down.
  */
 const checkRateLimit = async (phone) => {
-  // iOS Test Numbers - Always allow, never rate limit
-  const TEST_NUMBERS = ['6268455485', '6260491554'];
-  if (TEST_NUMBERS.includes(phone)) {
-    console.log(`[OTP] iOS test number, skipping rate limit for ${phone}`);
+  // Test Numbers - Always allow, never rate limit
+  if (isTestNumber(phone)) {
+    console.log(`[OTP] Test number, skipping rate limit for ${phone}`);
     return true;
   }
 
@@ -115,10 +126,9 @@ const storeOTP = async (phone, otpHash) => {
 const verifyOTP = async (phone, plainOtp) => {
   console.log(`[OTP] Verifying OTP for phone: ${phone}, OTP: ${plainOtp}`);
 
-  // iOS Test Numbers - Bypass OTP verification for App Store review
-  const TEST_NUMBERS = ['6268455485', '6260491554'];
-  if (TEST_NUMBERS.includes(phone) && plainOtp === '123456') {
-    console.log(`[OTP] ✅ iOS Test number bypass for ${phone}`);
+  // Test Numbers - Bypass OTP verification with default OTP 123456
+  if (isTestNumber(phone) && plainOtp === '123456') {
+    console.log(`[OTP] ✅ Test number bypass for ${phone}`);
     return { success: true };
   }
 
@@ -227,6 +237,8 @@ const verifyOTP = async (phone, plainOtp) => {
 };
 
 module.exports = {
+  TEST_NUMBERS,
+  isTestNumber,
   generateOTP,
   hashOTP,
   checkRateLimit,
