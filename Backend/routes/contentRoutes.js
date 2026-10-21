@@ -8,6 +8,7 @@ const { isAdmin } = require('../middleware/roleMiddleware');
 router.get('/faq', contentController.getFAQs);
 router.get('/faq/all', authenticate, isAdmin, contentController.getAllFAQs);
 router.get('/about', contentController.getAbout);
+router.get('/startup-recognition', contentController.getStartupRecognition);
 router.get('/app-guide', contentController.getAppGuide);
 router.get('/policy/:role/:type', contentController.getPolicy);
 
@@ -17,6 +18,7 @@ router.put('/faq/:id', authenticate, isAdmin, contentController.updateFAQ);
 router.delete('/faq/:id', authenticate, isAdmin, contentController.deleteFAQ);
 
 router.put('/about', authenticate, isAdmin, contentController.updateAbout);
+router.put('/startup-recognition', authenticate, isAdmin, contentController.updateStartupRecognition);
 router.put('/app-guide', authenticate, isAdmin, contentController.updateAppGuide);
 router.put('/policy', authenticate, isAdmin, contentController.updatePolicy);
 

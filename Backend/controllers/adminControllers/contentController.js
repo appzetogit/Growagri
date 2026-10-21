@@ -76,6 +76,9 @@ exports.getAbout = async (req, res) => {
 // @desc    Update About Content (Admin)
 exports.updateAbout = async (req, res) => {
     try {
+        if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 4) {
+            return res.status(400).json({ success: false, message: 'Maximum 4 images allowed for About section' });
+        }
         let about = await About.findOne();
         if (about) {
             about = await About.findByIdAndUpdate(about._id, req.body, { new: true, runValidators: true });
@@ -152,6 +155,38 @@ exports.updatePolicy = async (req, res) => {
             policy = await Policy.create({ role, type, content });
         }
         res.status(200).json({ success: true, data: policy });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const StartupRecognition = require('../../models/StartupRecognition');
+
+// ==================== Startup Recognition Controllers ====================
+
+// @desc    Get Startup Recognition (Public & Admin)
+exports.getStartupRecognition = async (req, res) => {
+    try {
+        let recognition = await StartupRecognition.findOne();
+        res.status(200).json({ success: true, data: recognition || null });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Update Startup Recognition (Admin)
+exports.updateStartupRecognition = async (req, res) => {
+    try {
+        let recognition = await StartupRecognition.findOne();
+        if (recognition) {
+            recognition = await StartupRecognition.findByIdAndUpdate(recognition._id, req.body, {
+                new: true,
+                runValidators: true
+            });
+        } else {
+            recognition = await StartupRecognition.create(req.body);
+        }
+        res.status(200).json({ success: true, message: 'Startup Recognition updated successfully', data: recognition });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

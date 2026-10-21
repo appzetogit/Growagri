@@ -85,7 +85,7 @@ const getChildRoute = (parentRoute, childName) => {
       "Registered Shops": "/admin/marketplace/registered-shops",
     },
     "/admin/manage-website": {
-      "Website Banners": "/admin/manage-website/banners",
+      "Startup Recognition": "/admin/manage-website/startup-recognition",
       "Blogs": "/admin/manage-website/blogs",
       "Articles": "/admin/manage-website/articles",
       "Reviews": "/admin/manage-website/reviews",

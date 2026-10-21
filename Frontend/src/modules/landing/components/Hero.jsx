@@ -6,12 +6,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import harvesterHero from '../landing_images/hero_premium.png';
 import TranslatedText from '../../../components/TranslatedText';
-import HeroBannerSlider from './HeroBannerSlider';
 
-// Register ScrollTrigger once with safe config.
-// ignoreMobileResize: true prevents GSAP from attaching a media-query listener
-// that appends/removes a 100vh-measurement div on every mobile viewport change.
-// Without this, _onMediaChange2 → _refresh100vh2 → removeChild throws a
 // NotFoundError when React has already cleaned up the DOM node.
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -124,115 +119,108 @@ const Hero = () => {
 
       {/* Main Content */}
       <div ref={contentRef} className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-20 pt-32 lg:pt-36 pb-20 lg:pb-24">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 xl:gap-14 items-center">
-          <div className="lg:col-span-7">
+        <div className="max-w-3xl">
 
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="inline-flex items-center space-x-2 bg-yellow-500/15 backdrop-blur-md text-yellow-400 px-5 py-1.5 rounded-full text-xs font-bold mb-6 tracking-widest uppercase border border-yellow-500/30 shadow-lg"
-          >
-            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-            <span><TranslatedText>Founded in India</TranslatedText></span>
-          </motion.div>
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="inline-flex items-center space-x-2 bg-yellow-500/15 backdrop-blur-md text-yellow-400 px-5 py-1.5 rounded-full text-xs font-bold mb-6 tracking-widest uppercase border border-yellow-500/30 shadow-lg"
+            >
+              <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+              <span><TranslatedText>Founded in India</TranslatedText></span>
+            </motion.div>
 
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-5xl md:text-7xl font-black text-white leading-none mb-2 tracking-tighter"
-          >
-            GROO
-          </motion.h1>
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="text-5xl md:text-7xl font-black text-white leading-none mb-2 tracking-tighter"
+            >
+              GROO
+            </motion.h1>
 
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: '5rem' }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="h-1 bg-yellow-400 rounded-full mb-6"
-          />
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: '5rem' }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+              className="h-1 bg-yellow-400 rounded-full mb-6"
+            />
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.3 }}
-            className="text-xl md:text-2xl font-bold text-yellow-400 mb-5 font-serif italic"
-          >
-            <TranslatedText>Grow more with GROO</TranslatedText>
-          </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="text-xl md:text-2xl font-bold text-yellow-400 mb-5 font-serif italic"
+            >
+              <TranslatedText>Grow more with GROO</TranslatedText>
+            </motion.p>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.45 }}
-            className="text-sm md:text-base text-gray-300 mb-8 max-w-2xl leading-relaxed font-medium"
-          >
-            <TranslatedText>
-              GROO is made for farmers. Farmers can book tractors, harvesters, rotavators, drones, JCB, borewell machines, labour, and other equipment on rent. With GROO, they can also easily order seeds, fertilizers, and other farming items from nearby shops. Our goal is to make farming work easy, fast, and on time. Farmers can get modern technology, useful services, weather updates, and support in one place. GROO helps save time, reduce trouble, and improve farming work. We want every farmer to get the right machine, right service, and right support at the right time.
-            </TranslatedText>
-          </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.45 }}
+              className="text-sm md:text-base text-gray-300 mb-8 max-w-2xl leading-relaxed font-medium"
+            >
+              <TranslatedText>
+                GROO is made for farmers. Farmers can book tractors, harvesters, rotavators, drones, JCB, borewell machines, labour, and other equipment on rent. With GROO, they can also easily order seeds, fertilizers, and other farming items from nearby shops. Our goal is to make farming work easy, fast, and on time. Farmers can get modern technology, useful services, weather updates, and support in one place. GROO helps save time, reduce trouble, and improve farming work. We want every farmer to get the right machine, right service, and right support at the right time.
+              </TranslatedText>
+            </motion.p>
 
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.6 }}
-            className="flex flex-col sm:flex-row gap-4 mb-16"
-          >
-            <Link to="/user/login">
-              <motion.div
-                whileHover={{ scale: 1.05, boxShadow: '0 20px 40px rgba(21, 128, 61, 0.4)' }}
-                whileTap={{ scale: 0.97 }}
-                className="bg-green-600 text-white px-8 py-3 rounded-full text-sm font-bold cursor-pointer shadow-xl text-center transition-colors hover:bg-green-700"
-              >
-                <TranslatedText>Book Now</TranslatedText>
-              </motion.div>
-            </Link>
-            <Link to="/vendor/login">
-              <motion.div
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.15)' }}
-                whileTap={{ scale: 0.97 }}
-                className="bg-white/8 backdrop-blur-md text-white border border-white/30 px-8 py-3 rounded-full text-sm font-bold cursor-pointer text-center"
-              >
-                <TranslatedText>Owner Registration</TranslatedText>
-              </motion.div>
-            </Link>
-          </motion.div>
+            {/* CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.6 }}
+              className="flex flex-col sm:flex-row gap-4 mb-16"
+            >
+              <Link to="/user/login">
+                <motion.div
+                  whileHover={{ scale: 1.05, boxShadow: '0 20px 40px rgba(21, 128, 61, 0.4)' }}
+                  whileTap={{ scale: 0.97 }}
+                  className="bg-green-600 text-white px-8 py-3 rounded-full text-sm font-bold cursor-pointer shadow-xl text-center transition-colors hover:bg-green-700"
+                >
+                  <TranslatedText>Book Now</TranslatedText>
+                </motion.div>
+              </Link>
+              <Link to="/vendor/login">
+                <motion.div
+                  whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  whileTap={{ scale: 0.97 }}
+                  className="bg-white/8 backdrop-blur-md text-white border border-white/30 px-8 py-3 rounded-full text-sm font-bold cursor-pointer text-center"
+                >
+                  <TranslatedText>Owner Registration</TranslatedText>
+                </motion.div>
+              </Link>
+            </motion.div>
 
-          {/* Stats */}
-          <div ref={statsRef} className="flex items-center space-x-8 md:space-x-14">
-            {[
-              { value: formatNumber(stats.farmers), label: 'Happy Farmers' },
-              { value: formatNumber(stats.owners), label: 'Verified Owners' },
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                custom={i}
-                variants={statVariants}
-                initial="hidden"
-                animate="show"
-                className="text-white group"
-              >
-                <p className="text-3xl md:text-4xl font-black tracking-tighter group-hover:text-yellow-400 transition-colors">
-                  {stat.value}
-                </p>
-                <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mt-1">
-                  <TranslatedText>{stat.label}</TranslatedText>
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Column: Dynamic Website Banner Container */}
-        <div className="lg:col-span-5 w-full">
-          <HeroBannerSlider />
+            {/* Stats */}
+            <div ref={statsRef} className="flex items-center space-x-8 md:space-x-14">
+              {[
+                { value: formatNumber(stats.farmers), label: 'Happy Farmers' },
+                { value: formatNumber(stats.owners), label: 'Verified Owners' },
+              ].map((stat, i) => (
+                <motion.div
+                  key={i}
+                  custom={i}
+                  variants={statVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="text-white group"
+                >
+                  <p className="text-3xl md:text-4xl font-black tracking-tighter group-hover:text-yellow-400 transition-colors">
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mt-1">
+                    <TranslatedText>{stat.label}</TranslatedText>
+                  </p>
+                </motion.div>
+              ))}
+            </div>
         </div>
       </div>
-    </div>
 
       {/* Scroll Indicator - fixed to bottom center */}
       <motion.div

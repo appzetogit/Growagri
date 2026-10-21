@@ -79,29 +79,26 @@ const ServicesSection = () => {
   };
 
   return (
-    <section id="services" className="py-12 bg-gray-50 overflow-hidden">
-      <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+    <section id="services" className="py-10 md:py-14 bg-gray-50 overflow-hidden">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
 
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-8"
+          className="text-center mb-6"
         >
-          <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2 tracking-tight">
+          <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-1.5 tracking-tight">
             {getTranslatedText("Agriculture Services")}
           </h2>
-          <p className="text-sm text-gray-500 max-w-2xl mx-auto font-medium">
+          <p className="text-xs md:text-sm text-gray-500 max-w-xl mx-auto font-medium">
             {getTranslatedText("Smart farming solutions designed for modern agriculture.")}
           </p>
         </motion.div>
 
         {/* Main Slider */}
-        <div className="relative w-full rounded-[2rem] overflow-hidden shadow-2xl border border-gray-100 bg-white">
-          {/* Desktop height spacer — invisible, keeps container tall on md+ */}
-          <div className="hidden md:block" style={{ paddingTop: '42%' }} />
-
+        <div className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-xl border border-gray-100 bg-white md:h-[340px]">
           {/* Animated Progress bar */}
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gray-100 z-30">
             <motion.div
@@ -114,10 +111,10 @@ const ServicesSection = () => {
             <motion.div
               key={currentIndex}
               custom={direction}
-              className="flex flex-col md:flex-row md:absolute md:inset-0"
+              className="flex flex-col md:flex-row md:absolute md:inset-0 h-full"
             >
               {/* LEFT: Ken Burns Image */}
-              <div className="w-full md:w-7/12 h-52 sm:h-64 md:h-full relative overflow-hidden flex-shrink-0">
+              <div className="w-full md:w-1/2 h-48 sm:h-56 md:h-full relative overflow-hidden flex-shrink-0">
                 <motion.img
                   key={currentIndex}
                   custom={direction}
@@ -139,21 +136,21 @@ const ServicesSection = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.3 }}
-                  className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-full border border-white/10 uppercase tracking-widest"
+                  className="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-white text-[9px] font-black px-2.5 py-1 rounded-full border border-white/10 uppercase tracking-widest"
                 >
                   {String(currentIndex + 1).padStart(2, '0')} / {String(services.length).padStart(2, '0')}
                 </motion.div>
               </div>
 
               {/* RIGHT: Animated Content */}
-              <div className="w-full md:w-5/12 p-7 md:p-10 flex flex-col justify-center bg-white relative overflow-hidden">
+              <div className="w-full md:w-1/2 p-5 sm:p-6 md:p-8 flex flex-col justify-center bg-white relative overflow-hidden">
                 {/* BG circle decoration */}
                 <motion.div
                   key={`bg-${currentIndex}`}
                   initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 0.06 }}
+                  animate={{ scale: 1, opacity: 0.05 }}
                   transition={{ duration: 0.8 }}
-                  className={`absolute -bottom-16 -right-16 w-48 h-48 rounded-full ${service.color.dot}`}
+                  className={`absolute -bottom-12 -right-12 w-40 h-40 rounded-full ${service.color.dot}`}
                 />
 
                 {/* Badge */}
@@ -164,9 +161,9 @@ const ServicesSection = () => {
                   animate="center"
                   exit="exit"
                   transition={{ duration: 0.45, delay: 0.05 }}
-                  className={`inline-flex items-center space-x-2 self-start px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border mb-3 ${service.color.badge}`}
+                  className={`inline-flex items-center space-x-1.5 self-start px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border mb-2.5 ${service.color.badge}`}
                 >
-                  <span className="text-sm">{React.cloneElement(service.icon, { size: 12 })}</span>
+                  <span className="text-xs">{React.cloneElement(service.icon, { size: 11 })}</span>
                   <span>{getTranslatedText("Premium Solution")}</span>
                 </motion.div>
 
@@ -178,7 +175,7 @@ const ServicesSection = () => {
                   animate="center"
                   exit="exit"
                   transition={{ duration: 0.45, delay: 0.12 }}
-                  className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter leading-tight mb-2"
+                  className="text-xl md:text-2xl font-black text-gray-900 tracking-tight leading-tight mb-1.5"
                 >
                   {getTranslatedText(service.title)}
                 </motion.h3>
@@ -191,7 +188,7 @@ const ServicesSection = () => {
                   animate="center"
                   exit="exit"
                   transition={{ duration: 0.45, delay: 0.2 }}
-                  className="text-gray-500 text-xs leading-relaxed max-w-xs mb-4"
+                  className="text-gray-500 text-xs leading-relaxed max-w-sm mb-3"
                 >
                   {getTranslatedText(service.desc)}
                 </motion.p>
@@ -204,10 +201,10 @@ const ServicesSection = () => {
                   animate="center"
                   exit="exit"
                   transition={{ duration: 0.45, delay: 0.28 }}
-                  className="flex flex-wrap gap-1.5 mb-5"
+                  className="flex flex-wrap gap-1.5 mb-4"
                 >
                   {service.specs.map((spec, i) => (
-                    <span key={i} className={`text-[9px] font-bold px-2.5 py-1 rounded-full border ${service.color.badge}`}>
+                    <span key={i} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${service.color.badge}`}>
                       {getTranslatedText(spec)}
                     </span>
                   ))}
@@ -223,13 +220,13 @@ const ServicesSection = () => {
                   transition={{ duration: 0.45, delay: 0.35 }}
                 >
                   <motion.button
-                    whileHover={{ scale: 1.04, x: 3 }}
-                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.03, x: 2 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={() => setSelectedService(service)}
-                    className={`inline-flex items-center space-x-2 ${service.color.btn} text-white px-5 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg`}
+                    className={`inline-flex items-center space-x-1.5 ${service.color.btn} text-white px-4 py-2 rounded-full font-bold text-[10px] uppercase tracking-wider transition-colors shadow-md`}
                   >
                     <span>{getTranslatedText("View Details")}</span>
-                    <HiArrowRight size={12} />
+                    <HiArrowRight size={11} />
                   </motion.button>
                 </motion.div>
               </div>
@@ -241,38 +238,38 @@ const ServicesSection = () => {
             whileHover={{ scale: 1.1, x: -2 }}
             whileTap={{ scale: 0.9 }}
             onClick={prevSlide}
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-gray-100 text-gray-600 hover:text-green-700 transition-colors"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-md border border-gray-100 text-gray-600 hover:text-green-700 transition-colors"
           >
-            <HiArrowLeft size={14} />
+            <HiArrowLeft size={13} />
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.1, x: 2 }}
             whileTap={{ scale: 0.9 }}
             onClick={nextSlide}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-gray-100 text-gray-600 hover:text-green-700 transition-colors"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-md border border-gray-100 text-gray-600 hover:text-green-700 transition-colors"
           >
-            <HiArrowRight size={14} />
+            <HiArrowRight size={13} />
           </motion.button>
         </div>
 
         {/* Thumbnail Strip */}
-        <div className="flex gap-2 mt-4 overflow-x-auto pb-1 no-scrollbar justify-center">
+        <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1 no-scrollbar justify-center">
           {services.map((svc, idx) => (
             <motion.button
               key={idx}
               onClick={() => goTo(idx, idx > currentIndex ? 1 : -1)}
-              whileHover={{ scale: 1.06, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              className={`relative flex-shrink-0 flex items-center space-x-2 px-3 py-2 rounded-xl border transition-all text-[10px] font-black uppercase tracking-wide ${currentIndex === idx ? 'bg-gray-900 text-white border-gray-900 shadow-lg' : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300 hover:text-gray-700'}`}
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              className={`relative flex-shrink-0 flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-[9px] font-bold uppercase tracking-wider ${currentIndex === idx ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300 hover:text-gray-700'}`}
             >
               {currentIndex === idx && (
                 <motion.div
                   layoutId="activePill"
-                  className="absolute inset-0 bg-gray-900 rounded-xl"
+                  className="absolute inset-0 bg-gray-900 rounded-lg"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
-              <span className="relative z-10">{React.cloneElement(svc.icon, { size: 13 })}</span>
+              <span className="relative z-10">{React.cloneElement(svc.icon, { size: 12 })}</span>
               <span className="relative z-10 hidden sm:block">{svc.title}</span>
             </motion.button>
           ))}

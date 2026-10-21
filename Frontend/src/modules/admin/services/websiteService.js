@@ -19,7 +19,11 @@ const websiteService = {
   updateReview: (id, data) => API.put(`/admin/website/review/${id}`, data),
   deleteReview: (id) => API.delete(`/admin/website/review/${id}`),
 
-  // Website Banners
+  // Startup Recognition
+  getStartupRecognition: () => API.get("/content/startup-recognition"),
+  updateStartupRecognition: (data) => API.put("/content/startup-recognition", data),
+
+  // Website Banners (legacy)
   getBanners: () => API.get("/admin/website/banner"),
   createBanner: (data) => API.post("/admin/website/banner", data),
   updateBanner: (id, data) => API.put(`/admin/website/banner/${id}`, data),

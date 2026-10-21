@@ -39,7 +39,6 @@ const Navbar = () => {
     { id: 'services', name: <TranslatedText>Services</TranslatedText>, href: '/services', isAnchor: false },
     { id: 'blogs', name: <TranslatedText>Blogs</TranslatedText>, href: '/blogs', isAnchor: false },
     { id: 'articles', name: <TranslatedText>Articles</TranslatedText>, href: '/articles', isAnchor: false },
-    { id: 'workflow', name: <TranslatedText>Workflow</TranslatedText>, href: '/workflow', isAnchor: false },
     { id: 'faq', name: <TranslatedText>FAQ</TranslatedText>, href: '/faq', isAnchor: false },
   ];
 
@@ -78,10 +77,16 @@ const Navbar = () => {
         }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className={`flex justify-between items-center transition-all duration-300 ${(isScrolled || isLightPage) ? 'h-16' : 'h-20'}`}>
           <div className="flex-shrink-0 flex items-center">
-            <Link to="/">
-              <img src="/logo.png" alt="Groo Logo" className="h-14 md:h-16 w-auto" />
+            <Link to="/" className="flex items-center">
+              <img
+                src="/logo.png"
+                alt="Groo Logo"
+                className={`w-auto object-contain transition-all duration-300 hover:scale-105 ${
+                  (isScrolled || isLightPage) ? 'h-14 md:h-16' : 'h-16 md:h-20'
+                }`}
+              />
             </Link>
           </div>
 

@@ -4,7 +4,6 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import ProblemSolution from './components/ProblemSolution';
 import ServicesSection from './components/ServicesSection';
-import WorkflowSection from './components/WorkflowSection';
 import FeatureSection from './components/FeatureSection';
 import EcosystemFlow from './components/EcosystemFlow';
 
@@ -14,6 +13,7 @@ import CompanyDeepDive from './components/CompanyDeepDive';
 import LiveContentSection from './components/LiveContentSection';
 import TestimonialSection from './components/TestimonialSection';
 import AboutSection from './components/AboutSection';
+import StartupRecognition from './components/StartupRecognition';
 import FAQSection from './components/FAQSection';
 
 const LandingPage = () => {
@@ -30,10 +30,10 @@ const LandingPage = () => {
       </Helmet>
       <Navbar />
       <Hero />
+      <StartupRecognition />
       <AboutSection />
       <ProblemSolution />
       <ServicesSection />
-      <WorkflowSection />
       <EcosystemFlow />
       <LiveContentSection />
       <FeatureSection />
