@@ -4,6 +4,8 @@ const contentController = require('../controllers/adminControllers/contentContro
 const { authenticate } = require('../middleware/authMiddleware');
 const { isAdmin } = require('../middleware/roleMiddleware');
 
+const { uploadImage, handleMulterError } = require('../middleware/uploadMiddleware');
+
 // Public routes
 router.get('/faq', contentController.getFAQs);
 router.get('/faq/all', authenticate, isAdmin, contentController.getAllFAQs);
@@ -18,6 +20,7 @@ router.put('/faq/:id', authenticate, isAdmin, contentController.updateFAQ);
 router.delete('/faq/:id', authenticate, isAdmin, contentController.deleteFAQ);
 
 router.put('/about', authenticate, isAdmin, contentController.updateAbout);
+router.post('/startup-recognition/upload-certificate', authenticate, isAdmin, uploadImage, handleMulterError, contentController.uploadStartupCertificate);
 router.put('/startup-recognition', authenticate, isAdmin, contentController.updateStartupRecognition);
 router.put('/app-guide', authenticate, isAdmin, contentController.updateAppGuide);
 router.put('/policy', authenticate, isAdmin, contentController.updatePolicy);

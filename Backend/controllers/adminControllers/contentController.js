@@ -174,17 +174,68 @@ exports.getStartupRecognition = async (req, res) => {
     }
 };
 
+// @desc    Upload Recognition Certificate (Admin)
+exports.uploadStartupCertificate = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No certificate file uploaded'
+            });
+        }
+
+        const certificateUrl = req.file.path; // Cloudinary secure_url
+
+        let recognition = await StartupRecognition.findOne();
+        if (recognition) {
+            recognition.certificateUrl = certificateUrl;
+            recognition.imageUrl = certificateUrl;
+            if (!Array.isArray(recognition.images)) {
+                recognition.images = [];
+            }
+            recognition.images = [{ url: certificateUrl, name: 'Recognition Certificate' }];
+            await recognition.save();
+        } else {
+            recognition = await StartupRecognition.create({
+                certificateUrl,
+                imageUrl: certificateUrl,
+                images: [{ url: certificateUrl, name: 'Recognition Certificate' }]
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            certificateUrl,
+            imageUrl: certificateUrl,
+            data: recognition,
+            message: 'Certificate uploaded and saved successfully'
+        });
+    } catch (error) {
+        console.error('Certificate upload error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to upload certificate',
+            error: error.message
+        });
+    }
+};
+
 // @desc    Update Startup Recognition (Admin)
 exports.updateStartupRecognition = async (req, res) => {
     try {
         let recognition = await StartupRecognition.findOne();
+        const updateData = { ...req.body };
+        if (updateData.certificateUrl) {
+            updateData.imageUrl = updateData.certificateUrl;
+            updateData.images = [{ url: updateData.certificateUrl, name: 'Recognition Certificate' }];
+        }
         if (recognition) {
-            recognition = await StartupRecognition.findByIdAndUpdate(recognition._id, req.body, {
+            recognition = await StartupRecognition.findByIdAndUpdate(recognition._id, updateData, {
                 new: true,
                 runValidators: true
             });
         } else {
-            recognition = await StartupRecognition.create(req.body);
+            recognition = await StartupRecognition.create(updateData);
         }
         res.status(200).json({ success: true, message: 'Startup Recognition updated successfully', data: recognition });
     } catch (error) {

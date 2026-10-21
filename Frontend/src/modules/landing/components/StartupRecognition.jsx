@@ -1,111 +1,165 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiAward,
-  FiExternalLink,
+  FiFileText,
+  FiCheck,
   FiCheckCircle,
+  FiArrowRight,
+  FiExternalLink,
+  FiDownload,
+  FiX,
   FiShield,
   FiTrendingUp,
   FiStar,
   FiUsers,
-  FiChevronLeft,
-  FiChevronRight,
 } from 'react-icons/fi';
+import { FaSeedling, FaHandshake } from 'react-icons/fa6';
 import TranslatedText from '../../../components/TranslatedText';
 import api from '../../../services/api';
 import defaultRecognitionImg from '../landing_images/bihar_startup_recognition.jpg';
 
+// Corner leaf decoration for bottom-left
+const BottomLeftLeaves = () => (
+  <svg
+    className="absolute -bottom-2 -left-2 w-14 h-14 sm:w-18 sm:h-18 pointer-events-none z-10 drop-shadow-sm select-none"
+    viewBox="0 0 100 100"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M2 98C12 65 35 40 78 30C66 55 48 80 2 98Z"
+      fill="url(#leaf-grad-left-main)"
+    />
+    <path
+      d="M18 95C32 78 52 62 78 30"
+      stroke="#15803d"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      opacity="0.8"
+    />
+    <path
+      d="M4 85C8 58 22 42 50 32C42 52 28 72 4 85Z"
+      fill="url(#leaf-grad-left-sec)"
+      opacity="0.95"
+    />
+    <defs>
+      <linearGradient id="leaf-grad-left-main" x1="0" y1="100" x2="80" y2="25" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#15803d" />
+        <stop offset="0.45" stopColor="#22c55e" />
+        <stop offset="0.85" stopColor="#4ade80" />
+        <stop offset="1" stopColor="#86efac" />
+      </linearGradient>
+      <linearGradient id="leaf-grad-left-sec" x1="0" y1="85" x2="55" y2="30" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#166534" />
+        <stop offset="0.5" stopColor="#16a34a" />
+        <stop offset="1" stopColor="#34d399" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+// Corner leaf decoration for bottom-right
+const BottomRightLeaves = () => (
+  <svg
+    className="absolute -bottom-2 -right-2 w-14 h-14 sm:w-18 sm:h-18 pointer-events-none z-10 drop-shadow-sm select-none"
+    viewBox="0 0 100 100"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M98 98C88 65 65 40 22 30C34 55 52 80 98 98Z"
+      fill="url(#leaf-grad-right-main)"
+    />
+    <path
+      d="M82 95C68 78 48 62 22 30"
+      stroke="#15803d"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      opacity="0.8"
+    />
+    <path
+      d="M96 85C92 58 78 42 50 32C58 52 72 72 96 85Z"
+      fill="url(#leaf-grad-right-sec)"
+      opacity="0.95"
+    />
+    <defs>
+      <linearGradient id="leaf-grad-right-main" x1="100" y1="100" x2="20" y2="25" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#15803d" />
+        <stop offset="0.45" stopColor="#22c55e" />
+        <stop offset="0.85" stopColor="#4ade80" />
+        <stop offset="1" stopColor="#86efac" />
+      </linearGradient>
+      <linearGradient id="leaf-grad-right-sec" x1="100" y1="85" x2="45" y2="30" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#166534" />
+        <stop offset="0.5" stopColor="#16a34a" />
+        <stop offset="1" stopColor="#34d399" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
 const renderHighlightIcon = (type) => {
   switch (type) {
+    case 'leaf':
+    case 'sprout':
+      return <FaSeedling className="text-[#15803d] text-base" />;
+    case 'file':
+    case 'certificate':
+    case 'document':
+      return <FiFileText className="text-[#15803d] text-base" />;
+    case 'handshake':
+      return <FaHandshake className="text-[#15803d] text-base" />;
     case 'shield':
-      return <FiShield className="text-emerald-500 text-lg md:text-xl" />;
+      return <FiShield className="text-[#15803d] text-base" />;
     case 'trending':
-      return <FiTrendingUp className="text-blue-500 text-lg md:text-xl" />;
+      return <FiTrendingUp className="text-[#15803d] text-base" />;
     case 'check':
-      return <FiCheckCircle className="text-green-500 text-lg md:text-xl" />;
+      return <FiCheckCircle className="text-[#15803d] text-base" />;
     case 'star':
-      return <FiStar className="text-yellow-500 text-lg md:text-xl" />;
+      return <FiStar className="text-[#15803d] text-base" />;
     case 'users':
-      return <FiUsers className="text-purple-500 text-lg md:text-xl" />;
+      return <FiUsers className="text-[#15803d] text-base" />;
     case 'award':
     default:
-      return <FiAward className="text-amber-500 text-lg md:text-xl" />;
+      return <FiAward className="text-[#15803d] text-base" />;
   }
 };
 
 const DEFAULT_DATA = {
-  badge: 'STARTUP RECOGNITION & ECOSYSTEM SUPPORT',
-  headingPrefix: 'Selected Under',
-  headingHighlight: 'Bihar Startup Policy 2022',
-  tagline: 'Building India’s Rural Agri Services Infrastructure.',
-  description:
-    'GROO Agri has been selected for seed funding consideration under the Bihar Startup Policy 2022. We are building technology-driven solutions to make agricultural services, modern farming equipment, and useful information more accessible to farmers across rural India.',
-  buttonText: 'Explore Startup Bihar',
-  buttonUrl: 'https://startup.bihar.gov.in/',
-  portalTrustText: 'Official Government of Bihar Portal',
-  imageUrl: defaultRecognitionImg,
-  images: [{ url: defaultRecognitionImg, name: 'Bihar Startup Recognition' }],
-  highlights: [
-    {
-      title: 'Seed Funding Consideration',
-      subtitle: 'Bihar Startup Policy 2022',
-      iconType: 'award',
-    },
-    {
-      title: 'Dept. of Industries Initiative',
-      subtitle: 'Government of Bihar',
-      iconType: 'shield',
-    },
-    {
-      title: 'Rural AgriTech Innovation',
-      subtitle: 'Empowering Bharat Farmers',
-      iconType: 'trending',
-    },
-  ],
+  badge: '',
+  headingPrefix: '',
+  headingHighlight: '',
+  tagline: '',
+  taglineSub: '',
+  description: '',
+  detailsLinkText: 'View Recognition Details',
+  buttonText: '',
+  buttonUrl: '',
+  emblemUrl: '/bihar-seal-green.svg',
+  certificateUrl: '',
+  imageUrl: '',
+  highlights: [],
   isActive: true,
-};
-
-const slideVariants = {
-  enter: (direction) => ({
-    x: direction > 0 ? '100%' : '-100%',
-    opacity: 0,
-    scale: 0.98,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    scale: 1,
-    transition: {
-      x: { type: 'spring', stiffness: 280, damping: 28 },
-      opacity: { duration: 0.35 },
-    },
-  },
-  exit: (direction) => ({
-    x: direction > 0 ? '-100%' : '100%',
-    opacity: 0,
-    scale: 0.98,
-    transition: { duration: 0.35, ease: 'easeInOut' },
-  }),
 };
 
 const StartupRecognition = () => {
   const [data, setData] = useState(DEFAULT_DATA);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const timerRef = useRef(null);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
 
   useEffect(() => {
     const fetchContent = async () => {
       try {
         const res = await api.get('/content/startup-recognition');
         if (res.data?.success && res.data?.data) {
+          const apiData = res.data.data;
           setData((prev) => ({
             ...prev,
-            ...res.data.data,
+            ...apiData,
             highlights:
-              Array.isArray(res.data.data.highlights) && res.data.data.highlights.length > 0
-                ? res.data.data.highlights
-                : prev.highlights,
+              Array.isArray(apiData.highlights) ? apiData.highlights : [],
           }));
         }
       } catch (err) {
@@ -115,295 +169,285 @@ const StartupRecognition = () => {
     fetchContent();
   }, []);
 
-  // Compute normalized slides array
-  const activeImages =
-    Array.isArray(data.images) && data.images.length > 0
-      ? data.images.map((img) => (typeof img === 'string' ? img : img.url)).filter(Boolean)
-      : data.imageUrl
-      ? [data.imageUrl]
-      : [defaultRecognitionImg];
-
-  // Continuous auto-sliding timer (every 3 seconds)
-  useEffect(() => {
-    if (activeImages.length <= 1) return;
-
-    const startTimer = () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setDirection(1);
-        setCurrentSlide((prev) => (prev + 1) % activeImages.length);
-      }, 3000);
-    };
-
-    startTimer();
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [activeImages.length]);
-
-  const resetTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (activeImages.length > 1) {
-      timerRef.current = setInterval(() => {
-        setDirection(1);
-        setCurrentSlide((prev) => (prev + 1) % activeImages.length);
-      }, 3000);
-    }
+  const isValidUrl = (url) => {
+    return Boolean(
+      url &&
+        typeof url === 'string' &&
+        (url.startsWith('http://') ||
+          url.startsWith('https://') ||
+          url.startsWith('data:image/') ||
+          url.startsWith('/uploads/'))
+    );
   };
 
-  const handlePrev = (e) => {
-    e.stopPropagation();
-    setDirection(-1);
-    setCurrentSlide((prev) => (prev - 1 + activeImages.length) % activeImages.length);
-    resetTimer();
-  };
+  const certificateImage =
+    (isValidUrl(data.certificateUrl) && data.certificateUrl) ||
+    (isValidUrl(data.imageUrl) && data.imageUrl) ||
+    (Array.isArray(data.images) &&
+      isValidUrl(data.images[0]?.url) &&
+      data.images[0].url) ||
+    defaultRecognitionImg;
 
-  const handleNext = (e) => {
-    e.stopPropagation();
-    setDirection(1);
-    setCurrentSlide((prev) => (prev + 1) % activeImages.length);
-    resetTimer();
-  };
+  const emblemImage = data.emblemUrl || '/bihar-seal-green.svg';
 
-  const handleDotClick = (i, e) => {
-    e.stopPropagation();
-    setDirection(i > currentSlide ? 1 : -1);
-    setCurrentSlide(i);
-    resetTimer();
-  };
-
-  // If explicitly hidden by admin, do not render section
   if (data.isActive === false) {
     return null;
   }
 
   return (
-    <section className="relative py-16 md:py-24 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 text-white overflow-hidden border-y border-emerald-500/20">
-      {/* Background Decorative Ambient Lighting */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-32 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-      </div>
-
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+    <section className="relative w-full py-5 md:py-8 bg-gradient-to-b from-white via-emerald-50/20 to-white overflow-hidden">
+      <div className="w-full max-w-[96%] xl:max-w-[1520px] 2xl:max-w-[1620px] mx-auto px-2 sm:px-4 lg:px-6">
+        
+        {/* Main Recognition Card Container (No Arrow Buttons) */}
+        <div className="relative rounded-3xl border border-[#bbf7d0] bg-gradient-to-r from-[#f4fcf6] via-[#ffffff] to-[#f0fbf4] shadow-[0_2px_16px_rgba(34,197,94,0.06)] hover:shadow-[0_4px_22px_rgba(34,197,94,0.1)] transition-all duration-300 overflow-hidden p-4 sm:p-5 lg:p-6 xl:p-7">
           
-          {/* Left Column: Text & Recognition Details */}
-          <div className="lg:col-span-7">
-            {/* Eyebrow Badge */}
-            {data.badge && (
-              <motion.div
-                initial={{ opacity: 0, y: -15 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-                className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-400 text-xs md:text-sm font-bold tracking-wider uppercase mb-5 backdrop-blur-md shadow-lg shadow-emerald-950/40"
-              >
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                </span>
-                <FiAward className="text-amber-400" />
-                <span>
-                  <TranslatedText>{data.badge}</TranslatedText>
-                </span>
-              </motion.div>
-            )}
+          {/* Corner Leaves Accents */}
+          <BottomLeftLeaves />
+          <BottomRightLeaves />
 
-            {/* Main Heading */}
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-4"
-            >
-              {data.headingPrefix && <TranslatedText>{data.headingPrefix}</TranslatedText>}{' '}
-              {data.headingHighlight && (
-                <span className="bg-gradient-to-r from-yellow-300 via-amber-400 to-emerald-400 bg-clip-text text-transparent">
-                  <TranslatedText>{data.headingHighlight}</TranslatedText>
-                </span>
+          {/* Content Layout */}
+          <div className="relative z-10 px-2 sm:px-4 lg:px-5 flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-5 xl:gap-7">
+            
+            {/* 1. Leftmost: Bihar Government Emblem */}
+            <div className="flex-shrink-0 flex flex-col items-center justify-center">
+              <div
+                className="p-1 rounded-2xl select-none"
+                title="बिहार सरकार - Government of Bihar"
+              >
+                <img
+                  src={emblemImage}
+                  alt="बिहार सरकार - Government of Bihar"
+                  className="w-22 sm:w-24 md:w-26 lg:w-28 h-auto object-contain select-none"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            {/* 2. Left-Center: Recognition Heading & Narrative */}
+            <div className="flex-1 min-w-0 text-center lg:text-left">
+              {/* Badge */}
+              {data.badge && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#15803d] text-white text-[12px] font-semibold shadow-2xs mb-2.5 select-none">
+                  <FiCheck className="text-white text-xs stroke-[3]" />
+                  <span>
+                    <TranslatedText>{data.badge}</TranslatedText>
+                  </span>
+                </div>
               )}
-            </motion.h2>
 
-            {/* Supporting Tagline */}
-            {data.tagline && (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="inline-block text-base md:text-lg font-semibold text-emerald-300/90 mb-5 border-l-4 border-amber-400 pl-3 italic"
-              >
-                <TranslatedText>{data.tagline}</TranslatedText>
-              </motion.div>
-            )}
+              {/* Main Headline */}
+              <h2 className="text-xl sm:text-2xl lg:text-[23px] xl:text-[25px] font-extrabold text-[#0f172a] tracking-tight leading-snug mb-2 whitespace-normal xl:whitespace-nowrap">
+                {data.headingPrefix && (
+                  <span>
+                    <TranslatedText>{data.headingPrefix}</TranslatedText>{' '}
+                  </span>
+                )}
+                {data.headingHighlight && (
+                  <span>
+                    <TranslatedText>{data.headingHighlight}</TranslatedText>
+                  </span>
+                )}
+              </h2>
 
-            {/* Narrative Description */}
-            {data.description && (
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-slate-300 text-sm md:text-base leading-relaxed mb-8 max-w-2xl font-normal"
-              >
-                <TranslatedText>{data.description}</TranslatedText>
-              </motion.p>
-            )}
+              {/* Description */}
+              {data.description && (
+                <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal max-w-xl mx-auto lg:mx-0">
+                  <TranslatedText>{data.description}</TranslatedText>
+                </p>
+              )}
 
-            {/* Impact Pillars / Micro-Highlights */}
+              {/* Action Link: View Recognition Details (ONLY trigger for certificate modal) */}
+              <div className="mt-3.5">
+                <button
+                  type="button"
+                  onClick={() => setShowCertificateModal(true)}
+                  className="inline-flex items-center gap-2 text-[#15803d] hover:text-[#166534] font-bold text-xs sm:text-[13px] group cursor-pointer transition-colors"
+                >
+                  <span className="w-4 h-4 rounded-full bg-[#eaf8ef] text-[#15803d] border border-[#bbf7d0] flex items-center justify-center text-[10px] font-extrabold">
+                    i
+                  </span>
+                  <span className="group-hover:underline underline-offset-4">
+                    <TranslatedText>{data.detailsLinkText || 'View Recognition Details'}</TranslatedText>
+                  </span>
+                  <FiArrowRight className="text-sm transform group-hover:translate-x-1 transition-transform text-[#15803d]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Subtle Vertical Divider (Desktop) */}
             {Array.isArray(data.highlights) && data.highlights.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-8"
-              >
+              <div className="hidden lg:block w-[1.5px] h-28 bg-[#bbf7d0]/80 self-center mx-1 flex-shrink-0" />
+            )}
+
+            {/* 3. Middle-Right: Key Recognition Highlights */}
+            {Array.isArray(data.highlights) && data.highlights.length > 0 && (
+              <div className="flex flex-col gap-2.5 w-full sm:w-auto min-w-[240px] lg:w-64 xl:w-72 shrink-0">
                 {data.highlights.map((item, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition-all duration-300 flex items-center space-x-3 shadow-md"
+                    className="bg-white hover:bg-emerald-50/20 border border-[#e2f4e9] hover:border-emerald-300 rounded-2xl px-4 py-2 sm:py-2.5 flex items-center gap-3.5 shadow-2xs transition-all"
                   >
-                    <div className="p-2 rounded-lg bg-slate-800/80 border border-slate-700/60 flex-shrink-0">
-                      {renderHighlightIcon(item.iconType)}
+                    <div className="w-8 h-8 rounded-full bg-[#eaf8ef] border border-[#bbf7d0] flex items-center justify-center shrink-0">
+                      {renderHighlightIcon(item.iconType || (idx === 1 ? 'leaf' : idx === 2 ? 'file' : 'award'))}
                     </div>
-                    <div>
-                      <h4 className="text-xs md:text-sm font-bold text-white leading-tight">
+                    <div className="min-w-0 flex-1 text-left">
+                      <h4 className="text-xs sm:text-[13px] font-bold text-slate-800 leading-tight">
                         <TranslatedText>{item.title}</TranslatedText>
                       </h4>
                       {item.subtitle && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
                           <TranslatedText>{item.subtitle}</TranslatedText>
                         </p>
                       )}
                     </div>
                   </div>
                 ))}
-              </motion.div>
+              </div>
             )}
 
-            {/* CTA Button and Credibility Tag */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex flex-wrap items-center gap-4"
-            >
-              {data.buttonText && data.buttonUrl && (
-                <a
-                  href={data.buttonUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold px-7 py-3 rounded-full text-sm shadow-xl shadow-emerald-900/40 hover:shadow-emerald-900/60 transition-all transform hover:-translate-y-0.5 cursor-pointer"
-                >
-                  <span>
-                    <TranslatedText>{data.buttonText}</TranslatedText>
-                  </span>
-                  <FiExternalLink className="text-base" />
-                </a>
-              )}
-
-              {data.portalTrustText && (
-                <div className="flex items-center space-x-1.5 text-xs text-slate-400 font-medium">
-                  <FiCheckCircle className="text-emerald-400 text-sm" />
-                  <span>
-                    <TranslatedText>{data.portalTrustText}</TranslatedText>
-                  </span>
-                </div>
-              )}
-            </motion.div>
-          </div>
-
-          {/* Right Column: Visual Recognition Showcase Slider */}
-          <div className="lg:col-span-5 flex justify-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 30 }}
-              whileInView={{ opacity: 1, scale: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="relative group w-full max-w-lg"
-            >
-              {/* Outer Glow Halo */}
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-500/30 via-emerald-500/30 to-yellow-500/30 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition duration-700 pointer-events-none" />
-
-              {/* Card / Slider Container */}
-              <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-emerald-400/30 bg-slate-900/90 shadow-2xl backdrop-blur-md aspect-[4/3] flex items-center justify-center">
-                <AnimatePresence initial={false} custom={direction}>
-                  <motion.div
-                    key={currentSlide}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    className="absolute inset-0 w-full h-full"
-                  >
-                    <img
-                      src={activeImages[currentSlide % activeImages.length]}
-                      alt={data.headingHighlight || 'Recognition - GROO Agri'}
-                      className="w-full h-full object-cover select-none pointer-events-none"
-                      loading="lazy"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Left/Right Navigation Arrows if > 1 image */}
-                {activeImages.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handlePrev}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/85 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-all opacity-80 group-hover:opacity-100 hover:scale-110 z-20 cursor-pointer shadow-lg"
-                      aria-label="Previous slide"
-                    >
-                      <FiChevronLeft className="text-xl" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/85 border border-white/20 text-white flex items-center justify-center backdrop-blur-md transition-all opacity-80 group-hover:opacity-100 hover:scale-110 z-20 cursor-pointer shadow-lg"
-                      aria-label="Next slide"
-                    >
-                      <FiChevronRight className="text-xl" />
-                    </button>
-
-                    {/* Bottom Indicator Dots */}
-                    <div className="absolute bottom-3 inset-x-0 flex justify-center items-center gap-1.5 z-20 pointer-events-auto">
-                      {activeImages.map((_, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={(e) => handleDotClick(i, e)}
-                          className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                            i === currentSlide % activeImages.length
-                              ? 'w-6 bg-gradient-to-r from-yellow-400 to-emerald-400 shadow-md shadow-emerald-500/50'
-                              : 'w-2 bg-white/40 hover:bg-white/70'
-                          }`}
-                          aria-label={`Go to slide ${i + 1}`}
-                        />
-                      ))}
+            {/* 4. Rightmost: Supporting Farmers Callout Box */}
+            {(data.tagline || data.buttonText) && (
+              <div className="w-full sm:w-auto lg:w-56 xl:w-60 shrink-0">
+                <div className="bg-[#e8f7ee] border border-[#bbf0cb] rounded-2xl p-4 sm:p-4.5 flex flex-col justify-between shadow-2xs h-full">
+                  
+                  {/* Header with Handshake Icon */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white border border-[#86efac] text-[#15803d] flex items-center justify-center shrink-0 shadow-2xs">
+                      <FaHandshake className="text-lg text-[#15803d]" />
                     </div>
-                  </>
-                )}
+                    <div className="min-w-0 flex-1 text-left">
+                      {data.tagline && (
+                        <h3 className="font-bold text-[#0f172a] text-xs sm:text-sm leading-tight">
+                          <TranslatedText>{data.tagline}</TranslatedText>
+                        </h3>
+                      )}
+                      {data.taglineSub && (
+                        <p className="text-[11px] text-slate-600 mt-1 leading-snug">
+                          <TranslatedText>{data.taglineSub}</TranslatedText>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Explore More Button */}
+                  {data.buttonText && (
+                    <div className="mt-3.5">
+                      <a
+                        href={data.buttonUrl || 'https://startup.bihar.gov.in/'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-[#064e3b] hover:bg-[#022c22] text-white font-semibold text-xs sm:text-sm py-2.5 px-4 rounded-full inline-flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow hover:-translate-y-0.5 cursor-pointer"
+                      >
+                        <span>
+                          <TranslatedText>{data.buttonText}</TranslatedText>
+                        </span>
+                        <FiArrowRight className="text-sm" />
+                      </a>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive Official Certificate Modal */}
+      <AnimatePresence>
+        {showCertificateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCertificateModal(false)}
+              className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm transition-opacity"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 20 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-emerald-100 overflow-hidden z-10 my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                    <FiAward className="text-base" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base sm:text-lg leading-tight">
+                      Bihar Startup Recognition Certificate
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Official Government of Bihar Document • Department of Industries
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCertificateModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <FiX className="text-lg" />
+                </button>
+              </div>
+
+              {/* Certificate Image View */}
+              <div className="p-4 sm:p-6 bg-slate-950/5 flex items-center justify-center">
+                <div className="relative rounded-2xl overflow-hidden border border-emerald-200/80 shadow-lg max-h-[65vh] bg-white">
+                  <img
+                    src={certificateImage}
+                    alt="Bihar Startup Recognition Certificate - GROO Agri"
+                    className="w-full h-auto max-h-[65vh] object-contain select-none"
+                  />
+                </div>
+              </div>
+
+              {/* Footer with Actions */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <FiCheckCircle className="text-emerald-600 text-sm" />
+                  <span className="font-semibold">Verified Recognition:</span>
+                  <span className="text-slate-500">BSPS/GROO/2023/045</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href={certificateImage}
+                    download="GrooAgri_Bihar_Startup_Recognition_Certificate.jpg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 hover:border-emerald-600 bg-white text-slate-700 hover:text-emerald-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <FiDownload className="text-sm" />
+                    <span>Download Certificate</span>
+                  </a>
+
+                  <a
+                    href={data.buttonUrl || 'https://startup.bihar.gov.in/'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <span>Visit Startup Bihar</span>
+                    <FiExternalLink className="text-sm" />
+                  </a>
+                </div>
               </div>
             </motion.div>
           </div>
-
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

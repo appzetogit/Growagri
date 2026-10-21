@@ -46,8 +46,7 @@ app.use(cors({
     "http://localhost:5173",
     "http://localhost:5174",
     "https://grooagri.com",
-    "https://www.grooagri.com",
-    "https://grooagri.vercel.app"
+    "https://www.grooagri.com"
   ],
   credentials: true
 }));

@@ -22,9 +22,19 @@ const startupRecognitionSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    taglineSub: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     description: {
       type: String,
       default: '',
+      trim: true,
+    },
+    detailsLinkText: {
+      type: String,
+      default: 'View Recognition Details',
       trim: true,
     },
     buttonText: {
@@ -43,6 +53,16 @@ const startupRecognitionSchema = new mongoose.Schema(
       trim: true,
     },
     imageUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    certificateUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    emblemUrl: {
       type: String,
       default: '',
       trim: true,
