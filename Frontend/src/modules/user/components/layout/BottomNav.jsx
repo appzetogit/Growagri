@@ -7,6 +7,8 @@ import { useCart } from '../../../../context/CartContext';
 import { useLanguage } from '../../../../context/LanguageContext';
 import { themeColors } from '../../../../theme';
 
+import { prefetchUserRoute, scheduleIdlePrefetch } from '../../../../utils/routePrefetcher';
+
 // Agriculture-themed colors for each nav item (layout unchanged)
 const navItemColors = {
   home: {
@@ -84,7 +86,12 @@ const BottomNav = React.memo(() => {
         });
       }
     }
-  }, [activeIndex, activeTab]);
+  }, [activeIndex, navItems]);
+
+  // Schedule idle background prefetch of all primary tabs
+  useEffect(() => {
+    scheduleIdlePrefetch(['bookings', 'cart', 'account', 'agri-market'], 1000);
+  }, []);
 
   const handleTabClick = (path) => {
     navigate(path);
@@ -136,6 +143,8 @@ const BottomNav = React.memo(() => {
               <motion.button
                 key={item.id}
                 onClick={() => handleTabClick(item.path)}
+                onMouseEnter={() => prefetchUserRoute(item.id)}
+                onTouchStart={() => prefetchUserRoute(item.id)}
                 whileTap={{ scale: 0.9 }}
                 className="flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all duration-200 relative"
               >

@@ -1772,17 +1772,6 @@ const BookingDetails = () => {
               <span className="text-sm font-bold text-gray-700">Email Help</span>
             </button>
 
-            {/* Raise Dispute Button */}
-            {['completed', 'work_done', 'cancelled'].includes(booking.status?.toLowerCase()) && (
-              <button
-                onClick={() => setShowDisputeModal(true)}
-                className="col-span-2 py-4 rounded-2xl text-amber-600 font-bold text-sm bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors active:scale-95 flex items-center justify-center gap-2"
-              >
-                <FiAlertTriangle className="w-4 h-4" />
-                Report Issue / Raise Dispute
-              </button>
-            )}
-
             {/* Cancel */}
             {!['cancelled', 'completed', 'work_done'].includes(booking.status?.toLowerCase()) && (
               <button

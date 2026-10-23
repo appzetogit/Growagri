@@ -24,13 +24,35 @@ import flutterBridge from '../../../../utils/flutterBridge';
 
 const SoilTesting = () => {
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [requests, setRequests] = useState([]);
+    
+    // Instant SWR state: Load cached requests & prices for 0ms initial render
+    const [requests, setRequests] = useState(() => {
+        try {
+            const cached = localStorage.getItem('cached_soil_requests');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [prices, setPrices] = useState(() => {
+        try {
+            const cached = localStorage.getItem('cached_soil_prices');
+            return cached ? JSON.parse(cached) : { basicPrice: 0, advancedPrice: 0 };
+        } catch {
+            return { basicPrice: 0, advancedPrice: 0 };
+        }
+    });
+    const [loading, setLoading] = useState(() => {
+        try {
+            return !localStorage.getItem('cached_soil_requests');
+        } catch {
+            return false;
+        }
+    });
     const [showForm, setShowForm] = useState(false);
     const [editingRequestId, setEditingRequestId] = useState(null);
     const [showPayOptions, setShowPayOptions] = useState(false);
-    const [prices, setPrices] = useState({ basicPrice: 0, advancedPrice: 0 });
     const [processingPayment, setProcessingPayment] = useState(false);
 
     const [fetchingLocation, setFetchingLocation] = useState(false);
@@ -53,7 +75,14 @@ const SoilTesting = () => {
 
     useEffect(() => {
         fetchMyRequests(false);
-        soilTestService.getPrices().then(res => res.success && setPrices(res.data)).catch(() => {});
+        soilTestService.getPrices().then(res => {
+            if (res.success) {
+                setPrices(res.data);
+                try {
+                    localStorage.setItem('cached_soil_prices', JSON.stringify(res.data));
+                } catch {}
+            }
+        }).catch(() => {});
 
         // Auto-update status every 15 seconds
         const interval = setInterval(() => fetchMyRequests(true), 15000);
@@ -74,9 +103,14 @@ const SoilTesting = () => {
 
     const fetchMyRequests = async (isPolling = false) => {
         try {
-            if (!isPolling) setLoading(true);
+            if (!isPolling && requests.length === 0) setLoading(true);
             const res = await soilTestService.getMyRequests();
-            if (res.success) setRequests(res.data);
+            if (res.success) {
+                setRequests(res.data);
+                try {
+                    localStorage.setItem('cached_soil_requests', JSON.stringify(res.data));
+                } catch {}
+            }
         } catch (err) {
             console.error(err);
         } finally {

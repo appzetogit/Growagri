@@ -6,13 +6,28 @@ import weatherService from '../../services/weatherService';
 
 export default function WeatherReport() {
     const navigate = useNavigate();
-    const [weather, setWeather] = useState(null);
-    const [loading, setLoading] = useState(true);
+
+    // Instant SWR state: Load from cache for 0ms initial render
+    const [weather, setWeather] = useState(() => {
+        try {
+            const cached = localStorage.getItem('cached_weather_report');
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [loading, setLoading] = useState(() => {
+        try {
+            return !localStorage.getItem('cached_weather_report');
+        } catch {
+            return true;
+        }
+    });
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const fetchWeather = () => {
-            setLoading(true);
+            if (!weather) setLoading(true);
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
@@ -21,22 +36,25 @@ export default function WeatherReport() {
                             const res = await weatherService.getWeather(latitude, longitude);
                             if (res.success) {
                                 setWeather(res.data);
+                                try {
+                                    localStorage.setItem('cached_weather_report', JSON.stringify(res.data));
+                                } catch {}
                             } else {
-                                setError(res.message);
+                                if (!weather) setError(res.message);
                             }
                         } catch (err) {
-                            setError("Failed to fetch weather data");
+                            if (!weather) setError("Failed to fetch weather data");
                         } finally {
                             setLoading(false);
                         }
                     },
                     (err) => {
-                        setError("Location access denied. Please allow location to see weather for your fields.");
+                        if (!weather) setError("Location access denied. Please allow location to see weather for your fields.");
                         setLoading(false);
                     }
                 );
             } else {
-                setError("Geolocation is not supported by your browser");
+                if (!weather) setError("Geolocation is not supported by your browser");
                 setLoading(false);
             }
         };
@@ -53,7 +71,7 @@ export default function WeatherReport() {
         return <FiCloud className={`${size} text-slate-400`} />;
     };
 
-    if (loading) {
+    if (loading && !weather) {
         return (
             <div className="min-h-screen bg-[#F1F8E9] flex items-center justify-center">
                 <div className="text-center">

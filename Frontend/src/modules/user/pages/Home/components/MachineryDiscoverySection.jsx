@@ -39,8 +39,8 @@ const MachineryDiscoverySection = () => {
     if (!loading && equipment.length === 0) return null;
 
     return (
-        <section className="px-5 mb-8">
-            <div className="flex items-center justify-between mb-5">
+        <section className="px-5 mb-1">
+            <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('Machinery Rental')}</h2>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -55,7 +55,7 @@ const MachineryDiscoverySection = () => {
                 </button>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                 {loading ? (
                     [1, 2].map(i => (
                         <div key={i} className="min-w-[280px] h-[180px] bg-white rounded-3xl animate-pulse border border-slate-100" />
@@ -73,6 +73,8 @@ const MachineryDiscoverySection = () => {
                                   <img
                                       src={item.images[0]}
                                       alt={item.name}
+                                      loading="lazy"
+                                      decoding="async"
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                                   />
                                 ) : (

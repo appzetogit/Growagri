@@ -1,10 +1,14 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import PageTransition from '../components/common/PageTransition';
-import BottomNav from '../components/layout/BottomNav';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import ProtectedRoute from '../../../components/auth/ProtectedRoute';
 import PublicRoute from '../../../components/auth/PublicRoute';
+import Login from '../pages/login';
+import { scheduleIdlePrefetch } from '../../../utils/routePrefetcher';
+
+// Lazy load secondary persistent widgets to keep login page chunk tiny
+const BottomNav = lazy(() => import('../components/layout/BottomNav'));
 import useAppNotifications from '../../../hooks/useAppNotifications.jsx';
 
 // Lazy load wrapper with error handling
@@ -56,7 +60,6 @@ const MyRating = lazyLoad(() => import('../pages/MyRating'));
 const AboutGroo = lazyLoad(() => import('../pages/AboutHomster'));
 const HowToUse = lazyLoad(() => import('../pages/HowToUse'));
 const UpdateProfile = lazyLoad(() => import('../pages/UpdateProfile'));
-const Login = lazyLoad(() => import('../pages/login'));
 const Privacy = lazyLoad(() => import('../pages/Privacy'));
 
 const Notifications = lazyLoad(() => import('../pages/Notifications'));
@@ -75,15 +78,27 @@ const MyAgriOrders = lazyLoad(() => import('../pages/AgriMarket/MyOrders'));
 const AgriCart = lazyLoad(() => import('../pages/AgriMarket/AgriCart'));
 const SchemeDetails = lazyLoad(() => import('../pages/Schemes/SchemeDetails'));
 
-// Lightweight loading fallback - no logo to avoid iOS rejection
+// Ultra-fast top indeterminate progress bar + skeleton (Zero-Jank transitions)
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+  <div className="w-full relative min-h-[50vh]">
+    {/* Micro Top Progress Bar */}
+    <div className="fixed top-0 left-0 right-0 h-[3px] bg-emerald-100 z-[99999] overflow-hidden">
+      <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 w-1/3 animate-pulse" />
+    </div>
+    {/* Lightweight subtle skeleton pulse */}
+    <div className="px-4 py-6 max-w-lg mx-auto space-y-4 animate-pulse">
+      <div className="h-16 bg-slate-100/80 rounded-2xl w-full" />
+      <div className="h-32 bg-slate-100/80 rounded-3xl w-full" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-28 bg-slate-100/70 rounded-2xl" />
+        <div className="h-28 bg-slate-100/70 rounded-2xl" />
+      </div>
+    </div>
   </div>
 );
 
-// Import Live Booking Card
-import LiveBookingCard from '../components/booking/LiveBookingCard';
+// Lazy load Live Booking Card so it is excluded from public/login chunks
+const LiveBookingCard = lazy(() => import('../components/booking/LiveBookingCard'));
 
 const UserRoutes = () => {
   const location = useLocation();
@@ -110,10 +125,17 @@ const UserRoutes = () => {
     location.pathname.includes('/cancellation-policy') ||
     location.pathname.includes('/schemes');
 
+  // Predictive background prefetch for high-traffic subroutes when browser is idle
+  useEffect(() => {
+    if (!isPublicPage) {
+      scheduleIdlePrefetch(['bookings', 'cart', 'account', 'agri-market', 'machinery', 'weather'], 800);
+    }
+  }, [isPublicPage]);
+
   return (
     <ErrorBoundary>
       {/* Main content area - leaves space for bottom nav when needed */}
-      <div className={shouldShowBottomNav ? "pb-24" : ""}>
+      <div className={shouldShowBottomNav ? "pb-20" : ""}>
         <Suspense fallback={<LoadingFallback />}>
           <PageTransition>
             <Routes>
@@ -167,9 +189,17 @@ const UserRoutes = () => {
         </Suspense>
       </div>
 
-      {/* These components are OUTSIDE Suspense so they persist during page loads */}
-      {!isBookingDetailsPage && !isBookingConfirmationPage && !isPublicPage && <LiveBookingCard hasBottomNav={shouldShowBottomNav} />}
-      {shouldShowBottomNav && <BottomNav />}
+      {/* These components are OUTSIDE main Suspense and loaded lazily only when needed */}
+      {!isBookingDetailsPage && !isBookingConfirmationPage && !isPublicPage && (
+        <Suspense fallback={null}>
+          <LiveBookingCard hasBottomNav={shouldShowBottomNav} />
+        </Suspense>
+      )}
+      {shouldShowBottomNav && (
+        <Suspense fallback={null}>
+          <BottomNav />
+        </Suspense>
+      )}
     </ErrorBoundary>
   );
 };

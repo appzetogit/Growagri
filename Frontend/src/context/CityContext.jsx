@@ -30,12 +30,17 @@ export const CityProvider = ({ children }) => {
 
   // Load cities and restore selection on mount
   useEffect(() => {
-    const initCity = async () => {
+    let isMounted = true;
+    let retryTimer = null;
+
+    const initCity = async (retryCount = 0) => {
       try {
         // Fetch active cities from public API
         const response = await api.get('/public/cities');
 
-        if (response.data.success && response.data.cities.length > 0) {
+        if (!isMounted) return;
+
+        if (response.data.success && response.data.cities && response.data.cities.length > 0) {
           const fetchedCities = response.data.cities;
           setCities(fetchedCities);
           try {
@@ -64,13 +69,43 @@ export const CityProvider = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error('Failed to load cities:', error);
+        // Fall back gracefully to cached cities without breaking the app
+        const savedCities = localStorage.getItem('cached_cities');
+        if (savedCities) {
+          try {
+            const parsed = JSON.parse(savedCities);
+            if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
+              setCities(parsed);
+              const savedCityId = localStorage.getItem('selectedCityId');
+              const selected = parsed.find(c => c._id === savedCityId || c.id === savedCityId) || parsed.find(c => c.isDefault) || parsed[0];
+              if (selected) setCurrentCity(selected);
+            }
+          } catch {}
+        }
+
+        // Retry silently up to 3 times with exponential backoff if backend is starting up
+        if (retryCount < 3 && isMounted) {
+          const delay = (retryCount + 1) * 2000;
+          retryTimer = setTimeout(() => {
+            if (isMounted) initCity(retryCount + 1);
+          }, delay);
+        } else {
+          // Keep failure non-fatal, quiet warning instead of red error stack
+          console.warn('[CityContext] Could not fetch remote cities. Operating from cached data.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initCity();
+
+    return () => {
+      isMounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   const selectCity = (city) => {

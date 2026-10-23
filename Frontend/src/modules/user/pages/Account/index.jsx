@@ -33,36 +33,40 @@ import { useLanguage } from '../../../../context/LanguageContext';
 const Account = () => {
   const navigate = useNavigate();
   const { language, languages, t } = useLanguage();
-  const [userProfile, setUserProfile] = useState({
-    name: 'Verified Farmer',
-    phone: '',
-    email: '',
-    isPhoneVerified: false,
-    isEmailVerified: false,
-    walletBalance: 0,
-    plans: null
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const stored = localStorage.getItem('userData');
+      if (stored) {
+        const u = JSON.parse(stored);
+        return {
+          name: u.name || 'Verified Farmer',
+          phone: u.phone || '',
+          email: u.email || '',
+          isPhoneVerified: !!u.isPhoneVerified,
+          isEmailVerified: !!u.isEmailVerified,
+          profilePhoto: u.profilePhoto || '',
+          walletBalance: u.wallet?.balance ?? (u.walletBalance ?? 0),
+          plans: u.plans || null
+        };
+      }
+    } catch {}
+    return {
+      name: 'Verified Farmer',
+      phone: '',
+      email: '',
+      isPhoneVerified: false,
+      isEmailVerified: false,
+      profilePhoto: '',
+      walletBalance: 0,
+      plans: null
+    };
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !localStorage.getItem('userData'));
 
-  // Fetch user profile from database
+  // Fetch user profile from database in background
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // First check localStorage
-        const storedUserData = localStorage.getItem('userData');
-        if (storedUserData) {
-          const userData = JSON.parse(storedUserData);
-          setUserProfile({
-            name: userData.name || 'Verified Farmer',
-            phone: userData.phone || '',
-            email: userData.email || '',
-            isPhoneVerified: userData.isPhoneVerified || false,
-            isEmailVerified: userData.isEmailVerified || false,
-            profilePhoto: userData.profilePhoto || '',
-            walletBalance: userData.wallet?.balance ?? 0
-          });
-        }
-
         // Fetch fresh data from API
         const response = await userAuthService.getProfile();
         if (response.success && response.user) {

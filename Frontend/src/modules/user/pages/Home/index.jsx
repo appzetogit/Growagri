@@ -15,20 +15,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiX, FiPlus } from 'react-icons/fi';
 
 import { userAuthService } from '../../../../services/authService';
-// Lazy load heavy components for better initial load performance
-import PromoCarousel from './components/PromoCarousel';
-// Lazy load OTHER heavy components
+import WeatherWidget from './components/WeatherWidget';
+import LogoLoader from '../../../../components/common/LogoLoader';
+import { prefetchUserRoute } from '../../../../utils/routePrefetcher';
+
+// Lazy load heavy components for instant initial Home page render
+const PromoCarousel = lazy(() => import('./components/PromoCarousel'));
 const NewAndNoteworthy = lazy(() => import('./components/NewAndNoteworthy'));
 const CuratedServices = lazy(() => import('./components/CuratedServices'));
-import ReferEarnSection from './components/ReferEarnSection';
-import CategoryModal from './components/CategoryModal';
-import SearchOverlay from './components/SearchOverlay';
-import WeatherWidget from './components/WeatherWidget';
-import AgriMarketplaceSection from './components/AgriMarketplaceSection';
-import MachineryDiscoverySection from './components/MachineryDiscoverySection';
-import GovernmentSchemesSection from './components/GovernmentSchemesSection';
-import LogoLoader from '../../../../components/common/LogoLoader';
-import AddressSelectionModal from '../Checkout/components/AddressSelectionModal';
+const GovernmentSchemesSection = lazy(() => import('./components/GovernmentSchemesSection'));
+const ReferEarnSection = lazy(() => import('./components/ReferEarnSection'));
+const MachineryDiscoverySection = lazy(() => import('./components/MachineryDiscoverySection'));
+
+// Lazy load modal overlays so they do not bloat the initial chunk
+const CategoryModal = lazy(() => import('./components/CategoryModal'));
+const SearchOverlay = lazy(() => import('./components/SearchOverlay'));
+const AddressSelectionModal = lazy(() => import('../Checkout/components/AddressSelectionModal'));
 
 
 
@@ -302,7 +304,7 @@ const Home = () => {
         const cityId = currentCity?._id || currentCity?.id;
 
         const [categoriesRes, homeContentRes] = await Promise.all([
-          publicCatalogService.getCategories({ cityId, forceRefresh: true }),
+          publicCatalogService.getCategories({ cityId }),
           publicCatalogService.getHomeContent(cityId)
         ]);
 
@@ -341,7 +343,7 @@ const Home = () => {
     fetchData();
   }, [currentCity, cityLoading]);
 
-  const { socket } = useSocket() || {};
+  const socket = useSocket();
 
   // Real-time synchronization: Instant updates when Admin adds, edits, deletes or toggles content
   useEffect(() => {
@@ -626,7 +628,7 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen pb-20 relative" style={{ backgroundColor: '#F1F8E9' }}>
+    <div className="min-h-screen relative" style={{ backgroundColor: '#F1F8E9' }}>
       {/* Refined Brand Mesh Gradient Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0"
@@ -670,7 +672,7 @@ const Home = () => {
           </div>
         </motion.div>
 
-        <main className="pt-6 space-y-8 pb-24 max-w-screen-xl mx-auto w-full">
+        <main className="pt-6 space-y-6 pb-0 max-w-screen-xl mx-auto w-full">
           {!isLocationSupported && (
             <div
               className="flex items-center justify-between gap-3 py-2.5 px-4 mx-4 rounded-2xl"
@@ -710,22 +712,24 @@ const Home = () => {
             {/* Hero Section - Promo Carousel */}
             {homeContent?.isPromosVisible !== false && (homeContent?.promos || []).length > 0 && (
               <motion.section variants={itemVariants} className="relative z-0 mb-0 pb-0">
-                <PromoCarousel
-                  promos={(homeContent?.promos || []).map(promo => ({
-                    id: promo.id || promo._id,
-                    title: promo.title || '',
-                    subtitle: promo.subtitle || promo.description || '',
-                    buttonText: promo.buttonText || 'Book now',
-                    className: promo.gradientClass || 'from-[#00A6A6] to-[#008a8a]',
-                    image: toAssetUrl(promo.imageUrl, { width: 800 }),
-                    targetCategoryId: promo.targetCategoryId,
-                    slug: promo.slug,
-                    scrollToSection: promo.scrollToSection,
-                    order: promo.order || 0,
-                    route: null
-                  })).sort((a, b) => (a.order || 0) - (b.order || 0))}
-                  onPromoClick={handlePromoClick}
-                />
+                <Suspense fallback={<div className="h-44 bg-slate-50 animate-pulse rounded-2xl mx-4 my-1" />}>
+                  <PromoCarousel
+                    promos={(homeContent?.promos || []).map(promo => ({
+                      id: promo.id || promo._id,
+                      title: promo.title || '',
+                      subtitle: promo.subtitle || promo.description || '',
+                      buttonText: promo.buttonText || 'Book now',
+                      className: promo.gradientClass || 'from-[#00A6A6] to-[#008a8a]',
+                      image: toAssetUrl(promo.imageUrl, { width: 800 }),
+                      targetCategoryId: promo.targetCategoryId,
+                      slug: promo.slug,
+                      scrollToSection: promo.scrollToSection,
+                      order: promo.order || 0,
+                      route: null
+                    })).sort((a, b) => (a.order || 0) - (b.order || 0))}
+                    onPromoClick={handlePromoClick}
+                  />
+                </Suspense>
               </motion.section>
             )}
 
@@ -753,6 +757,20 @@ const Home = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.04 }}
+                      onMouseEnter={() => {
+                        const r = (item.route || '').toLowerCase();
+                        if (r.includes('agri')) prefetchUserRoute('agri-market');
+                        else if (r.includes('machinery')) prefetchUserRoute('machinery');
+                        else if (r.includes('soil')) prefetchUserRoute('soil-testing');
+                        else if (r.includes('weather')) prefetchUserRoute('weather');
+                      }}
+                      onTouchStart={() => {
+                        const r = (item.route || '').toLowerCase();
+                        if (r.includes('agri')) prefetchUserRoute('agri-market');
+                        else if (r.includes('machinery')) prefetchUserRoute('machinery');
+                        else if (r.includes('soil')) prefetchUserRoute('soil-testing');
+                        else if (r.includes('weather')) prefetchUserRoute('weather');
+                      }}
                       onClick={() => {
                         if (item.actionType === 'navigate' && item.route && item.route.trim() !== '') {
                           navigate(item.route.trim());
@@ -883,39 +901,40 @@ const Home = () => {
 
             {/* Government Schemes Section */}
             <motion.div variants={itemVariants}>
-              <GovernmentSchemesSection />
+              <Suspense fallback={<div className="h-32 bg-slate-50 animate-pulse rounded-2xl mx-4 my-2" />}>
+                <GovernmentSchemesSection />
+              </Suspense>
             </motion.div>
 
             {/* Refer & Earn Section */}
             <motion.div variants={itemVariants}>
-              <ReferEarnSection onReferClick={handleReferClick} />
+              <Suspense fallback={<div className="h-28 bg-emerald-50/50 animate-pulse rounded-2xl mx-4 my-2" />}>
+                <ReferEarnSection onReferClick={handleReferClick} />
+              </Suspense>
             </motion.div>
 
-            {/* Machinery Discovery Section */}
+            {/* Machinery Discovery Section - Final bottom section */}
             <motion.div variants={itemVariants}>
-              <MachineryDiscoverySection />
+              <Suspense fallback={<div className="h-44 bg-slate-50 animate-pulse rounded-3xl mx-4 my-2" />}>
+                <MachineryDiscoverySection />
+              </Suspense>
             </motion.div>
-
-            {/* Agriculture Marketplace */}
-            <motion.div variants={itemVariants}>
-              <AgriMarketplaceSection />
-            </motion.div>
-
 
           </>
         </main>
       </motion.div>
 
-      {/* Bottom Navigation */}
-      {!isAddressModalOpen && <BottomNav />}
-
-      {/* Category Modal */}
-      <CategoryModal
-        isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
-        category={selectedCategory}
-        currentCity={currentCity}
-      />
+      {/* Category Modal (Loaded on-demand when open) */}
+      {isCategoryModalOpen && (
+        <Suspense fallback={null}>
+          <CategoryModal
+            isOpen={isCategoryModalOpen}
+            onClose={() => setIsCategoryModalOpen(false)}
+            category={selectedCategory}
+            currentCity={currentCity}
+          />
+        </Suspense>
+      )}
 
       {/* Section Tab Full Page Modal */}
       <AnimatePresence>
@@ -1049,22 +1068,30 @@ const Home = () => {
       </AnimatePresence>
 
 
-      {/* Search Overlay */}
-      <SearchOverlay
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        categories={categories}
-        onCategoryClick={handleCategoryClick}
-      />
+      {/* Search Overlay (Loaded on-demand when open) */}
+      {isSearchOpen && (
+        <Suspense fallback={null}>
+          <SearchOverlay
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            categories={categories}
+            onCategoryClick={handleCategoryClick}
+          />
+        </Suspense>
+      )}
 
-      {/* Address Selection Modal */}
-      <AddressSelectionModal
-        isOpen={isAddressModalOpen}
-        onClose={() => setIsAddressModalOpen(false)}
-        houseNumber={houseNumber}
-        onHouseNumberChange={setHouseNumber}
-        onSave={handleAddressSave}
-      />
+      {/* Address Selection Modal (Loaded on-demand when open) */}
+      {isAddressModalOpen && (
+        <Suspense fallback={null}>
+          <AddressSelectionModal
+            isOpen={isAddressModalOpen}
+            onClose={() => setIsAddressModalOpen(false)}
+            houseNumber={houseNumber}
+            onHouseNumberChange={setHouseNumber}
+            onSave={handleAddressSave}
+          />
+        </Suspense>
+      )}
 
 
     </div>

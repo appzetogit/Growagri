@@ -4,9 +4,9 @@
  * Like Ola/Uber/Rapido - works even when app is closed
  */
 
-// Import Firebase scripts
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+// Import Firebase scripts (Aligned with package.json firebase version 9.14.0)
+importScripts('https://www.gstatic.com/firebasejs/9.14.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.14.0/firebase-messaging-compat.js');
 
 // Firebase configuration - Production values
 const firebaseConfig = {

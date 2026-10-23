@@ -83,18 +83,68 @@ async function requestNotificationPermission() {
 }
 
 /**
- * Get FCM token from Firebase
+ * Safely purge conflicting FCM IndexedDB databases that trigger VersionError:
+ * "The requested version (1) is less than the existing version (2)"
+ */
+async function resetFCMIndexedDB() {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) return;
+
+  const targetDatabases = [
+    'firebase-messaging-database',
+    'fcm_token_details_db',
+    'fcm_vapid_details_db',
+    'firebase-installations-database'
+  ];
+
+  try {
+    if (indexedDB.databases) {
+      const dbs = await indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name && (db.name.includes('firebase') || db.name.includes('fcm'))) {
+          if (!targetDatabases.includes(db.name)) {
+            targetDatabases.push(db.name);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Silent fail if browser restricts indexedDB.databases()
+  }
+
+  for (const dbName of targetDatabases) {
+    await new Promise((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(dbName);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+}
+
+/**
+ * Get FCM token from Firebase with automated IndexedDB VersionError recovery
+ * @param {number} retryCount
  * @returns {Promise<string|null>}
  */
-async function getFCMToken() {
+async function getFCMToken(retryCount = 0) {
   try {
     if (!messaging) {
-      console.error('Firebase messaging not initialized');
+      console.warn('[FCM] Firebase messaging not initialized');
       return null;
     }
 
     const registration = await registerServiceWorker();
-    await registration.update(); // Update service worker
+    if (registration) {
+      try {
+        await registration.update();
+      } catch {
+        // Silent on background update
+      }
+    }
 
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
@@ -105,12 +155,24 @@ async function getFCMToken() {
       console.log('✅ FCM Token obtained:', token.substring(0, 20) + '...');
       return token;
     } else {
-      console.log('❌ No FCM token available');
+      console.log('ℹ️ No FCM token available');
       return null;
     }
   } catch (error) {
-    console.error('❌ Error getting FCM token:', error);
-    throw error;
+    const isVersionError =
+      error?.name === 'VersionError' ||
+      String(error?.message || '').includes('VersionError') ||
+      String(error?.message || '').includes('less than the existing version');
+
+    if (isVersionError && retryCount === 0) {
+      console.warn('[FCM] 🔄 VersionError detected in browser IndexedDB. Purging conflicting database and auto-retrying...');
+      await resetFCMIndexedDB();
+      // Retry once with clean IndexedDB
+      return await getFCMToken(1);
+    }
+
+    console.warn('[FCM] ⚠️ FCM token unavailable:', error?.message || error);
+    return null;
   }
 }
 
@@ -163,14 +225,14 @@ async function registerFCMToken(userType = 'user', forceUpdate = false) {
     console.log('[FCM] Getting FCM token from Firebase...');
     const token = await getFCMToken();
     if (!token) {
-      console.log('[FCM] ❌ Failed to get FCM token from Firebase');
+      console.log('[FCM] ℹ️ FCM token could not be obtained at this time');
       return null;
     }
     console.log('[FCM] ✅ Got FCM token:', token.substring(0, 30) + '...');
 
     return await saveTokenToBackend(token, userType, 'web');
   } catch (error) {
-    console.error('[FCM] ❌ Error registering FCM token:', error);
+    console.warn('[FCM] ⚠️ FCM registration skipped:', error?.message || error);
     return null;
   }
 }

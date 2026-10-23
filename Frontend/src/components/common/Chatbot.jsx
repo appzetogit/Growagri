@@ -9,7 +9,6 @@ import {
   IoMic, 
   IoMicOutline, 
   IoVolumeHighOutline, 
-  IoVolumeMuteOutline, 
   IoRefreshOutline, 
   IoCopyOutline, 
   IoCheckmarkOutline,
@@ -377,7 +376,6 @@ const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState(appLanguage || 'Hindi');
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
-  const [autoSpeechEnabled, setAutoSpeechEnabled] = useState(false);
   const [currentlySpeakingIdx, setCurrentlySpeakingIdx] = useState(null);
   const [copiedIdx, setCopiedIdx] = useState(null);
 
@@ -614,7 +612,7 @@ const Chatbot = () => {
         }
         setMessages(prev => [...prev, { text: botReply, sender: 'bot', timestamp: timeNow() }]);
 
-        if (autoSpeechEnabled || lastUsedVoice) {
+        if (lastUsedVoice) {
           speakText(botReply, updatedMessages.length);
         }
       } else {
@@ -654,7 +652,7 @@ const Chatbot = () => {
           opacity: isOpen ? 0 : 1,
         }}
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        className={`fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-[9999] touch-none select-none ${
+        className={`fixed bottom-[90px] right-4 sm:bottom-8 sm:right-8 z-[9999] touch-none select-none ${
           isOpen ? 'pointer-events-none' : 'pointer-events-auto'
         }`}
       >
@@ -776,26 +774,6 @@ const Chatbot = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* Auto TTS Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (autoSpeechEnabled && window.speechSynthesis) {
-                            window.speechSynthesis.cancel();
-                            setCurrentlySpeakingIdx(null);
-                          }
-                          setAutoSpeechEnabled(!autoSpeechEnabled);
-                        }}
-                        className={`p-1.5 rounded-full text-white transition-all ${
-                          autoSpeechEnabled ? 'bg-emerald-500/40' : 'bg-white/10 hover:bg-white/20'
-                        }`}
-                        title={autoSpeechEnabled ? t('Mute Audio') : t('Read Aloud')}
-                        aria-label={autoSpeechEnabled ? t('Mute Audio') : t('Read Aloud')}
-                        aria-pressed={autoSpeechEnabled}
-                      >
-                        {autoSpeechEnabled ? <IoVolumeHighOutline size={18} /> : <IoVolumeMuteOutline size={18} />}
-                      </button>
 
                       {/* Reset Conversation */}
                       <button

@@ -14,9 +14,32 @@ import { themeColors } from '../../../../theme';
 const MachineryExplorer = () => {
   const navigate = useNavigate();
   const { currentCity } = useCity();
-  const [loading, setLoading] = useState(true);
-  const [equipment, setEquipment] = useState([]);
-  const [categories, setCategories] = useState([]);
+
+  // Instant SWR state: Initialize from cache for 0ms frame 1 render
+  const [equipment, setEquipment] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_machinery_equipment');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [categories, setCategories] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_machinery_categories');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('cached_machinery_equipment');
+    } catch {
+      return true;
+    }
+  });
+
   const [selectedCat, setSelectedCat] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -26,7 +49,7 @@ const MachineryExplorer = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
+      if (equipment.length === 0) setLoading(true);
       const cityId = currentCity?._id || currentCity?.id;
       
       const [equipsRes, catsRes] = await Promise.all([
@@ -37,8 +60,20 @@ const MachineryExplorer = () => {
         publicEquipmentService.getMachineryCategories(cityId)
       ]);
 
-      if (equipsRes.success) setEquipment(equipsRes.data);
-      if (catsRes.success) setCategories(catsRes.data);
+      if (equipsRes.success) {
+        setEquipment(equipsRes.data);
+        if (!selectedCat) {
+          try {
+            localStorage.setItem('cached_machinery_equipment', JSON.stringify(equipsRes.data));
+          } catch {}
+        }
+      }
+      if (catsRes.success) {
+        setCategories(catsRes.data);
+        try {
+          localStorage.setItem('cached_machinery_categories', JSON.stringify(catsRes.data));
+        } catch {}
+      }
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -116,7 +151,24 @@ const MachineryExplorer = () => {
         </div>
       </div>
 
-      {loading ? <LogoLoader /> : (
+      {/* Background sync micro indicator */}
+      {loading && equipment.length > 0 && (
+        <div className="h-0.5 bg-blue-100 overflow-hidden">
+          <div className="h-full bg-blue-500 w-1/3 animate-pulse" />
+        </div>
+      )}
+
+      {loading && equipment.length === 0 ? (
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-white rounded-[40px] border border-slate-100 p-4 space-y-4 shadow-sm">
+              <div className="h-48 bg-slate-100 rounded-3xl w-full" />
+              <div className="h-6 bg-slate-100 rounded-xl w-3/4" />
+              <div className="h-4 bg-slate-100 rounded-lg w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
           {filtered.length === 0 ? (
             <div className="col-span-full py-20 text-center space-y-4">

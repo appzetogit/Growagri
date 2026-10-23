@@ -22,9 +22,25 @@ const AgriMarket = () => {
     const navigate = useNavigate();
     const { currentCity } = useCity();
     const { addToCart, cartCount } = useEcommerceCart();
-    const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [products, setProducts] = useState(() => {
+        try {
+            const cached = localStorage.getItem('cached_agri_products');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [categories, setCategories] = useState(() => {
+        try {
+            const cached = localStorage.getItem('cached_agri_categories');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [loading, setLoading] = useState(() => {
+        return !localStorage.getItem('cached_agri_products');
+    });
 
     const handleAddToCartClick = async (product) => {
         try {
@@ -48,7 +64,9 @@ const AgriMarket = () => {
     }, [currentCity]);
 
     const fetchData = async () => {
-        setLoading(true);
+        if (products.length === 0) {
+            setLoading(true);
+        }
         let hasError = false;
 
         // Load products independently
@@ -58,7 +76,13 @@ const AgriMarket = () => {
                 params.cityId = currentCity._id || currentCity.id;
             }
             const prodRes = await ecommerceService.getProducts(params);
-            if (prodRes.success) setProducts(prodRes.data || []);
+            if (prodRes.success) {
+                const pList = prodRes.data || [];
+                setProducts(pList);
+                try {
+                    localStorage.setItem('cached_agri_products', JSON.stringify(pList));
+                } catch {}
+            }
         } catch (err) {
             console.error('Products fetch error:', err?.response?.data || err.message);
             hasError = true;
@@ -77,7 +101,10 @@ const AgriMarket = () => {
                     return allowedKeywords.some(kw => title.includes(kw));
                 });
                 setCategories(filteredCats);
-                if (filteredCats.length > 0) {
+                try {
+                    localStorage.setItem('cached_agri_categories', JSON.stringify(filteredCats));
+                } catch {}
+                if (filteredCats.length > 0 && selectedCategory === 'all') {
                     setSelectedCategory(filteredCats[0]._id);
                 }
             }
@@ -85,9 +112,10 @@ const AgriMarket = () => {
             console.error('Categories fetch error:', err.message);
         }
 
-        if (hasError) {
+        if (hasError && products.length === 0) {
             toast.error("Products load karne mein dikkat hui");
         }
+        setLoading(false);
 
         // Check for existing orders
         try {

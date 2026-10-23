@@ -115,8 +115,9 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    // For vendor/worker/admin, token is strictly required. For user, allow guest connection for public events.
-    if (!token && userType !== 'user') {
+    // Only connect if user/vendor/worker/admin is authenticated with a token.
+    // Public routes, login pages, and unauthenticated sessions must not establish socket connections.
+    if (!token) {
       if (socket) {
         socket.disconnect();
         setSocket(null);
@@ -142,11 +143,16 @@ export const SocketProvider = ({ children }) => {
       secure: isHttps,
       rejectUnauthorized: false,
       reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000,
       autoConnect: true
+    });
+
+    // Gracefully handle connect_error to avoid uncaught console spam if backend is offline/restarting
+    newSocket.on('connect_error', () => {
+      // Quietly handled without crashing UI
     });
 
     setSocket(newSocket);
