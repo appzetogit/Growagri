@@ -60,10 +60,22 @@ const serviceSchema = new mongoose.Schema({
   // ==========================================
   rental_type: {
     type: String,
-    enum: ['hourly', 'land_based', 'monthly'],
+    enum: ['hourly', 'minute', 'acre', 'bigha', 'land_based', 'monthly', 'daily'],
     default: 'hourly'
   },
+  minute_price: {
+    type: Number,
+    default: 0
+  },
   hourly_price: {
+    type: Number,
+    default: 0
+  },
+  acre_price: {
+    type: Number,
+    default: 0
+  },
+  bigha_price: {
     type: Number,
     default: 0
   },

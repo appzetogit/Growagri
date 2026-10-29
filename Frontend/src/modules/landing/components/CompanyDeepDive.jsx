@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { motion, useInView, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { FiTrendingUp, FiTarget, FiBox, FiUsers, FiGlobe, FiShield } from 'react-icons/fi';
 import { usePageTranslation } from '../../../hooks/usePageTranslation';
+import TeamSection from './TeamSection';
 
 // Color palette per card index
 const cardColors = [
@@ -197,6 +198,9 @@ const CompanyDeepDive = () => {
                         </div>
                     </motion.div>
                 </div>
+
+                {/* Our Team Section */}
+                <TeamSection />
 
                 {/* Impact Section */}
                 <div className="mb-16">

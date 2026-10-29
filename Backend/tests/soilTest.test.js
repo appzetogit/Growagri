@@ -79,7 +79,42 @@ const oid = () => new mongoose.Types.ObjectId();
   res = mockRes(); await adminCtl.deleteSoilTestRequest({ params: { id: reqId } }, res);
   assert.strictEqual(res.code, 400);
 
-  console.log('soil test checks passed');
+  // 7. Dynamic Test Types test: Admin configures new test packages
+  res = mockRes();
+  await adminCtl.updateSoilTestSettings({
+    body: {
+      commissionPercentage: 15,
+      testTypes: [
+        { name: 'Basic Test', title: 'Basic Test (3 Param)', description: 'NPK test', price: 200, isActive: true },
+        { name: 'Advanced Test', title: 'Advanced Test (12 Param)', description: 'Full test', price: 800, isActive: true },
+        { name: 'Micro-Nutrient Special', title: 'Micro-Nutrient Special (6 Param)', description: 'Zinc, Iron, etc.', price: 500, isActive: true }
+      ]
+    }
+  }, res);
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.data.testTypes.length, 3);
+
+  // User gets dynamic test types
+  res = mockRes();
+  await userCtl.getSoilTestPrices({}, res);
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.data.testTypes.length, 3);
+  assert.strictEqual(res.body.data.testTypes[2].price, 500);
+
+  // User books the new dynamic test package
+  res = mockRes();
+  await userCtl.createSoilTestRequest({
+    user,
+    body: { ...form, testType: 'Micro-Nutrient Special (6 Param)', paymentMethod: 'wallet' }
+  }, res);
+  assert.strictEqual(res.code, 201);
+  const dynDoc = await SoilTestRequest.findById(res.body.data._id);
+  assert.strictEqual(dynDoc.totalAmount, 500);
+  assert.strictEqual(dynDoc.adminCommission, 75); // 15% of 500
+  assert.strictEqual(dynDoc.vendorEarning, 425);
+  assert.strictEqual(dynDoc.testType, 'Micro-Nutrient Special (6 Param)');
+
+  console.log('soil test checks passed (including dynamic test types)');
   await new Promise(r => setTimeout(r, 500)); // let fire-and-forget notifications finish
   await mongoose.disconnect();
   await mongo.stop();

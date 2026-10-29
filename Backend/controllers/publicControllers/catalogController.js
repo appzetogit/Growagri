@@ -71,7 +71,7 @@ const getPublicCategories = async (req, res) => {
     }
 
     let categories = await Category.find(query)
-      .select('title slug homeIconUrl homeBadge hasSaleBadge homeOrder showOnHome parentCategory parentCategories isAlwaysMain trackingType requiresDriver sectionType hourlyPrice')
+      .select('title slug homeIconUrl homeBadge hasSaleBadge homeOrder showOnHome parentCategory parentCategories isAlwaysMain trackingType requiresDriver sectionType minutePrice hourlyPrice acrePrice bighaPrice')
       .populate('parentCategories', 'title slug')
       .sort({ homeOrder: 1, createdAt: -1 })
       .lean();
@@ -99,7 +99,10 @@ const getPublicCategories = async (req, res) => {
       trackingType: cat.trackingType || 'none',
       requiresDriver: cat.requiresDriver || false,
       sectionType: cat.sectionType || 'General',
+      minutePrice: Number(cat.minutePrice) || 0,
       hourlyPrice: Number(cat.hourlyPrice) || 0,
+      acrePrice: Number(cat.acrePrice) || 0,
+      bighaPrice: Number(cat.bighaPrice) || 0,
     }));
 
     // Fetch brands for these categories

@@ -309,7 +309,7 @@ const VendorSoilTests = () => {
 
                             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
                                 <p className="text-sm font-medium text-slate-900">
-                                    {req.testType === 'Advanced' ? 'Advanced Test (12 Parameters)' : 'Basic Test (3 Parameters)'}
+                                    {req.testType || 'Soil Test'}
                                 </p>
                                 <p className="text-xs text-slate-600">{req.landSize} · {req.cropType || 'General Crop'}</p>
                                 <div className="flex items-start gap-1.5 text-xs text-slate-600">
@@ -429,7 +429,7 @@ const VendorSoilTests = () => {
                                                 </div>
                                                 <div className="col-span-2 mt-1">
                                                     <p className="text-slate-400 font-bold">Test Tier</p>
-                                                    <p className="font-semibold text-teal-600">{activeRequest.testType === 'Advanced' ? 'Advanced Test (12 Param)' : 'Basic Test (3 Param)'}</p>
+                                                    <p className="font-semibold text-teal-600">{activeRequest.testType || 'Soil Test'}</p>
                                                 </div>
                                             </div>
                                         </div>

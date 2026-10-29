@@ -102,6 +102,16 @@ const settingsSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  // Dynamic Soil Test Types
+  soilTestTypes: [
+    {
+      name: { type: String, required: true },
+      title: { type: String },
+      description: { type: String, default: '' },
+      price: { type: Number, required: true, min: 0 },
+      isActive: { type: Boolean, default: true }
+    }
+  ],
   // Razorpay Settings
   razorpayKeyId: {
     type: String,

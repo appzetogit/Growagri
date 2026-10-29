@@ -318,7 +318,10 @@ const Home = () => {
             badge: cat.badge,
             requiresDriver: cat.requiresDriver,
             sectionType: cat.sectionType || 'General',
+            minutePrice: Number(cat.minutePrice) || 0,
             hourlyPrice: Number(cat.hourlyPrice) || 0,
+            acrePrice: Number(cat.acrePrice) || 0,
+            bighaPrice: Number(cat.bighaPrice) || 0,
             showOnHome: cat.showOnHome ?? true
           }));
           setCategories(mappedCategories);
@@ -385,7 +388,10 @@ const Home = () => {
             badge: cat.badge,
             requiresDriver: cat.requiresDriver,
             sectionType: cat.sectionType || 'General',
+            minutePrice: Number(cat.minutePrice) || 0,
             hourlyPrice: Number(cat.hourlyPrice) || 0,
+            acrePrice: Number(cat.acrePrice) || 0,
+            bighaPrice: Number(cat.bighaPrice) || 0,
             showOnHome: cat.showOnHome ?? true
           }));
           setCategories(mappedCategories);
@@ -468,7 +474,7 @@ const Home = () => {
     try {
       setActiveSectionTab(null);
       const categoryName = cat.title || 'Agriculture';
-      const itemPrice = Number(cat.hourlyPrice) || Number(cat.hourly_price) || Number(cat.basePrice) || 0;
+      const itemPrice = Number(cat.hourlyPrice) || Number(cat.acrePrice) || Number(cat.bighaPrice) || Number(cat.minutePrice) || Number(cat.hourly_price) || Number(cat.basePrice) || 0;
       const itemIcon = toAssetUrl(cat.icon || cat.image || '');
 
       await addToCart({
@@ -479,9 +485,12 @@ const Home = () => {
         icon: itemIcon,
         price: itemPrice,
         unitPrice: itemPrice,
-        hourly_price: itemPrice,
-        land_price: cat.land_price || 0,
-        land_unit: cat.land_unit || 'Acre',
+        hourly_price: Number(cat.hourlyPrice) || 0,
+        minute_price: Number(cat.minutePrice) || 0,
+        acre_price: Number(cat.acrePrice) || 0,
+        bigha_price: Number(cat.bighaPrice) || 0,
+        land_price: Number(cat.acrePrice) || Number(cat.bighaPrice) || cat.land_price || 0,
+        land_unit: cat.bighaPrice ? 'Bigha' : (cat.land_unit || 'Acre'),
         daily_price: cat.daily_price || 0,
         categoryTitle: categoryName,
         category: categoryName,
@@ -1025,17 +1034,14 @@ const Home = () => {
                                   </p>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-1 border-t border-slate-50 mt-auto">
-                                  <span className="text-xs font-black text-emerald-700">
-                                    {cat.hourlyPrice ? `₹${cat.hourlyPrice}/hr` : 'Hourly'}
-                                  </span>
+                                <div className="pt-2 border-t border-slate-50 mt-auto flex items-center justify-center">
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleQuickAddAndCheckout(cat);
                                     }}
-                                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black flex items-center gap-1 transition-all shadow-sm shadow-emerald-600/20"
+                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-emerald-600/20"
                                   >
                                     <FiPlus className="w-3.5 h-3.5" />
                                     Add

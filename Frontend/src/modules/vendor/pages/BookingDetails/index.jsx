@@ -1103,14 +1103,36 @@ export default function BookingDetails() {
               <p className="text-sm text-gray-600">{booking.timeSlot.time}</p>
 
               {/* Rental Details */}
-              {booking.rental_type && booking.rental_type !== 'hourly' && (
+              {booking.rental_type && (
                 <div className="mt-2 space-y-1">
                   <span
                     className="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
                     style={{ background: `${themeColors.button}15`, color: themeColors.button }}
                   >
-                    {booking.rental_type === 'daily' ? 'Daily Rental' : booking.rental_type === 'land_based' ? 'Land Based' : booking.rental_type === 'monthly' ? 'Monthly Rental' : booking.rental_type}
+                    {booking.rental_type === 'daily'
+                      ? 'Daily Rental'
+                      : booking.rental_type === 'monthly'
+                      ? 'Monthly Rental'
+                      : booking.rental_type === 'minute'
+                      ? 'Minute Rental'
+                      : booking.rental_type === 'acre'
+                      ? 'Acre Rental'
+                      : booking.rental_type === 'bigha'
+                      ? 'Bigha Rental'
+                      : booking.rental_type === 'land_based'
+                      ? 'Land Based'
+                      : `${booking.rental_type} Rental`}
                   </span>
+                  {booking.rental_type === 'minute' && booking.estimatedDuration && (
+                    <p className="text-sm font-semibold text-gray-700">
+                      ⏱ {booking.estimatedDuration} Minute{booking.estimatedDuration > 1 ? 's' : ''}
+                    </p>
+                  )}
+                  {booking.rental_type === 'hourly' && booking.estimatedDuration && (
+                    <p className="text-sm font-semibold text-gray-700">
+                      ⏱ {booking.estimatedDuration} Hour{booking.estimatedDuration > 1 ? 's' : ''}
+                    </p>
+                  )}
                   {booking.rental_type === 'daily' && booking.estimatedDuration && (
                     <p className="text-sm font-semibold text-gray-700">
                       📅 {booking.estimatedDuration} Day{booking.estimatedDuration > 1 ? 's' : ''}
@@ -1131,16 +1153,15 @@ export default function BookingDetails() {
                       )}
                     </p>
                   )}
-                  {booking.rental_type === 'land_based' && booking.landSize && (
-                    <p className="text-sm font-semibold text-gray-700">🗺️ Area: {booking.landSize}</p>
+                  {(booking.rental_type === 'acre' || booking.rental_type === 'bigha' || booking.rental_type === 'land_based') && booking.landSize && (
+                    <p className="text-sm font-semibold text-gray-700">
+                      🗺️ Area: {booking.landSize} {booking.landUnit || (booking.rental_type === 'acre' ? 'Acre' : booking.rental_type === 'bigha' ? 'Bigha' : 'Acre')}{booking.landSize > 1 && (booking.rental_type === 'acre' || booking.rental_type === 'land_based') ? 's' : ''}
+                    </p>
                   )}
                   {booking.cropType && (
                     <p className="text-xs text-gray-500">🌾 Crop: {booking.cropType}</p>
                   )}
                 </div>
-              )}
-              {booking.rental_type === 'hourly' && booking.estimatedDuration && (
-                <p className="text-sm font-semibold text-gray-700 mt-1">⏱ {booking.estimatedDuration} Hour{booking.estimatedDuration > 1 ? 's' : ''}</p>
               )}
             </div>
           </div>

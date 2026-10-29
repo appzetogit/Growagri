@@ -21,24 +21,78 @@ const getSoilTestSettings = async (req, res) => {
  */
 const updateSoilTestSettings = async (req, res) => {
     try {
-        const basicPrice = Number(req.body.basicPrice);
-        const advancedPrice = Number(req.body.advancedPrice);
         const commissionPercentage = Number(req.body.commissionPercentage);
-
-        if (![basicPrice, advancedPrice].every(n => Number.isFinite(n) && n >= 0)) {
-            return res.status(400).json({ success: false, message: 'Prices must be 0 or more' });
-        }
         if (!Number.isFinite(commissionPercentage) || commissionPercentage < 0 || commissionPercentage > 100) {
             return res.status(400).json({ success: false, message: 'Commission must be between 0 and 100' });
         }
 
+        const updateFields = {
+            soilTestCommissionPercentage: commissionPercentage
+        };
+
+        if (Array.isArray(req.body.testTypes)) {
+            // Admin sent dynamic test types list
+            const formattedTestTypes = req.body.testTypes.map((item, idx) => {
+                const name = (item.name || `Test Type ${idx + 1}`).trim();
+                const title = (item.title || name).trim();
+                const description = (item.description || '').trim();
+                const price = Math.max(0, Number(item.price) || 0);
+                const isActive = item.isActive !== false;
+                return {
+                    name,
+                    title,
+                    description,
+                    price,
+                    isActive
+                };
+            });
+
+            updateFields.soilTestTypes = formattedTestTypes;
+
+            // Also keep basicPrice and advancedPrice in sync for backwards compatibility
+            const basicMatch = formattedTestTypes.find(t => t.name?.toLowerCase().includes('basic') || t.title?.toLowerCase().includes('basic')) || formattedTestTypes[0];
+            const advancedMatch = formattedTestTypes.find(t => t.name?.toLowerCase().includes('advanced') || t.title?.toLowerCase().includes('advanced')) || formattedTestTypes[1];
+
+            updateFields.soilTestBasicPrice = basicMatch ? basicMatch.price : 0;
+            updateFields.soilTestAdvancedPrice = advancedMatch ? advancedMatch.price : 0;
+        } else {
+            // Legacy format or direct prices
+            const basicPrice = Number(req.body.basicPrice);
+            const advancedPrice = Number(req.body.advancedPrice);
+            if (![basicPrice, advancedPrice].every(n => Number.isFinite(n) && n >= 0)) {
+                return res.status(400).json({ success: false, message: 'Prices must be 0 or more' });
+            }
+            updateFields.soilTestBasicPrice = basicPrice;
+            updateFields.soilTestAdvancedPrice = advancedPrice;
+
+            // If soilTestTypes exists in DB, update their prices or create defaults
+            const s = await Settings.findOne({ type: 'global' }).lean();
+            if (s?.soilTestTypes && s.soilTestTypes.length > 0) {
+                const updatedTypes = s.soilTestTypes.map(t => {
+                    if (t.name?.toLowerCase().includes('basic') || t.title?.toLowerCase().includes('basic')) {
+                        return { ...t, price: basicPrice };
+                    }
+                    if (t.name?.toLowerCase().includes('advanced') || t.title?.toLowerCase().includes('advanced')) {
+                        return { ...t, price: advancedPrice };
+                    }
+                    return t;
+                });
+                updateFields.soilTestTypes = updatedTypes;
+            }
+        }
+
         await Settings.updateOne(
             { type: 'global' },
-            { $set: { soilTestBasicPrice: basicPrice, soilTestAdvancedPrice: advancedPrice, soilTestCommissionPercentage: commissionPercentage } },
+            { $set: updateFields },
             { upsert: true }
         );
 
-        res.status(200).json({ success: true, message: 'Soil test pricing updated', data: { basicPrice, advancedPrice, commissionPercentage } });
+        const updatedPricing = await getSoilTestPricing();
+        res.status(200).json({
+            success: true,
+            message: 'Soil test settings updated',
+            data: updatedPricing
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

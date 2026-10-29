@@ -108,6 +108,15 @@ const BookingDetailsPage = () => {
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    {booking.rental_type && (
+                        <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
+                            {booking.rental_type === 'minute' ? 'Minute Rental'
+                              : booking.rental_type === 'hourly' ? 'Hourly Rental'
+                              : booking.rental_type === 'acre' ? 'Acre Rental'
+                              : booking.rental_type === 'bigha' ? 'Bigha Rental'
+                              : `${booking.rental_type} Rental`}
+                        </span>
+                    )}
                     <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${getStatusColor(booking.status)}`}>
                         {booking.status?.replace('_', ' ')}
                     </span>
@@ -140,7 +149,16 @@ const BookingDetailsPage = () => {
                                             </div>
                                             <div className="flex-1">
                                                 <h4 className="font-bold text-gray-800">{item.serviceId?.title || 'Equipment Name'}</h4>
-                                                <p className="text-xs text-gray-500">Qty: {item.quantity} | Total Area: {item.totalArea || 0} Acre</p>
+                                                <p className="text-xs text-gray-500">
+                                                  Qty: {item.quantity}
+                                                  {booking.rental_type === 'minute'
+                                                    ? ` | Duration: ${booking.estimatedDuration || item.quantity} Mins`
+                                                    : booking.rental_type === 'hourly'
+                                                    ? ` | Duration: ${booking.estimatedDuration || item.quantity} Hrs`
+                                                    : booking.rental_type === 'bigha'
+                                                    ? ` | Total Area: ${item.totalArea || booking.landSize || 0} Bigha`
+                                                    : ` | Total Area: ${item.totalArea || booking.landSize || 0} Acre`}
+                                                </p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="font-bold text-gray-900">₹{item.itemTotal?.toLocaleString()}</p>

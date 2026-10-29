@@ -1097,7 +1097,14 @@ const SettlementManagement = () => {
                             <div className="min-w-0">
                               <p className="text-[9px] font-bold uppercase text-gray-400">Equipment</p>
                               <p className="font-semibold text-gray-900 truncate">{b.equipmentId?.name || b.serviceName || '—'}</p>
-                              <p className="text-gray-500 truncate">{items || b.serviceName}{b.rental_type ? ` • ${b.rental_type.replace(/_/g, ' ')}` : ''}{b.estimatedDuration ? ` • ${b.estimatedDuration} hr` : ''}</p>
+                              <p className="text-gray-500 truncate">
+                                {items || b.serviceName}
+                                {b.rental_type ? ` • ${b.rental_type.replace(/_/g, ' ')}` : ''}
+                                {b.rental_type === 'minute' && b.estimatedDuration ? ` • ${b.estimatedDuration} mins` : ''}
+                                {b.rental_type === 'hourly' && b.estimatedDuration ? ` • ${b.estimatedDuration} hr` : ''}
+                                {(b.rental_type === 'acre' || b.rental_type === 'land_based') && (b.landSize || b.estimatedDuration) ? ` • ${b.landSize || b.estimatedDuration} acre` : ''}
+                                {b.rental_type === 'bigha' && (b.landSize || b.estimatedDuration) ? ` • ${b.landSize || b.estimatedDuration} bigha` : ''}
+                              </p>
                             </div>
                             <div className="min-w-0">
                               <p className="text-[9px] font-bold uppercase text-gray-400">Schedule</p>

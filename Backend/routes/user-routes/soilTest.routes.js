@@ -9,9 +9,10 @@ const {
     updateSoilTestRequest
 } = require('../../controllers/userControllers/soilTestController');
 
-router.use(authenticate);
-
+// Public route - soil test packages & pricing
 router.get('/prices', getSoilTestPrices);
+
+router.use(authenticate);
 router.post('/request', createSoilTestRequest);
 router.get('/my-requests', getMySoilTestRequests);
 router.put('/request/:id', updateSoilTestRequest);

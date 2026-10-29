@@ -31,7 +31,7 @@ const getUserCart = async (req, res) => {
       if (item.serviceId && mongoose.Types.ObjectId.isValid(item.serviceId)) {
         // 1. Try Service first
         populatedService = await Service.findById(item.serviceId)
-          .select('title iconUrl slug hourly_price land_price land_unit daily_price')
+          .select('title iconUrl slug hourly_price minute_price acre_price bigha_price land_price land_unit daily_price')
           .lean();
 
         // 2. Fallback to VendorEquipment
@@ -44,6 +44,9 @@ const getUserCart = async (req, res) => {
               iconUrl: (equip.images && equip.images[0]) || '',
               slug: (equip.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
               hourly_price: Number(equip.pricing?.hourly?.price) || 0,
+              minute_price: 0,
+              acre_price: Number(equip.pricing?.land_based?.price) || 0,
+              bigha_price: 0,
               land_price: Number(equip.pricing?.land_based?.price) || 0,
               land_unit: 'bigha',
               daily_price: Number(equip.pricing?.daily?.price) || 0,
@@ -61,7 +64,10 @@ const getUserCart = async (req, res) => {
               title: prod.title,
               iconUrl: prod.imageUrl || (prod.images && prod.images[0]) || '',
               slug: prod.slug,
+              minute_price: 0,
               hourly_price: prod.unit === 'hour' ? prod.price : 0,
+              acre_price: prod.unit === 'acre' ? prod.price : 0,
+              bigha_price: prod.unit === 'bigha' ? prod.price : 0,
               land_price: (prod.unit === 'acre' || prod.unit === 'bigha') ? prod.price : 0,
               land_unit: prod.unit === 'bigha' ? 'bigha' : 'acre',
               daily_price: prod.unit === 'day' ? prod.price : 0,
@@ -79,8 +85,11 @@ const getUserCart = async (req, res) => {
               title: cat.title,
               iconUrl: cat.icon || '',
               slug: cat.slug,
+              minute_price: Number(cat.minutePrice) || 0,
               hourly_price: Number(cat.hourlyPrice) || 0,
-              land_price: 0,
+              acre_price: Number(cat.acrePrice) || 0,
+              bigha_price: Number(cat.bighaPrice) || 0,
+              land_price: Number(cat.acrePrice) || 0,
               land_unit: 'acre',
               daily_price: 0,
               isCategoryService: true
@@ -89,14 +98,39 @@ const getUserCart = async (req, res) => {
         }
       }
 
+      let matchedCategory = null;
       if (item.categoryId && mongoose.Types.ObjectId.isValid(item.categoryId)) {
-        populatedCategory = await Category.findById(item.categoryId)
-          .select('title slug')
+        matchedCategory = await Category.findById(item.categoryId)
+          .select('title slug minutePrice hourlyPrice acrePrice bighaPrice')
           .lean();
+        if (matchedCategory) {
+          populatedCategory = { _id: matchedCategory._id, title: matchedCategory.title, slug: matchedCategory.slug };
+        }
       }
+      if (!matchedCategory && (item.category || item.categoryTitle || item.title)) {
+        matchedCategory = await Category.findOne({
+          $or: [
+            { title: item.title },
+            { title: item.categoryTitle },
+            { title: item.category }
+          ]
+        }).select('title slug minutePrice hourlyPrice acrePrice bighaPrice').lean();
+      }
+
+      const minute = populatedService?.minute_price || Number(matchedCategory?.minutePrice) || item.minute_price || 0;
+      const hourly = populatedService?.hourly_price || Number(matchedCategory?.hourlyPrice) || item.hourly_price || 0;
+      const acre = populatedService?.acre_price || Number(matchedCategory?.acrePrice) || item.acre_price || populatedService?.land_price || item.land_price || 0;
+      const bigha = populatedService?.bigha_price || Number(matchedCategory?.bighaPrice) || item.bigha_price || 0;
+      const landP = acre || bigha || item.land_price || populatedService?.land_price || 0;
 
       return {
         ...item,
+        minute_price: minute,
+        hourly_price: hourly,
+        acre_price: acre,
+        bigha_price: bigha,
+        land_price: landP,
+        unitPrice: hourly || minute || acre || bigha || item.unitPrice || 0,
         // Crucial: keep populated object or original ID string so serviceId is NEVER null!
         serviceId: populatedService || item.serviceId,
         categoryId: populatedCategory || item.categoryId
@@ -155,6 +189,9 @@ const addToCart = async (req, res) => {
       brandId,
       card,
       hourly_price,
+      minute_price,
+      acre_price,
+      bigha_price,
       land_price,
       land_unit,
       daily_price,
@@ -233,13 +270,21 @@ const addToCart = async (req, res) => {
     const calculatedUnitPrice = unitPrice !== undefined ? unitPrice : (price !== undefined ? price : (service?.basePrice || 0));
 
     if (existingItemIndex !== -1) {
-      // Update quantity if item exists
+      // Update quantity and refresh prices if item exists
       const existingItem = cart.items[existingItemIndex];
       const newCount = (existingItem.serviceCount || 1) + (serviceCount || 1);
-      const newPrice = (existingItem.unitPrice || calculatedUnitPrice) * newCount;
+      const effectiveUnitPrice = calculatedUnitPrice || existingItem.unitPrice;
+      const newPrice = effectiveUnitPrice * newCount;
 
       cart.items[existingItemIndex].serviceCount = newCount;
       cart.items[existingItemIndex].price = newPrice;
+      cart.items[existingItemIndex].unitPrice = effectiveUnitPrice;
+      if (minute_price !== undefined) cart.items[existingItemIndex].minute_price = Number(minute_price);
+      if (hourly_price !== undefined) cart.items[existingItemIndex].hourly_price = Number(hourly_price);
+      if (acre_price !== undefined) cart.items[existingItemIndex].acre_price = Number(acre_price);
+      if (bigha_price !== undefined) cart.items[existingItemIndex].bigha_price = Number(bigha_price);
+      if (land_price !== undefined) cart.items[existingItemIndex].land_price = Number(land_price);
+      if (daily_price !== undefined) cart.items[existingItemIndex].daily_price = Number(daily_price);
     } else {
       // Add new item
       const newItem = {
@@ -270,8 +315,11 @@ const addToCart = async (req, res) => {
         pricing_context: pricing_context || 'any',
         parentSourceId: parentSourceId || null,
         // Agriculture rental guideline prices
-        hourly_price: hourly_price || service?.hourly_price || (vendorEquipment?.pricing?.hourly?.price ? Number(vendorEquipment.pricing.hourly.price) : 0) || Number(categoryDoc?.hourlyPrice) || 0,
-        land_price: land_price || service?.land_price || (vendorEquipment?.pricing?.land_based?.price ? Number(vendorEquipment.pricing.land_based.price) : 0),
+        minute_price: minute_price !== undefined ? Number(minute_price) : (service?.minute_price || Number(categoryDoc?.minutePrice) || 0),
+        hourly_price: hourly_price !== undefined ? Number(hourly_price) : (service?.hourly_price || (vendorEquipment?.pricing?.hourly?.price ? Number(vendorEquipment.pricing.hourly.price) : 0) || Number(categoryDoc?.hourlyPrice) || 0),
+        acre_price: acre_price !== undefined ? Number(acre_price) : (service?.acre_price || (vendorEquipment?.pricing?.land_based?.price ? Number(vendorEquipment.pricing.land_based.price) : 0) || Number(categoryDoc?.acrePrice) || land_price || 0),
+        bigha_price: bigha_price !== undefined ? Number(bigha_price) : (service?.bigha_price || Number(categoryDoc?.bighaPrice) || 0),
+        land_price: land_price || service?.land_price || (vendorEquipment?.pricing?.land_based?.price ? Number(vendorEquipment.pricing.land_based.price) : 0) || Number(categoryDoc?.acrePrice) || 0,
         land_unit: land_unit || service?.land_unit || 'acre',
         daily_price: daily_price || service?.daily_price || (vendorEquipment?.pricing?.daily?.price ? Number(vendorEquipment.pricing.daily.price) : 0),
       };

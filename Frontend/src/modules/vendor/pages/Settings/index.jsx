@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiBell, FiVolume2, FiInfo, FiTrash2, FiMapPin } from 'react-icons/fi';
+import { FiBell, FiInfo, FiTrash2, FiMapPin } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
 import { vendorAuthService } from '../../../../services/authService';
 import { registerFCMToken, removeFCMToken } from '../../../../services/pushNotificationService';
-import api from '../../../../services/api';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
 
@@ -13,44 +12,11 @@ const Settings = () => {
   const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [sendingTest, setSendingTest] = useState(false);
   const [settings, setSettings] = useState({
     notifications: true,
     soundAlerts: true,
     language: 'en',
   });
-
-  const handleSendTestNotification = async () => {
-    console.log('[Test Notification] Send button clicked');
-    console.log('[Test Notification] Current settings state:', settings);
-    console.log('[Test Notification] Stored FCM token (web):', localStorage.getItem('fcm_token_vendor_web'));
-    console.log('[Test Notification] Stored FCM token (mobile):', localStorage.getItem('fcm_token_vendor_mobile'));
-    console.log('[Test Notification] Notification.permission:', typeof Notification !== 'undefined' ? Notification.permission : 'Not supported');
-    console.log('[Test Notification] Vendor Access Token:', localStorage.getItem('vendorAccessToken') ? 'Present (Hidden for security)' : 'Missing');
-
-    setSendingTest(true);
-    try {
-      console.log('[Test Notification] Sending API request to /vendors/fcm-tokens/test...');
-      const response = await api.post('/vendors/fcm-tokens/test');
-      console.log('[Test Notification] API response:', response.data);
-      if (response.data.success) {
-        toast.success('Test push notification sent successfully!');
-      } else {
-        console.warn('[Test Notification] Backend returned success false:', response.data.error);
-        toast.error(response.data.error || 'Failed to send test notification');
-      }
-    } catch (error) {
-      console.error('[Test Notification] Error sending test notification:', error);
-      if (error.response) {
-        console.error('[Test Notification] Error response status:', error.response.status);
-        console.error('[Test Notification] Error response data:', error.response.data);
-      }
-      toast.error(error.response?.data?.error || 'Failed to send test notification');
-    } finally {
-      setSendingTest(false);
-      console.log('[Test Notification] Finished flow');
-    }
-  };
 
   useLayoutEffect(() => {
     const html = document.documentElement;
@@ -119,7 +85,7 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen pb-20" style={{ background: themeColors.backgroundGradient }}>
-      <Header title="Settings" />
+      <Header title="Settings" onBack={() => navigate('/vendor/profile')} />
 
       <main className="px-4 py-6">
         {/* Notification Settings */}
@@ -149,43 +115,6 @@ const Settings = () => {
                   className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.notifications ? 'transform translate-x-6' : ''
                     }`}
                 />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FiVolume2 className="w-5 h-5" style={{ color: themeColors.icon }} />
-                <div>
-                  <p className="font-semibold text-gray-800">Sound Alerts</p>
-                  <p className="text-sm text-gray-600">Play sound for new bookings</p>
-                </div>
-              </div>
-              <button
-                onClick={() => handleToggle('soundAlerts')}
-                className={`relative w-12 h-6 rounded-full transition-colors ${settings.soundAlerts ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.soundAlerts ? 'transform translate-x-6' : ''
-                    }`}
-                />
-              </button>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100 flex justify-center">
-              <button
-                type="button"
-                onClick={handleSendTestNotification}
-                disabled={sendingTest}
-                className="w-full py-2.5 px-4 rounded-xl font-semibold text-white text-sm transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 hover:opacity-90"
-                style={{
-                  background: themeColors.button,
-                  boxShadow: `0 2px 8px ${themeColors.button}30`,
-                  cursor: 'pointer'
-                }}
-              >
-                <FiBell className="w-4 h-4" />
-                {sendingTest ? 'Sending...' : 'Test Push Notification'}
               </button>
             </div>
           </div>

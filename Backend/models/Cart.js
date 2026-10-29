@@ -136,7 +136,10 @@ const cartItemSchema = new mongoose.Schema({
     end: String
   },
   // Agriculture Equipment Rental Guideline Prices
+  minute_price: { type: Number, default: 0 },
   hourly_price: { type: Number, default: 0 },
+  acre_price:   { type: Number, default: 0 },
+  bigha_price:  { type: Number, default: 0 },
   land_price:   { type: Number, default: 0 },
   land_unit: { type: String, default: 'acre' },
   daily_price:  { type: Number, default: 0 },

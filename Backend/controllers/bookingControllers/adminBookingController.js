@@ -72,7 +72,11 @@ const getAllBookings = async (req, res) => {
     if (userId) query.userId = userId;
     if (vendorId) query.vendorId = vendorId;
     if (workerId) query.workerId = workerId;
-    if (rental_type) query.rental_type = rental_type;
+    if (rental_type === 'acre') {
+      query.rental_type = { $in: ['acre', 'land_based'] };
+    } else if (rental_type) {
+      query.rental_type = rental_type;
+    }
     if (serviceCategory) query.serviceCategory = serviceCategory;
 
     if (startDate || endDate) {

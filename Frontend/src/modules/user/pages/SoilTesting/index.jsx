@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     FiChevronLeft,
     FiMapPin,
@@ -68,24 +68,57 @@ const SoilTesting = () => {
 
     const inputClass = 'w-full bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#2E7D32] focus:ring-2 focus:ring-green-100 transition';
 
-    const testOptions = [
-        { value: 'Basic', label: 'Basic Test (3 Parameters - NPK)', desc: 'Tests Nitrogen, Phosphorus, and Potassium' },
-        { value: 'Advanced', label: 'Advanced Test (12 Parameters - Govt. Standard)', desc: 'Complete analysis including pH, EC, OC, NPK & Micro-nutrients' }
-    ];
+    const testOptions = useMemo(() => {
+        if (prices.testTypes && prices.testTypes.length > 0) {
+            return prices.testTypes.filter(t => t.isActive !== false).map(t => ({
+                value: t.title || t.name,
+                label: t.title || t.name,
+                desc: t.description || '',
+                price: Number(t.price) || 0
+            }));
+        }
+        return [
+            { value: 'Basic Test (3 Parameters - NPK)', label: 'Basic Test (3 Parameters - NPK)', desc: 'Tests Nitrogen, Phosphorus, and Potassium', price: Number(prices.basicPrice) || 100 },
+            { value: 'Advanced Test (12 Parameters - Govt. Standard)', label: 'Advanced Test (12 Parameters - Govt. Standard)', desc: 'Complete analysis including pH, EC, OC, NPK & Micro-nutrients', price: Number(prices.advancedPrice) || 1000 }
+        ];
+    }, [prices]);
 
-    useEffect(() => {
-        fetchMyRequests(false);
-        soilTestService.getPrices().then(res => {
-            if (res.success) {
+    const fetchPrices = async () => {
+        try {
+            const res = await soilTestService.getPrices();
+            if (res.success && res.data) {
                 setPrices(res.data);
+                if (res.data.testTypes && res.data.testTypes.length > 0) {
+                    const activeTypes = res.data.testTypes.filter(t => t.isActive !== false);
+                    const firstOption = activeTypes[0] || res.data.testTypes[0];
+                    if (firstOption) {
+                        setFormData(prev => {
+                            const stillValid = activeTypes.some(t => (t.title || t.name) === prev.testType);
+                            return {
+                                ...prev,
+                                testType: stillValid ? prev.testType : (firstOption.title || firstOption.name)
+                            };
+                        });
+                    }
+                }
                 try {
                     localStorage.setItem('cached_soil_prices', JSON.stringify(res.data));
                 } catch {}
             }
-        }).catch(() => {});
+        } catch (err) {
+            console.error('Failed to fetch soil test prices:', err);
+        }
+    };
 
-        // Auto-update status every 15 seconds
-        const interval = setInterval(() => fetchMyRequests(true), 15000);
+    useEffect(() => {
+        fetchMyRequests(false);
+        fetchPrices();
+
+        // Auto-update status and pricing every 15 seconds
+        const interval = setInterval(() => {
+            fetchMyRequests(true);
+            fetchPrices();
+        }, 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -149,18 +182,33 @@ const SoilTesting = () => {
     const closeForm = () => {
         setShowForm(false);
         setEditingRequestId(null);
-        setFormData({
+    };
+
+    const openNewRequest = (presetTestType = null) => {
+        fetchPrices();
+        setEditingRequestId(null);
+        setFormData(prev => ({
             landSize: '',
             location: localStorage.getItem('currentAddress') || '',
             latitude: null,
             longitude: null,
             cropType: '',
-            testType: 'Basic',
+            testType: presetTestType || prev.testType || testOptions[0]?.value || 'Basic Test',
             phoneNumber: JSON.parse(localStorage.getItem('userData') || '{}').phone || ''
-        });
+        }));
+        setShowForm(true);
     };
 
-    const selectedPrice = formData.testType === 'Advanced' ? prices.advancedPrice : prices.basicPrice;
+    const selectedOption = useMemo(() => {
+        return testOptions.find(o =>
+            o.value === formData.testType ||
+            o.label === formData.testType ||
+            (formData.testType === 'Basic' && o.label?.includes('Basic')) ||
+            (formData.testType === 'Advanced' && o.label?.includes('Advanced'))
+        ) || testOptions[0];
+    }, [testOptions, formData.testType]);
+
+    const selectedPrice = selectedOption ? selectedOption.price : (formData.testType === 'Advanced' ? prices.advancedPrice : prices.basicPrice);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -352,11 +400,50 @@ const SoilTesting = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => { setEditingRequestId(null); setShowForm(true); }}
+                        onClick={() => openNewRequest()}
                         className="w-full bg-white text-[#2E7D32] py-2.5 rounded-xl font-semibold text-sm active:scale-[0.98] transition-transform"
                     >
                         Request Soil Test
                     </button>
+                </div>
+
+                {/* Available Test Packages */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-base font-semibold text-slate-900">Available Soil Test Packages</h2>
+                            <p className="text-xs text-slate-500">Pick a package according to your soil testing needs</p>
+                        </div>
+                        <span className="text-xs font-semibold text-[#2E7D32] bg-green-50 border border-green-100 px-2 py-0.5 rounded-lg">
+                            {testOptions.length} Packages
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5">
+                        {testOptions.map((opt) => (
+                            <div
+                                key={opt.value}
+                                onClick={() => openNewRequest(opt.value)}
+                                className="bg-white rounded-2xl border border-slate-200 p-4 hover:border-[#2E7D32] hover:shadow-sm cursor-pointer transition-all active:scale-[0.99] flex items-center justify-between gap-3"
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-sm font-semibold text-slate-900">{opt.label}</h3>
+                                    {opt.desc && (
+                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{opt.desc}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-base font-bold text-[#2E7D32]">₹{opt.price}</span>
+                                    <button
+                                        type="button"
+                                        className="px-3 py-1.5 bg-[#2E7D32] hover:bg-green-800 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
+                                    >
+                                        Book
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Features */}
@@ -406,7 +493,7 @@ const SoilTesting = () => {
                                         <div className="min-w-0">
                                             <p className="text-[11px] text-slate-400 mb-0.5">#{req._id.slice(-8).toUpperCase()}</p>
                                             <h4 className="font-semibold text-slate-900 text-sm">{req.landSize?.replace(/Arce/g, 'Acre')} Land — {req.cropType || 'General'}</h4>
-                                            <p className="text-xs font-medium text-[#2E7D32] mt-0.5">{req.testType === 'Advanced' ? 'Advanced Test (12 Parameters)' : 'Basic Test (3 Parameters)'}</p>
+                                            <p className="text-xs font-medium text-[#2E7D32] mt-0.5">{req.testType || 'Soil Test'}</p>
                                         </div>
                                         <StatusBadge status={req.status} />
                                     </div>
@@ -487,7 +574,7 @@ const SoilTesting = () => {
                             <p className="text-xs text-slate-500 mt-0.5 mb-4">Your request is submitted as soon as the payment is done.</p>
 
                             <div className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-3 mb-4">
-                                <span className="text-sm text-slate-600">{formData.testType} Soil Test</span>
+                                <span className="text-sm text-slate-600 truncate max-w-[200px]">{selectedOption?.label || formData.testType || 'Soil Test'}</span>
                                 <span className="text-base font-semibold text-slate-900">₹{selectedPrice}</span>
                             </div>
 
@@ -600,8 +687,11 @@ const SoilTesting = () => {
                             <h2 className="text-sm font-semibold text-slate-900">Test Type</h2>
                             {editingRequestId && <p className="text-xs text-slate-500 -mt-1">Test type can't be changed after payment.</p>}
                             {testOptions.map(option => {
-                                const selected = formData.testType === option.value;
-                                const price = option.value === 'Advanced' ? prices.advancedPrice : prices.basicPrice;
+                                const selected = (formData.testType === option.value ||
+                                    formData.testType === option.label ||
+                                    (formData.testType === 'Basic' && option.label?.includes('Basic')) ||
+                                    (formData.testType === 'Advanced' && option.label?.includes('Advanced')));
+                                const price = option.price;
                                 return (
                                     <button
                                         key={option.value}
@@ -617,7 +707,7 @@ const SoilTesting = () => {
                                         </span>
                                         <span className="flex-1">
                                             <span className="block text-sm font-medium text-slate-900">{option.label}</span>
-                                            <span className="block text-xs text-slate-500 mt-0.5">{option.desc}</span>
+                                            {option.desc && <span className="block text-xs text-slate-500 mt-0.5">{option.desc}</span>}
                                         </span>
                                         {price > 0 && <span className="text-sm font-semibold text-slate-900 flex-shrink-0">₹{price}</span>}
                                     </button>

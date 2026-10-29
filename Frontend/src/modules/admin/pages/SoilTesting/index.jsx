@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     FiSearch, FiFilter, FiTrash2, FiCheckCircle, FiClock,
     FiUser, FiMapPin, FiActivity, FiUpload, FiUserCheck, FiX,
-    FiDollarSign, FiTrendingUp, FiCreditCard, FiPieChart
+    FiDollarSign, FiTrendingUp, FiCreditCard, FiPieChart,
+    FiSettings, FiPlus, FiEdit2, FiLayers
 } from 'react-icons/fi';
 import adminSoilTestService from '../../../../services/adminSoilTestService';
 import { toast } from 'react-hot-toast';
@@ -52,8 +53,21 @@ const ManageSoilTests = () => {
     const [approveNotes, setApproveNotes]           = useState('');
     const [previewUrl, setPreviewUrl]               = useState(null);
     const [saving, setSaving]             = useState(false);
-    const [pricing, setPricing]           = useState({ basicPrice: '', advancedPrice: '', commissionPercentage: '' });
+    const [pricing, setPricing]           = useState({ basicPrice: '', advancedPrice: '', commissionPercentage: 10, testTypes: [] });
     const [savingSettings, setSavingSettings] = useState(false);
+    const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [settingsForm, setSettingsForm] = useState({
+        commissionPercentage: 10,
+        testTypes: []
+    });
+    const [editingTestTypeIndex, setEditingTestTypeIndex] = useState(null);
+    const [testTypeDraft, setTestTypeDraft] = useState({
+        name: '',
+        title: '',
+        description: '',
+        price: '',
+        isActive: true
+    });
 
     const vendorShare = (price) => {
         const p = Number(price) || 0;
@@ -63,7 +77,15 @@ const ManageSoilTests = () => {
     useEffect(() => {
         fetchRequests(false);
         fetchVendors();
-        adminSoilTestService.getSettings().then(res => res.success && setPricing(res.data)).catch(() => {});
+        adminSoilTestService.getSettings().then(res => {
+            if (res.success && res.data) {
+                setPricing(res.data);
+                setSettingsForm({
+                    commissionPercentage: res.data.commissionPercentage ?? 10,
+                    testTypes: res.data.testTypes || []
+                });
+            }
+        }).catch(() => {});
 
         // Auto-update status every 15 seconds
         const interval = setInterval(() => fetchRequests(true), 15000);
@@ -72,7 +94,7 @@ const ManageSoilTests = () => {
 
     // Prevent background scrolling when a modal is open
     useEffect(() => {
-        if (assignModal || approveModal) {
+        if (assignModal || approveModal || settingsModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
@@ -80,7 +102,7 @@ const ManageSoilTests = () => {
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [assignModal, approveModal]);
+    }, [assignModal, approveModal, settingsModalOpen]);
 
     const fetchRequests = async (isPolling = false) => {
         try {
@@ -133,9 +155,18 @@ const ManageSoilTests = () => {
     const handleSaveSettings = async () => {
         try {
             setSavingSettings(true);
-            const res = await adminSoilTestService.updateSettings(pricing);
-            if (res.success) toast.success('Pricing saved');
-        } catch (err) { toast.error(err.response?.data?.message || 'Failed to save pricing'); }
+            const payload = {
+                commissionPercentage: Number(settingsForm.commissionPercentage) || 0,
+                testTypes: settingsForm.testTypes
+            };
+            const res = await adminSoilTestService.updateSettings(payload);
+            if (res.success) {
+                toast.success('Soil testing settings & packages saved');
+                setPricing(res.data);
+                setSettingsModalOpen(false);
+                setEditingTestTypeIndex(null);
+            }
+        } catch (err) { toast.error(err.response?.data?.message || 'Failed to save settings'); }
         finally { setSavingSettings(false); }
     };
 
@@ -222,38 +253,31 @@ const ManageSoilTests = () => {
 
     return (
         <div className="p-8">
-            {/* Header: title + pricing */}
-            <div className="flex flex-wrap items-end justify-between gap-6 mb-6">
+            {/* Header: title + Settings button */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-semibold text-slate-900">Soil Testing</h1>
                     <p className="text-sm text-slate-500 mt-0.5">Review requests, assign labs, and track revenue</p>
                 </div>
-                <div>
-                    <div className="flex items-end gap-3">
-                        {[
-                            { key: 'basicPrice', label: 'Basic Test', prefix: '₹' },
-                            { key: 'advancedPrice', label: 'Advanced Test', prefix: '₹' },
-                            { key: 'commissionPercentage', label: 'Commission', suffix: '%' },
-                        ].map(f => (
-                            <div key={f.key}>
-                                <label className="block text-xs font-medium text-slate-500 mb-1">{f.label}</label>
-                                <div className="relative">
-                                    {f.prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{f.prefix}</span>}
-                                    <input type="number" min="0" max={f.suffix ? 100 : undefined}
-                                        className={`w-28 bg-white border border-slate-200 rounded-lg py-2 text-sm text-slate-900 outline-none focus:border-blue-500 ${f.prefix ? 'pl-7 pr-3' : 'pl-3 pr-7'}`}
-                                        value={pricing[f.key]} onChange={e => setPricing({ ...pricing, [f.key]: e.target.value })} />
-                                    {f.suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{f.suffix}</span>}
-                                </div>
-                            </div>
-                        ))}
-                        <button onClick={handleSaveSettings} disabled={savingSettings}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-                            {savingSettings ? 'Saving...' : 'Save'}
-                        </button>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1.5 text-right">
-                        Vendor gets ₹{vendorShare(pricing.basicPrice)} (Basic) · ₹{vendorShare(pricing.advancedPrice)} (Advanced) on approval
-                    </p>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            adminSoilTestService.getSettings().then(res => {
+                                if (res.success && res.data) {
+                                    setPricing(res.data);
+                                    setSettingsForm({
+                                        commissionPercentage: res.data.commissionPercentage ?? 10,
+                                        testTypes: res.data.testTypes || []
+                                    });
+                                }
+                            }).catch(() => {});
+                            setSettingsModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-sm transition-all active:scale-95"
+                    >
+                        <FiSettings className="w-4 h-4 text-slate-500" />
+                        <span>Settings</span>
+                    </button>
                 </div>
             </div>
 
@@ -322,7 +346,7 @@ const ManageSoilTests = () => {
                                 </td>
                                 <td className="px-5 py-4 align-top">
                                     <p className="font-bold text-slate-800 text-sm">{req.landSize?.replace(/Arce/g, 'Acre')} — {req.cropType || 'General'}</p>
-                                    <p className="text-[10px] font-semibold text-teal-600 mb-1">{req.testType === 'Advanced' ? 'Advanced Test (12 Param)' : 'Basic Test (3 Param)'}</p>
+                                    <p className="text-[10px] font-semibold text-teal-600 mb-1">{req.testType || 'Soil Test'}</p>
                                     <div className="flex items-center gap-1 text-slate-400">
                                         <FiMapPin className="text-[10px]" />
                                         <p className="text-[10px] font-medium truncate max-w-[180px]">{req.location}</p>
@@ -713,6 +737,322 @@ const ManageSoilTests = () => {
                                 ) : (
                                     <img src={previewUrl} alt="Report Preview" className="max-w-full max-h-full object-contain rounded-2xl shadow-xl bg-white" />
                                 )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ── Settings Modal ── */}
+            <AnimatePresence>
+                {settingsModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !savingSettings && setSettingsModalOpen(false)}
+                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                            className="relative bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            {/* Modal Header */}
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                        <FiSettings className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-slate-900">Soil Testing Settings</h2>
+                                        <p className="text-xs text-slate-500">Configure platform commission & dynamic soil test packages</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => !savingSettings && setSettingsModalOpen(false)}
+                                    className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <FiX className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="p-6 overflow-y-auto space-y-6">
+                                {/* Platform Commission Section */}
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-800">Admin Commission Percentage</label>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Cut deducted from each booking. Lab vendor receives remaining {100 - (Number(settingsForm.commissionPercentage) || 0)}% upon report approval.
+                                            </p>
+                                        </div>
+                                        <div className="relative w-28 flex-shrink-0">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-3 pr-7 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500"
+                                                value={settingsForm.commissionPercentage}
+                                                onChange={e => setSettingsForm({ ...settingsForm, commissionPercentage: e.target.value })}
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dynamic Test Packages Section */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-slate-900">Soil Test Packages</h3>
+                                            <p className="text-xs text-slate-500">Add or edit test packages available to farmers</p>
+                                        </div>
+                                        {editingTestTypeIndex === null && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setTestTypeDraft({
+                                                        name: '',
+                                                        title: '',
+                                                        description: '',
+                                                        price: '',
+                                                        isActive: true
+                                                    });
+                                                    setEditingTestTypeIndex(-1); // -1 indicates adding new
+                                                }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors"
+                                            >
+                                                <FiPlus className="w-3.5 h-3.5" />
+                                                <span>Add Test Type</span>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Add / Edit Form */}
+                                    {editingTestTypeIndex !== null && (
+                                        <div className="mb-4 bg-blue-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                                                    {editingTestTypeIndex === -1 ? 'New Test Package' : 'Edit Test Package'}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Package Name / Title *</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g. Basic Test (3 Parameters - NPK)"
+                                                        className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-blue-500"
+                                                        value={testTypeDraft.title || testTypeDraft.name}
+                                                        onChange={e => setTestTypeDraft({ ...testTypeDraft, title: e.target.value, name: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Farmer Price (₹) *</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            placeholder="e.g. 500"
+                                                            className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm outline-none focus:border-blue-500 font-semibold"
+                                                            value={testTypeDraft.price}
+                                                            onChange={e => setTestTypeDraft({ ...testTypeDraft, price: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-600 mb-1">Description / Parameters Included</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Tests Nitrogen, Phosphorus, Potassium & Organic Carbon"
+                                                    className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-blue-500"
+                                                    value={testTypeDraft.description}
+                                                    onChange={e => setTestTypeDraft({ ...testTypeDraft, description: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={testTypeDraft.isActive}
+                                                        onChange={e => setTestTypeDraft({ ...testTypeDraft, isActive: e.target.checked })}
+                                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                    />
+                                                    <span>Active (Visible for farmers to select)</span>
+                                                </label>
+                                                <div className="text-xs text-slate-500">
+                                                    Vendor gets: <strong className="text-emerald-600">₹{(Number(testTypeDraft.price || 0) * (1 - (Number(settingsForm.commissionPercentage) || 0) / 100)).toFixed(2)}</strong>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-blue-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingTestTypeIndex(null)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200/60 rounded-lg transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const name = (testTypeDraft.title || testTypeDraft.name || '').trim();
+                                                        if (!name) return toast.error('Package name is required');
+                                                        const price = Number(testTypeDraft.price);
+                                                        if (!Number.isFinite(price) || price < 0) return toast.error('Valid price is required');
+
+                                                        const updatedItem = {
+                                                            name,
+                                                            title: name,
+                                                            description: (testTypeDraft.description || '').trim(),
+                                                            price,
+                                                            isActive: testTypeDraft.isActive !== false
+                                                        };
+
+                                                        let newTypes = [...(settingsForm.testTypes || [])];
+                                                        if (editingTestTypeIndex === -1) {
+                                                            newTypes.push(updatedItem);
+                                                            toast.success(`"${name}" added. Click "Save Settings" below to publish.`);
+                                                        } else {
+                                                            newTypes[editingTestTypeIndex] = updatedItem;
+                                                            toast.success(`"${name}" updated. Click "Save Settings" below to publish.`);
+                                                        }
+                                                        setSettingsForm({ ...settingsForm, testTypes: newTypes });
+                                                        setEditingTestTypeIndex(null);
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                                >
+                                                    {editingTestTypeIndex === -1 ? 'Add Package' : 'Update Package'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* List of Test Types */}
+                                    <div className="space-y-2">
+                                        {(!settingsForm.testTypes || settingsForm.testTypes.length === 0) ? (
+                                            <p className="text-center py-6 text-xs text-slate-400 border border-dashed rounded-xl">
+                                                No test types configured. Click "+ Add Test Type" to create one.
+                                            </p>
+                                        ) : (
+                                            settingsForm.testTypes.map((type, idx) => {
+                                                const price = Number(type.price) || 0;
+                                                const commRate = Number(settingsForm.commissionPercentage) || 0;
+                                                const vendorAmt = (price * (1 - commRate / 100)).toFixed(2);
+                                                const adminAmt = (price * (commRate / 100)).toFixed(2);
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
+                                                            type.isActive !== false ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-50 border-slate-200 opacity-60'
+                                                        }`}
+                                                    >
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold text-sm text-slate-900 truncate">
+                                                                    {type.title || type.name}
+                                                                </span>
+                                                                {type.isActive === false && (
+                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
+                                                                        Inactive
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {type.description && (
+                                                                <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{type.description}</p>
+                                                            )}
+                                                            <p className="text-[11px] text-slate-400 mt-1">
+                                                                Vendor: <span className="font-medium text-emerald-600">₹{vendorAmt}</span> · Commission: <span className="font-medium text-slate-600">₹{adminAmt}</span>
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                                            <span className="text-base font-bold text-slate-900">
+                                                                ₹{price}
+                                                            </span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setTestTypeDraft({
+                                                                            name: type.name || '',
+                                                                            title: type.title || type.name || '',
+                                                                            description: type.description || '',
+                                                                            price: type.price !== undefined ? type.price : '',
+                                                                            isActive: type.isActive !== false
+                                                                        });
+                                                                        setEditingTestTypeIndex(idx);
+                                                                    }}
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                                    title="Edit Package"
+                                                                >
+                                                                    <FiEdit2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (settingsForm.testTypes.length <= 1) {
+                                                                            return toast.error('At least one test type package must be configured.');
+                                                                        }
+                                                                        if (window.confirm(`Delete "${type.title || type.name}" package?`)) {
+                                                                            const newTypes = settingsForm.testTypes.filter((_, i) => i !== idx);
+                                                                            setSettingsForm({ ...settingsForm, testTypes: newTypes });
+                                                                            if (editingTestTypeIndex === idx) setEditingTestTypeIndex(null);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                                                    title="Delete Package"
+                                                                >
+                                                                    <FiTrash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                <p className="text-xs text-slate-500">
+                                    Total {settingsForm.testTypes?.length || 0} packages configured
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={savingSettings}
+                                        onClick={() => {
+                                            setSettingsModalOpen(false);
+                                            setEditingTestTypeIndex(null);
+                                        }}
+                                        className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-sm font-medium transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={savingSettings}
+                                        onClick={handleSaveSettings}
+                                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                                    >
+                                        {savingSettings ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                <span>Saving...</span>
+                                            </>
+                                        ) : (
+                                            <span>Save Settings</span>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </div>

@@ -103,7 +103,7 @@ const SoilTestingRevenue = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-800">{vendorLabel(r.vendorId)}</td>
                         <td className="px-4 py-3">
-                          <p className="text-sm text-gray-800">{r.testType} Test</p>
+                          <p className="text-sm text-gray-800">{r.testType ? (r.testType.includes('Test') ? r.testType : `${r.testType} Test`) : 'Soil Test'}</p>
                           <p className="text-[11px] text-gray-500">{r.landSize}{r.cropType ? ` · ${r.cropType}` : ''}</p>
                         </td>
                         <td className="px-4 py-3">

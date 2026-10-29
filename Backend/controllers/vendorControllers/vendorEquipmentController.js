@@ -326,22 +326,33 @@ exports.completeMachineryWork = async (req, res) => {
 
     const durationDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)));
 
-    if (booking.rental_type === 'hourly') {
+    if (booking.rental_type === 'minute') {
+      const durationMins = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+      baseAmount = (service.minute_price || (service.hourly_price ? Math.round(service.hourly_price / 60) : 0) || booking.basePrice || 0) * durationMins;
+    } else if (booking.rental_type === 'hourly') {
       baseAmount = (service.hourly_price || booking.basePrice || 0) * durationHours;
-    } else if (booking.rental_type === 'land_based') {
-      baseAmount = (service.land_price || booking.basePrice || 0) * (workUnits || 1);
+    } else if (booking.rental_type === 'acre' || booking.rental_type === 'land_based') {
+      baseAmount = (service.acre_price || service.land_price || booking.basePrice || 0) * (workUnits || parseFloat(booking.landSize) || 1);
+    } else if (booking.rental_type === 'bigha') {
+      baseAmount = (service.bigha_price || booking.basePrice || 0) * (workUnits || parseFloat(booking.landSize) || 1);
     } else if (booking.rental_type === 'daily') {
       baseAmount = (service.daily_price || booking.basePrice || 0) * durationDays;
     }
 
     // Add per-implement charges (ONLY for those selected during booking)
     if (booking.selectedImplements && booking.selectedImplements.length > 0) {
+      const durationMins = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
       for (const impl of booking.selectedImplements) {
         const implPricing = impl.pricing;
-        if (booking.rental_type === 'hourly' && implPricing?.hourly?.isEnabled) {
+        if (booking.rental_type === 'minute' && (implPricing?.minute?.isEnabled || implPricing?.hourly?.isEnabled)) {
+          const mPrice = implPricing?.minute?.price || (implPricing?.hourly?.price ? Math.round(implPricing.hourly.price / 60) : 0);
+          baseAmount += mPrice * durationMins;
+        } else if (booking.rental_type === 'hourly' && implPricing?.hourly?.isEnabled) {
           baseAmount += (implPricing.hourly.price || 0) * durationHours;
-        } else if (booking.rental_type === 'land_based' && implPricing?.land_based?.isEnabled) {
-          baseAmount += (implPricing.land_based.price || 0) * (workUnits || 1);
+        } else if ((booking.rental_type === 'acre' || booking.rental_type === 'land_based') && (implPricing?.acre?.isEnabled || implPricing?.land_based?.isEnabled)) {
+          baseAmount += (implPricing.acre?.price || implPricing.land_based?.price || 0) * (workUnits || parseFloat(booking.landSize) || 1);
+        } else if (booking.rental_type === 'bigha' && implPricing?.bigha?.isEnabled) {
+          baseAmount += (implPricing.bigha.price || 0) * (workUnits || parseFloat(booking.landSize) || 1);
         } else if (booking.rental_type === 'daily' && implPricing?.daily?.isEnabled) {
           baseAmount += (implPricing.daily.price || 0) * durationDays;
         }

@@ -397,8 +397,8 @@ const ActiveJobs = memo(() => {
                         <span className="text-gray-700 font-medium">{job.timeSlot?.date} • {job.timeSlot?.time}</span>
                       </div>
 
-                      {/* Rental Details — daily/hourly/land_based */}
-                      {job.rental_type && job.rental_type !== 'hourly' && (
+                      {/* Rental Details — minute/hourly/acre/bigha/daily/monthly */}
+                      {job.rental_type && (
                         <div className="flex items-start gap-2 text-sm">
                           <div className="p-1 rounded mt-0.5" style={{ background: 'rgba(0, 0, 0, 0.03)' }}>
                             <FiPackage className="w-4 h-4" style={{ color: statusColor }} />
@@ -408,8 +408,32 @@ const ActiveJobs = memo(() => {
                               className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block w-fit"
                               style={{ background: `${statusColor}15`, color: statusColor }}
                             >
-                              {job.rental_type === 'daily' ? 'Daily Rental' : job.rental_type === 'land_based' ? 'Land Based' : job.rental_type === 'monthly' ? 'Monthly Rental' : job.rental_type}
+                              {job.rental_type === 'daily'
+                                ? 'Daily Rental'
+                                : job.rental_type === 'monthly'
+                                ? 'Monthly Rental'
+                                : job.rental_type === 'minute'
+                                ? 'Minute Rental'
+                                : job.rental_type === 'hourly'
+                                ? 'Hourly Rental'
+                                : job.rental_type === 'acre'
+                                ? 'Acre Rental'
+                                : job.rental_type === 'bigha'
+                                ? 'Bigha Rental'
+                                : job.rental_type === 'land_based'
+                                ? 'Land Based'
+                                : `${job.rental_type} Rental`}
                             </span>
+                            {job.rental_type === 'minute' && job.estimatedDuration && (
+                              <span className="text-gray-700 font-semibold">
+                                ⏱ {job.estimatedDuration} Minute{job.estimatedDuration > 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {job.rental_type === 'hourly' && job.estimatedDuration && (
+                              <span className="text-gray-700 font-semibold">
+                                ⏱ {job.estimatedDuration} Hour{job.estimatedDuration > 1 ? 's' : ''}
+                              </span>
+                            )}
                             {job.rental_type === 'daily' && job.estimatedDuration && (
                               <span className="text-gray-600 font-semibold">
                                 📅 {job.estimatedDuration} Day{job.estimatedDuration > 1 ? 's' : ''}
@@ -431,21 +455,15 @@ const ActiveJobs = memo(() => {
                                 )}
                               </span>
                             )}
-                            {job.rental_type === 'land_based' && job.landSize && (
-                              <span className="text-gray-600 font-semibold">🗺️ {job.landSize}</span>
+                            {(job.rental_type === 'acre' || job.rental_type === 'bigha' || job.rental_type === 'land_based') && job.landSize && (
+                              <span className="text-gray-600 font-semibold">
+                                🗺️ {job.landSize} {job.landUnit || (job.rental_type === 'acre' ? 'Acre' : job.rental_type === 'bigha' ? 'Bigha' : 'Acre')}{job.landSize > 1 && (job.rental_type === 'acre' || job.rental_type === 'land_based') ? 's' : ''}
+                              </span>
                             )}
                             {job.cropType && (
                               <span className="text-gray-500 text-xs">🌾 Crop: {job.cropType}</span>
                             )}
                           </div>
-                        </div>
-                      )}
-                      {job.rental_type === 'hourly' && job.estimatedDuration && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="p-1 rounded" style={{ background: 'rgba(0, 0, 0, 0.03)' }}>
-                            <FiPackage className="w-4 h-4" style={{ color: statusColor }} />
-                          </div>
-                          <span className="text-gray-700 font-semibold">⏱ {job.estimatedDuration} Hour{job.estimatedDuration > 1 ? 's' : ''}</span>
                         </div>
                       )}
                     </div>

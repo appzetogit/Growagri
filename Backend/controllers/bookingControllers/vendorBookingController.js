@@ -1620,10 +1620,15 @@ const endTrip = async (req, res) => {
 
     if (alreadyPriced) {
       baseAmount = booking.basePrice || 0;
+    } else if (booking.rental_type === 'minute') {
+      const durationMins = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+      baseAmount = (service?.minute_price || (service?.hourly_price ? Math.round(service.hourly_price / 60) : 0) || booking.basePrice || 0) * durationMins;
     } else if (booking.rental_type === 'hourly') {
       baseAmount = (service?.hourly_price || booking.basePrice || 0) * durationHours;
-    } else if (booking.rental_type === 'land_based') {
-      baseAmount = (service?.land_price || booking.basePrice || 0) * (parseFloat(workUnits) || 1);
+    } else if (booking.rental_type === 'acre' || booking.rental_type === 'land_based') {
+      baseAmount = (service?.acre_price || service?.land_price || booking.basePrice || 0) * (parseFloat(workUnits) || parseFloat(booking.landSize) || 1);
+    } else if (booking.rental_type === 'bigha') {
+      baseAmount = (service?.bigha_price || booking.basePrice || 0) * (parseFloat(workUnits) || parseFloat(booking.landSize) || 1);
     } else if (booking.rental_type === 'monthly') {
       baseAmount = service?.monthly_price || booking.basePrice || 0;
     } else {

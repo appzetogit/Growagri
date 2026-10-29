@@ -38,7 +38,7 @@ const RentalTimer = ({ booking }) => {
 
   useEffect(() => {
     if (!booking) return;
-    const isTimeBased = booking.rental_type === 'hourly' || booking.rental_type === 'daily' || booking.rental_type === 'monthly';
+    const isTimeBased = booking.rental_type === 'minute' || booking.rental_type === 'hourly' || booking.rental_type === 'daily' || booking.rental_type === 'monthly';
     const isActive = booking.status?.toLowerCase() === 'in_progress';
 
     if (!isTimeBased || !isActive || !booking.startedAt) return;
@@ -46,7 +46,9 @@ const RentalTimer = ({ booking }) => {
     const startedTime = new Date(booking.startedAt).getTime();
     const duration = booking.estimatedDuration || 1;
     // Calculate total duration in milliseconds
-    const durationMs = booking.rental_type === 'hourly'
+    const durationMs = booking.rental_type === 'minute'
+      ? duration * 60 * 1000
+      : booking.rental_type === 'hourly'
       ? duration * 60 * 60 * 1000
       : duration * 24 * 60 * 60 * 1000;
 
@@ -70,7 +72,7 @@ const RentalTimer = ({ booking }) => {
   }, [booking]);
 
   if (!booking) return null;
-  const isTimeBased = booking.rental_type === 'hourly' || booking.rental_type === 'daily' || booking.rental_type === 'monthly';
+  const isTimeBased = booking.rental_type === 'minute' || booking.rental_type === 'hourly' || booking.rental_type === 'daily' || booking.rental_type === 'monthly';
   const isActive = booking.status?.toLowerCase() === 'in_progress';
 
   if (!isTimeBased || !isActive || !booking.startedAt) return null;
@@ -83,7 +85,7 @@ const RentalTimer = ({ booking }) => {
     const mins = totalMins % 60;
     const hours = Math.floor(totalMins / 60);
 
-    if (booking.rental_type === 'hourly') {
+    if (booking.rental_type === 'minute' || booking.rental_type === 'hourly') {
       return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     } else {
       const days = Math.floor(hours / 24);

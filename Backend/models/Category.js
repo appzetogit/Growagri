@@ -47,7 +47,19 @@ const categorySchema = new mongoose.Schema({
     type: String,
     default: 'General'
   },
+  minutePrice: {
+    type: Number,
+    default: 0
+  },
   hourlyPrice: {
+    type: Number,
+    default: 0
+  },
+  acrePrice: {
+    type: Number,
+    default: 0
+  },
+  bighaPrice: {
     type: Number,
     default: 0
   },

@@ -41,7 +41,10 @@ const vendorEquipmentSchema = new mongoose.Schema({
       required: true
     },
     pricing: {
+      minute:     { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } },
       hourly:     { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } },
+      acre:       { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } },
+      bigha:      { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } },
       land_based: { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } },
       daily:      { price: { type: Number, default: 0 }, isEnabled: { type: Boolean, default: false } }
     }
@@ -75,7 +78,19 @@ const vendorEquipmentSchema = new mongoose.Schema({
   }],
   // Rental Pricing Logic
   pricing: {
+    minute: {
+      price: { type: Number, default: 0 },
+      isEnabled: { type: Boolean, default: false }
+    },
     hourly: {
+      price: { type: Number, default: 0 },
+      isEnabled: { type: Boolean, default: false }
+    },
+    acre: {
+      price: { type: Number, default: 0 },
+      isEnabled: { type: Boolean, default: false }
+    },
+    bigha: {
       price: { type: Number, default: 0 },
       isEnabled: { type: Boolean, default: false }
     },

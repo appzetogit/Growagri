@@ -171,7 +171,10 @@ export const ensureIds = (catalog) => {
       trackingType: c.trackingType || "none",
       requiresDriver: Boolean(c.requiresDriver),
       sectionType: c.sectionType || "",
+      minutePrice: Number(c.minutePrice) || 0,
       hourlyPrice: Number(c.hourlyPrice) || 0,
+      acrePrice: Number(c.acrePrice) || 0,
+      bighaPrice: Number(c.bighaPrice) || 0,
     })),
     services: (catalog.services || []).map((s) => ({
       id: s.id || `usvc-${Date.now()}-${Math.random().toString(16).slice(2)}`,

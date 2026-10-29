@@ -11,7 +11,7 @@ import { adminBookingService } from '../../../../services/adminBookingService';
 import adminVendorService from '../../../../services/adminVendorService';
 import { getDashboardStats } from '../../../../services/adminDashboardService';
 import BookingTrackingModal from './components/BookingTrackingModal';
-import { bookingItems, paymentInfo, PAYMENT_TONES } from './bookingDisplay';
+import { bookingItems, paymentInfo, PAYMENT_TONES, titleCase } from './bookingDisplay';
 
 const BookingStatsCard = ({ title, count, icon: Icon, colorClass, bgClass }) => (
   <div className={`px-2.5 py-2 rounded-lg border border-gray-100 shadow-sm flex items-center gap-2 min-w-0 ${bgClass}`}>
@@ -95,8 +95,10 @@ const Bookings = () => {
       
       if (vendorFilter) params.vendorId = vendorFilter;
       if (moduleFilter === 'Hourly Rent') params.rental_type = 'hourly';
+      if (moduleFilter === 'Minute Rent') params.rental_type = 'minute';
+      if (moduleFilter === 'Acre Rent') params.rental_type = 'acre';
+      if (moduleFilter === 'Bigha Rent') params.rental_type = 'bigha';
       if (moduleFilter === 'Monthly Rent') params.rental_type = 'monthly';
-      if (moduleFilter === 'Acre Rent') params.rental_type = 'land_based';
 
       const res = await adminBookingService.getAllBookings(params);
       if (res.success) {
@@ -248,8 +250,10 @@ const Bookings = () => {
           >
             <option>All Types</option>
             <option value="Hourly Rent">🚜 Hourly Rent</option>
-            <option value="Monthly Rent">📅 Monthly Rent</option>
+            <option value="Minute Rent">⏱️ Minute Rent</option>
             <option value="Acre Rent">🌾 Acre Rent</option>
+            <option value="Bigha Rent">🌱 Bigha Rent</option>
+            <option value="Monthly Rent">📅 Monthly Rent</option>
           </select>
 
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5">
@@ -373,9 +377,21 @@ const Bookings = () => {
                     <td className="px-4 py-3 max-w-[200px]">
                       {(() => {
                         const { main, sub } = bookingItems(booking);
+                        const rentalLabel = booking.rental_type === 'minute' ? 'Min'
+                          : booking.rental_type === 'hourly' ? 'Hr'
+                          : booking.rental_type === 'acre' ? 'Acre'
+                          : booking.rental_type === 'bigha' ? 'Bigha'
+                          : booking.rental_type ? titleCase(booking.rental_type) : null;
                         return (
                           <div className="min-w-0" title={[main, sub].filter(Boolean).join(' — ')}>
-                            <p className="font-bold text-gray-900 text-xs truncate">{main}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-gray-900 text-xs truncate">{main}</p>
+                              {rentalLabel && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 uppercase">
+                                  {rentalLabel}
+                                </span>
+                              )}
+                            </div>
                             {sub && <p className="text-[10px] text-gray-500 truncate">{sub}</p>}
                           </div>
                         );

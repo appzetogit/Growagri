@@ -274,7 +274,7 @@ const bookingSchema = new mongoose.Schema({
   },
   rental_type: {
     type: String,
-    enum: ['hourly', 'land_based', 'monthly', 'daily'],
+    enum: ['hourly', 'minute', 'acre', 'bigha', 'land_based', 'monthly', 'daily'],
     default: null
   },
   endDate: {

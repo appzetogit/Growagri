@@ -301,7 +301,7 @@ const Checkout = () => {
         return;
       }
     } else {
-      const needsTime = rentalType === 'hourly' || rentalType === 'land_based' || rentalType === 'daily';
+      const needsTime = rentalType === 'hourly' || rentalType === 'minute' || rentalType === 'land_based' || rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'daily';
       if (!addressDetails || !selectedDate || (needsTime && !selectedTime)) {
         if (!addressDetails) setShowAddressModal(true);
         else if (!selectedDate || (needsTime && !selectedTime)) setShowTimeSlotModal(true);
@@ -331,6 +331,10 @@ const Checkout = () => {
           subtitle: item.card?.subtitle || item.description || '',
           price: (() => {
             const svcO = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
+            if (rentalType === 'minute') return svcO.minute_price || item.minute_price || (svcO.hourly_price ? Math.round(svcO.hourly_price / 60) : item.price) || 0;
+            if (rentalType === 'hourly') return svcO.hourly_price || item.hourly_price || item.price || 0;
+            if (rentalType === 'acre') return svcO.acre_price || item.acre_price || svcO.land_price || item.land_price || item.price || 0;
+            if (rentalType === 'bigha') return svcO.bigha_price || item.bigha_price || item.price || 0;
             if (rentalType === 'daily') return svcO.daily_price || item.daily_price || item.price || 0;
             if (rentalType === 'land_based') return svcO.land_price || item.land_price || item.price || 0;
             if (rentalType === 'monthly') return svcO.monthly_price || svcO.daily_price || item.monthly_price || item.daily_price || item.price || 0;
@@ -403,10 +407,11 @@ const Checkout = () => {
         bookedItems: bookedItemsData,
 
         // --- AGRICULTURE SPECIFIC ---
-        landSize: landSize || 1,
+        landSize: (rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'land_based') ? (Number(landSize) || 1) : undefined,
+        landUnit: rentalType === 'bigha' ? 'bigha' : 'acre',
         cropType: cropType || '',
         chemicalUsed: chemicalUsed || '',
-        estimatedDuration: estimatedDuration || 1,
+        estimatedDuration: (rentalType === 'hourly' || rentalType === 'minute') ? (Number(estimatedDuration) || 1) : undefined,
         selectedImplements: cartItems
           .filter(item => item.pricing_context === 'sub-category')
           .map(impl => ({
@@ -574,7 +579,7 @@ const Checkout = () => {
       // Validate required fields
       if (bookingType === 'scheduled') {
         // daily/land_based/monthly: only date required (no time selection needed)
-        const needsTime = rentalType === 'hourly';
+        const needsTime = rentalType === 'hourly' || rentalType === 'minute' || rentalType === 'land_based' || rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'daily';
         if (!selectedDate || (needsTime && !selectedTime)) {
           toast.error('Please select date & time slot');
           setShowTimeSlotModal(true);
@@ -667,6 +672,10 @@ const Checkout = () => {
           subtitle: item.description || '',
           price: (() => {
             const svcO = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
+            if (rentalType === 'minute') return svcO.minute_price || item.minute_price || (svcO.hourly_price ? Math.round(svcO.hourly_price / 60) : item.price) || 0;
+            if (rentalType === 'hourly') return svcO.hourly_price || item.hourly_price || item.price || 0;
+            if (rentalType === 'acre') return svcO.acre_price || item.acre_price || svcO.land_price || item.land_price || item.price || 0;
+            if (rentalType === 'bigha') return svcO.bigha_price || item.bigha_price || item.price || 0;
             if (rentalType === 'daily') return svcO.daily_price || item.daily_price || item.price || 0;
             if (rentalType === 'land_based') return svcO.land_price || item.land_price || item.price || 0;
             if (rentalType === 'monthly') return svcO.monthly_price || svcO.daily_price || item.monthly_price || item.daily_price || item.price || 0;
@@ -707,9 +716,10 @@ const Checkout = () => {
         rental_type: rentalType,
         cropType,
         chemicalUsed,
-        landSize,
+        landSize: (rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'land_based') ? (Number(landSize) || 1) : undefined,
+        landUnit: rentalType === 'bigha' ? 'bigha' : 'acre',
         endDate: (rentalType === 'monthly' || rentalType === 'daily') && endDate ? endDate.toISOString() : undefined,
-        estimatedDuration: rentalType === 'hourly' ? (Number(estimatedDuration) || undefined) : (['daily', 'monthly'].includes(rentalType) ? (Number(localDays) || undefined) : undefined),
+        estimatedDuration: (rentalType === 'hourly' || rentalType === 'minute') ? (Number(estimatedDuration) || undefined) : (['daily', 'monthly'].includes(rentalType) ? (Number(localDays) || undefined) : undefined),
         amount: amountToPay,
 
         // Pass Full Breakdown to Backend
@@ -804,7 +814,7 @@ const Checkout = () => {
       }
 
       if (bookingType === 'scheduled') {
-        const needsTime = rentalType === 'hourly';
+        const needsTime = rentalType === 'hourly' || rentalType === 'minute' || rentalType === 'land_based' || rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'daily';
         if (!selectedDate || (needsTime && !selectedTime)) {
           toast.error(rentalType === 'monthly' ? 'Please select start date' : 'Please select date & time slot');
           setShowTimeSlotModal(true);
@@ -883,6 +893,10 @@ const Checkout = () => {
             subtitle: item.description || '',
             price: (() => {
               const svcO = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
+              if (rentalType === 'minute') return svcO.minute_price || item.minute_price || (svcO.hourly_price ? Math.round(svcO.hourly_price / 60) : item.price) || 0;
+              if (rentalType === 'hourly') return svcO.hourly_price || item.hourly_price || item.price || 0;
+              if (rentalType === 'acre') return svcO.acre_price || item.acre_price || svcO.land_price || item.land_price || item.price || 0;
+              if (rentalType === 'bigha') return svcO.bigha_price || item.bigha_price || item.price || 0;
               if (rentalType === 'daily') return svcO.daily_price || item.daily_price || item.price || 0;
               if (rentalType === 'land_based') return svcO.land_price || item.land_price || item.price || 0;
               if (rentalType === 'monthly') return svcO.monthly_price || svcO.daily_price || item.monthly_price || item.daily_price || item.price || 0;
@@ -922,9 +936,10 @@ const Checkout = () => {
           rental_type: rentalType,
           cropType,
           chemicalUsed,
-          landSize,
+          landSize: (rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'land_based') ? (Number(landSize) || 1) : undefined,
+          landUnit: rentalType === 'bigha' ? 'bigha' : 'acre',
           endDate: (rentalType === 'monthly' || rentalType === 'daily') && endDate ? endDate.toISOString() : undefined,
-          estimatedDuration: rentalType === 'hourly' ? (Number(estimatedDuration) || undefined) : (['daily', 'monthly'].includes(rentalType) ? (Number(localDays) || undefined) : undefined),
+          estimatedDuration: (rentalType === 'hourly' || rentalType === 'minute') ? (Number(estimatedDuration) || undefined) : (['daily', 'monthly'].includes(rentalType) ? (Number(localDays) || undefined) : undefined),
           amount: amountToPay,
           basePrice: totalOriginalPrice,
           discount: savings,
@@ -1394,12 +1409,16 @@ const Checkout = () => {
     let basePrice = item.price || 0;
     // Data-driven: any item with rental price fields is treated as machinery
     const svc = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
-    const isAgri = !!(svc.hourly_price || svc.land_price || svc.daily_price ||
-      item.hourly_price || item.land_price || item.daily_price ||
-      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture');
+    const isAgri = !!(svc.minute_price || svc.hourly_price || svc.acre_price || svc.bigha_price || svc.land_price || svc.daily_price ||
+      item.minute_price || item.hourly_price || item.acre_price || item.bigha_price || item.land_price || item.daily_price ||
+      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture' ||
+      item.equipmentId || item.vendorEquipmentId || item.isRental || item.rental_type);
 
     if (isAgri) {
-      if (rentalType === 'hourly') basePrice = svc.hourly_price || item.hourly_price || basePrice;
+      if (rentalType === 'minute') basePrice = svc.minute_price || item.minute_price || (svc.hourly_price ? Math.round(svc.hourly_price / 60) : basePrice);
+      else if (rentalType === 'hourly') basePrice = svc.hourly_price || item.hourly_price || basePrice;
+      else if (rentalType === 'acre') basePrice = svc.acre_price || item.acre_price || svc.land_price || item.land_price || basePrice;
+      else if (rentalType === 'bigha') basePrice = svc.bigha_price || item.bigha_price || basePrice;
       else if (rentalType === 'land_based') basePrice = svc.land_price || item.land_price || basePrice;
       else if (rentalType === 'daily' || rentalType === 'monthly') basePrice = svc.daily_price || item.daily_price || basePrice;
     }
@@ -1421,8 +1440,8 @@ const Checkout = () => {
     // 4. Multiply by Quantity (Dynamic Multipliers for Agri)
     let qty = 1;
     if (isAgri) {
-      if (rentalType === 'hourly') qty = parseFloat(estimatedDuration) || 1;
-      else if (rentalType === 'land_based') qty = parseFloat(landSize) || 1;
+      if (rentalType === 'minute' || rentalType === 'hourly') qty = parseFloat(estimatedDuration) || 1;
+      else if (rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'land_based') qty = parseFloat(landSize) || 1;
       else if (rentalType === 'daily' || rentalType === 'monthly') qty = parseFloat(localDays) || 1;
     }
 
@@ -1448,14 +1467,18 @@ const Checkout = () => {
   // so that savings = 0 when no real plan discount exists (prevents fake BEST PRICE banner).
   const totalOriginalPrice = cartItems.reduce((sum, item) => {
     const svcO = item.serviceId && typeof item.serviceId === 'object' ? item.serviceId : item;
-    const isAgri = !!(svcO.hourly_price || svcO.land_price || svcO.daily_price ||
-      item.hourly_price || item.land_price || item.daily_price ||
-      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture');
+    const isAgri = !!(svcO.minute_price || svcO.hourly_price || svcO.acre_price || svcO.bigha_price || svcO.land_price || svcO.daily_price ||
+      item.minute_price || item.hourly_price || item.acre_price || item.bigha_price || item.land_price || item.daily_price ||
+      item.categoryTitle === 'Agriculture' || item.category === 'Agriculture' ||
+      item.equipmentId || item.vendorEquipmentId || item.isRental || item.rental_type);
 
     // Use exact same base price logic as calculateItemPrice() to avoid mismatch
     let base = item.price || 0;
     if (isAgri) {
-      if (rentalType === 'hourly') base = svcO.hourly_price || item.hourly_price || base;
+      if (rentalType === 'minute') base = svcO.minute_price || item.minute_price || (svcO.hourly_price ? Math.round(svcO.hourly_price / 60) : base);
+      else if (rentalType === 'hourly') base = svcO.hourly_price || item.hourly_price || base;
+      else if (rentalType === 'acre') base = svcO.acre_price || item.acre_price || svcO.land_price || item.land_price || base;
+      else if (rentalType === 'bigha') base = svcO.bigha_price || item.bigha_price || base;
       else if (rentalType === 'land_based') base = svcO.land_price || item.land_price || base;
       else if (rentalType === 'daily' || rentalType === 'monthly') base = svcO.daily_price || item.daily_price || base;
     }
@@ -1463,8 +1486,8 @@ const Checkout = () => {
     // Dynamic quantity — same as calculateItemPrice()
     let qty = 1;
     if (isAgri) {
-      if (rentalType === 'hourly') qty = parseFloat(estimatedDuration) || 1;
-      else if (rentalType === 'land_based') qty = parseFloat(landSize) || 1;
+      if (rentalType === 'minute' || rentalType === 'hourly') qty = parseFloat(estimatedDuration) || 1;
+      else if (rentalType === 'acre' || rentalType === 'bigha' || rentalType === 'land_based') qty = parseFloat(landSize) || 1;
       else if (rentalType === 'daily' || rentalType === 'monthly') qty = parseFloat(localDays) || 1;
     }
 
@@ -1781,9 +1804,13 @@ const Checkout = () => {
                     )}
                   </div>
 
-                  {/* Hourly Rate Badge */}
+                  {/* Dynamic Rate Badge */}
                   <span className="text-[10px] font-bold bg-slate-50 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 shadow-xs">
-                    Hourly Rate
+                    {rentalType === 'minute' ? 'Minute Rate' :
+                     rentalType === 'hourly' ? 'Hourly Rate' :
+                     rentalType === 'acre' ? 'Acre Rate' :
+                     rentalType === 'bigha' ? 'Bigha Rate' :
+                     rentalType === 'daily' ? 'Daily Rate' : 'Standard Rate'}
                   </span>
                 </div>
               </div>
@@ -1791,7 +1818,7 @@ const Checkout = () => {
           })}
         </div>
 
-        {/* ══ RENTAL TYPE CARD (New - agriculture feature) ══ */}
+        {/* ══ RENTAL TYPE CARD (Agriculture feature) ══ */}
         {/* Only show when cart has items and cart is not a plan */}
         {cartItems.length > 0 && !cartItems[0]?.isPlan && (
           <RentalTypeCard
@@ -1803,30 +1830,29 @@ const Checkout = () => {
                 : null
             }
             initialRentalType={rentalType}
-            landUnit={
-              cartItems[0]?.serviceId
-                ? (typeof cartItems[0].serviceId === 'object'
-                  ? cartItems[0].serviceId.land_unit
-                  : cartItems[0].land_unit)
-                : cartItems[0]?.land_unit || 'acre'
-            }
+            landUnit={rentalType === 'bigha' ? 'bigha' : 'acre'}
             initialQuantity={
-              rentalType === 'hourly' ? (estimatedDuration || 1)
-                : rentalType === 'land_based' ? (landSize || 1)
-                  : (localDays || 1)
+              rentalType === 'minute' ? (estimatedDuration || 30)
+                : rentalType === 'hourly' ? (estimatedDuration || 1)
+                  : (landSize || 1)
             }
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onRentalChange={({ type, quantity }) => {
               setRentalType(type);
-              if (type === 'hourly') setEstimatedDuration(quantity);
-              else if (type === 'land_based') setLandSize(quantity);
-              else if (type === 'daily') setLocalDays(quantity);
-              else if (type === 'monthly') setLocalDays(quantity);
+              if (type === 'minute' || type === 'hourly') {
+                setEstimatedDuration(quantity);
+              } else if (type === 'acre' || type === 'bigha' || type === 'land_based') {
+                setLandSize(quantity);
+              } else if (type === 'daily' || type === 'monthly') {
+                setLocalDays(quantity);
+              }
             }}
             pricing={{
+              minute: cartItems[0]?.serviceId?.minute_price || cartItems[0]?.minute_price || 0,
               hourly: cartItems[0]?.serviceId?.hourly_price || cartItems[0]?.hourly_price || 0,
-              land_based: cartItems[0]?.serviceId?.land_price || cartItems[0]?.land_price || 0,
+              acre: cartItems[0]?.serviceId?.acre_price || cartItems[0]?.acre_price || cartItems[0]?.serviceId?.land_price || cartItems[0]?.land_price || 0,
+              bigha: cartItems[0]?.serviceId?.bigha_price || cartItems[0]?.bigha_price || 0,
               daily: cartItems[0]?.serviceId?.daily_price || cartItems[0]?.daily_price || 0
             }}
           />
@@ -2089,7 +2115,7 @@ const Checkout = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-600 mb-0.5">
-                      {rentalType === 'monthly' ? 'Rental Period' : rentalType === 'hourly' ? 'Booking Duration' : 'Time Slot'}
+                      {rentalType === 'monthly' ? 'Rental Period' : (rentalType === 'hourly' || rentalType === 'minute') ? 'Booking Duration' : (rentalType === 'acre' || rentalType === 'bigha') ? 'Land Area & Schedule' : 'Time Slot'}
                     </p>
                     <p className="text-sm font-medium text-black">
                       {selectedDate ? (() => {
@@ -2103,10 +2129,22 @@ const Checkout = () => {
                           const { day: eDay, date: eDateNum } = formatDate(endDate);
                           const eMonth = monthNames[endDate.getMonth()];
                           displayStr += ` - ${eDay}, ${eDateNum} ${eMonth}`;
+                        } else if (rentalType === 'minute') {
+                          const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
+                          displayStr += ` • ${timeDisplay}`;
+                          if (estimatedDuration) displayStr += ` (${estimatedDuration} Mins)`;
                         } else if (rentalType === 'hourly') {
                           const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
                           displayStr += ` • ${timeDisplay}`;
                           if (estimatedDuration) displayStr += ` (${estimatedDuration} Hours)`;
+                        } else if (rentalType === 'acre') {
+                          const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
+                          if (timeDisplay && timeDisplay !== '00:00') displayStr += ` • ${timeDisplay}`;
+                          if (landSize) displayStr += ` (${landSize} Acres)`;
+                        } else if (rentalType === 'bigha') {
+                          const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
+                          if (timeDisplay && timeDisplay !== '00:00') displayStr += ` • ${timeDisplay}`;
+                          if (landSize) displayStr += ` (${landSize} Bighas)`;
                         } else if (rentalType === 'daily') {
                           const timeDisplay = getTimeSlots().find(slot => slot.value === selectedTime)?.display || selectedTime;
                           if (timeDisplay && timeDisplay !== '00:00') displayStr += ` • ${timeDisplay}`;

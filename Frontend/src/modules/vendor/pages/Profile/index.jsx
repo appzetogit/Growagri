@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiUser, FiEdit2, FiMapPin, FiPhone, FiMail, FiBriefcase, FiStar, FiArrowRight, FiSettings, FiChevronRight, FiCreditCard, FiLogOut, FiClock, FiCheckCircle, FiPackage, FiActivity } from 'react-icons/fi';
+import { FiUser, FiEdit2, FiMapPin, FiPhone, FiMail, FiBriefcase, FiStar, FiArrowRight, FiSettings, FiChevronRight, FiCreditCard, FiLogOut, FiCheckCircle, FiPackage, FiActivity } from 'react-icons/fi';
 import { FaTractor } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
@@ -32,7 +32,6 @@ const Profile = () => {
     { id: 5, label: 'My Ratings', icon: FiStar, path: '/vendor/my-ratings' },
     { id: 7, label: 'Manage Address', icon: FiMapPin, path: '/vendor/address-management' },
     { id: 8, label: 'Settings', icon: FiSettings, path: '/vendor/settings' },
-    { id: 10, label: 'Maintenance Calendar', icon: FiClock, path: '/vendor/maintenance' },
     { id: 11, label: 'Legal Compliance', icon: FiCheckCircle, path: '/vendor/compliance' },
     { id: 13, label: 'Soil Test Requests', icon: FiActivity, path: '/vendor/soil-tests' },
     { id: 9, label: 'About GrooAgri', icon: null, customIcon: 'G', path: '/vendor/about-groo' },

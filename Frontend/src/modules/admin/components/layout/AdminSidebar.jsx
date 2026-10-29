@@ -86,6 +86,7 @@ const getChildRoute = (parentRoute, childName) => {
     },
     "/admin/manage-website": {
       "Startup Recognition": "/admin/manage-website/startup-recognition",
+      "Manage Team": "/admin/manage-website/manage-team",
       "Blogs": "/admin/manage-website/blogs",
       "Articles": "/admin/manage-website/articles",
       "Reviews": "/admin/manage-website/reviews",

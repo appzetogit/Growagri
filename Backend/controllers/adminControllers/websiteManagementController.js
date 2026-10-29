@@ -2,6 +2,7 @@ const Blog = require('../../models/Blog');
 const Article = require('../../models/Article');
 const WebsiteReview = require('../../models/WebsiteReview');
 const WebsiteBanner = require('../../models/WebsiteBanner');
+const TeamMember = require('../../models/TeamMember');
 
 // Blog Controllers
 exports.getBlogs = async (req, res) => {
@@ -161,6 +162,70 @@ exports.deleteBanner = async (req, res) => {
     const banner = await WebsiteBanner.findByIdAndDelete(req.params.id);
     if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
     res.status(200).json({ success: true, message: "Banner deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== Team Member Controllers ====================
+
+exports.getTeamMembers = async (req, res) => {
+  try {
+    const query = req.publicOnly ? { isActive: true } : {};
+    let members = await TeamMember.find(query).sort({ order: 1, createdAt: 1 });
+
+    // Seed default team members if collection is empty
+    if (members.length === 0) {
+      const seedMembers = [
+        {
+          name: 'Chinmay Anand',
+          role: 'Founder & CEO',
+          bio: 'Designated Partner at GLOBAL RURAL OUTREACH ORGANISATION LLP. Transforming agriculture through technology.',
+          order: 1,
+          isActive: true,
+        },
+        {
+          name: 'Ifat Khanam',
+          role: 'Co-Founder',
+          bio: 'Designated Partner at GLOBAL RURAL OUTREACH ORGANISATION LLP. Driving farm mechanization and smart agritech.',
+          order: 2,
+          isActive: true,
+        },
+      ];
+      await TeamMember.insertMany(seedMembers);
+      members = await TeamMember.find(query).sort({ order: 1, createdAt: 1 });
+    }
+
+    res.status(200).json({ success: true, count: members.length, data: members });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.createTeamMember = async (req, res) => {
+  try {
+    const member = await TeamMember.create(req.body);
+    res.status(201).json({ success: true, data: member, message: 'Team member created successfully' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateTeamMember = async (req, res) => {
+  try {
+    const member = await TeamMember.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found" });
+    res.status(200).json({ success: true, data: member, message: 'Team member updated successfully' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteTeamMember = async (req, res) => {
+  try {
+    const member = await TeamMember.findByIdAndDelete(req.params.id);
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found" });
+    res.status(200).json({ success: true, message: "Team member deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

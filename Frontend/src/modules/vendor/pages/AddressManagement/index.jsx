@@ -169,7 +169,13 @@ const AddressManagement = () => {
       <Header
         title="Manage Business Address"
         showBack={true}
-        onBack={() => navigate('/vendor/settings')}
+        onBack={() => {
+          if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+          } else {
+            navigate('/vendor/profile');
+          }
+        }}
       />
 
       <main className="px-4 py-6">

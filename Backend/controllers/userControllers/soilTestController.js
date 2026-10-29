@@ -33,8 +33,16 @@ const notifyAdminsOfNewRequest = async (request, farmerName) => {
  */
 const getSoilTestPrices = async (req, res) => {
     try {
-        const { basicPrice, advancedPrice } = await getSoilTestPricing();
-        res.status(200).json({ success: true, data: { basicPrice, advancedPrice } });
+        const pricing = await getSoilTestPricing();
+        res.status(200).json({
+            success: true,
+            data: {
+                basicPrice: pricing.basicPrice,
+                advancedPrice: pricing.advancedPrice,
+                commissionPercentage: pricing.commissionPercentage,
+                testTypes: pricing.testTypes?.filter(t => t.isActive !== false) || []
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -54,7 +62,37 @@ const createSoilTestRequest = async (req, res) => {
 
         // Price always comes from admin settings, never from the client
         const pricing = await getSoilTestPricing();
-        const totalAmount = testType === 'Advanced' ? pricing.advancedPrice : pricing.basicPrice;
+
+        let matchedTest = null;
+        if (Array.isArray(pricing.testTypes)) {
+            matchedTest = pricing.testTypes.find(t =>
+                (t._id && t._id.toString() === testType) ||
+                t.title === testType ||
+                t.name === testType ||
+                t.title?.toLowerCase() === testType?.toLowerCase() ||
+                t.name?.toLowerCase() === testType?.toLowerCase()
+            );
+            if (!matchedTest && testType === 'Basic') {
+                matchedTest = pricing.testTypes.find(t => t.name?.toLowerCase().includes('basic') || t.title?.toLowerCase().includes('basic')) || pricing.testTypes[0];
+            } else if (!matchedTest && testType === 'Advanced') {
+                matchedTest = pricing.testTypes.find(t => t.name?.toLowerCase().includes('advanced') || t.title?.toLowerCase().includes('advanced')) || pricing.testTypes[1];
+            }
+        }
+
+        let totalAmount = 0;
+        let finalTestTypeName = testType;
+
+        if (matchedTest) {
+            totalAmount = Number(matchedTest.price);
+            finalTestTypeName = matchedTest.title || matchedTest.name;
+        } else if (testType === 'Advanced') {
+            totalAmount = pricing.advancedPrice;
+            finalTestTypeName = 'Advanced Test';
+        } else {
+            totalAmount = pricing.basicPrice;
+            finalTestTypeName = 'Basic Test';
+        }
+
         if (!(totalAmount > 0)) {
             return res.status(400).json({ success: false, message: 'Soil testing is not available right now. Please try again later.' });
         }
@@ -67,7 +105,7 @@ const createSoilTestRequest = async (req, res) => {
             latitude,
             longitude,
             cropType,
-            testType: testType === 'Advanced' ? 'Advanced' : 'Basic',
+            testType: finalTestTypeName,
             phoneNumber,
             totalAmount,
             commissionPercentage: pricing.commissionPercentage,

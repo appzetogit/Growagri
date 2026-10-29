@@ -34,10 +34,22 @@ const createCategoryValidation = [
     .optional()
     .isIn(['active', 'inactive', 'deleted'])
     .withMessage('Status must be active, inactive, or deleted'),
+  body('minutePrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Minute price must be a number'),
   body('hourlyPrice')
     .optional()
     .isNumeric()
-    .withMessage('Hourly price must be a number')
+    .withMessage('Hourly price must be a number'),
+  body('acrePrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Acre price must be a number'),
+  body('bighaPrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Bigha price must be a number')
 ];
 
 const updateCategoryValidation = [
@@ -62,10 +74,22 @@ const updateCategoryValidation = [
     .optional()
     .isIn(['active', 'inactive', 'deleted'])
     .withMessage('Status must be active, inactive, or deleted'),
+  body('minutePrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Minute price must be a number'),
   body('hourlyPrice')
     .optional()
     .isNumeric()
-    .withMessage('Hourly price must be a number')
+    .withMessage('Hourly price must be a number'),
+  body('acrePrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Acre price must be a number'),
+  body('bighaPrice')
+    .optional()
+    .isNumeric()
+    .withMessage('Bigha price must be a number')
 ];
 
 // Routes

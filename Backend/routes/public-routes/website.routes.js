@@ -9,5 +9,7 @@ router.get('/blogs', publicOnly, websiteController.getBlogs);
 router.get('/articles', publicOnly, websiteController.getArticles);
 router.get('/reviews', publicOnly, websiteController.getReviews);
 router.get('/banners', publicOnly, websiteController.getBanners);
+router.get('/team-members', publicOnly, websiteController.getTeamMembers);
+router.get('/team', publicOnly, websiteController.getTeamMembers);
 
 module.exports = router;

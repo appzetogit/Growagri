@@ -12,7 +12,10 @@ const categorySchema = z.object({
   sectionType: z.string().min(1, "Please select a Home Page Tab Section"),
   title: z.string().trim().min(2, "Category title must be at least 2 characters"),
   homeIconUrl: z.string().min(1, "Please upload a home / profile icon"),
-  hourlyPrice: z.coerce.number({ invalid_type_error: "Please enter a valid hourly price" }).min(1, "1 Hour price must be greater than 0"),
+  minutePrice: z.coerce.number().min(0, "Minute price cannot be negative").default(0),
+  hourlyPrice: z.coerce.number().min(0, "Hourly price cannot be negative").default(0),
+  acrePrice: z.coerce.number().min(0, "Acre price cannot be negative").default(0),
+  bighaPrice: z.coerce.number().min(0, "Bigha price cannot be negative").default(0),
   slug: z.string().optional(),
   homeBadge: z.string().optional(),
   hasSaleBadge: z.boolean().optional(),
@@ -49,7 +52,10 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
     trackingType: "none",
     requiresDriver: false,
     sectionType: "",
+    minutePrice: "",
     hourlyPrice: "",
+    acrePrice: "",
+    bighaPrice: "",
   });
 
   const categoriesBase = useMemo(() => {
@@ -113,7 +119,10 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
           trackingType: cat.trackingType || 'none',
           requiresDriver: cat.requiresDriver || false,
           sectionType: cat.sectionType || '',
+          minutePrice: cat.minutePrice !== undefined && cat.minutePrice !== null ? cat.minutePrice : 0,
           hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
+          acrePrice: cat.acrePrice !== undefined && cat.acrePrice !== null ? cat.acrePrice : 0,
+          bighaPrice: cat.bighaPrice !== undefined && cat.bighaPrice !== null ? cat.bighaPrice : 0,
         }));
 
         setCatalog({ ...catalog, categories: mapped });
@@ -148,7 +157,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
         hasSaleBadge: false, showOnHome: true, parentCategory: "",
         parentCategories: [], isAlwaysMain: false,
         trackingType: "none", requiresDriver: false,
-        sectionType: "", hourlyPrice: "",
+        sectionType: "",
+        minutePrice: "", hourlyPrice: "", acrePrice: "", bighaPrice: "",
       });
       return;
     }
@@ -167,7 +177,10 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       trackingType: editing.trackingType || "none",
       requiresDriver: Boolean(editing.requiresDriver),
       sectionType: editing.sectionType || "",
-      hourlyPrice: editing.hourlyPrice !== undefined && editing.hourlyPrice !== null ? editing.hourlyPrice : "",
+      minutePrice: editing.minutePrice !== undefined && editing.minutePrice !== null && editing.minutePrice !== 0 ? editing.minutePrice : "",
+      hourlyPrice: editing.hourlyPrice !== undefined && editing.hourlyPrice !== null && editing.hourlyPrice !== 0 ? editing.hourlyPrice : "",
+      acrePrice: editing.acrePrice !== undefined && editing.acrePrice !== null && editing.acrePrice !== 0 ? editing.acrePrice : "",
+      bighaPrice: editing.bighaPrice !== undefined && editing.bighaPrice !== null && editing.bighaPrice !== 0 ? editing.bighaPrice : "",
     });
   }, [editingId, editing]);
 
@@ -178,7 +191,8 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
       hasSaleBadge: false, showOnHome: true, parentCategory: "",
       parentCategories: [], isAlwaysMain: false,
       trackingType: "none", requiresDriver: false,
-      sectionType: "", hourlyPrice: "",
+      sectionType: "",
+      minutePrice: "", hourlyPrice: "", acrePrice: "", bighaPrice: "",
     });
     setIsModalOpen(false);
   };
@@ -205,15 +219,31 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
     trackingType: cat.trackingType || 'none',
     requiresDriver: cat.requiresDriver || false,
     sectionType: cat.sectionType || '',
+    minutePrice: cat.minutePrice !== undefined && cat.minutePrice !== null ? cat.minutePrice : 0,
     hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
+    acrePrice: cat.acrePrice !== undefined && cat.acrePrice !== null ? cat.acrePrice : 0,
+    bighaPrice: cat.bighaPrice !== undefined && cat.bighaPrice !== null ? cat.bighaPrice : 0,
   });
 
   const upsert = async () => {
+    const minutePrice = form.minutePrice === "" ? 0 : Number(form.minutePrice);
+    const hourlyPrice = form.hourlyPrice === "" ? 0 : Number(form.hourlyPrice);
+    const acrePrice = form.acrePrice === "" ? 0 : Number(form.acrePrice);
+    const bighaPrice = form.bighaPrice === "" ? 0 : Number(form.bighaPrice);
+
+    if (minutePrice <= 0 && hourlyPrice <= 0 && acrePrice <= 0 && bighaPrice <= 0) {
+      toast.error("Please enter at least one pricing rate (Min, Hour, Acre, or Bigha)");
+      return;
+    }
+
     const val = categorySchema.safeParse({
       ...form,
       title: form.title.trim(),
       slug: slugify(form.title.trim()),
-      hourlyPrice: form.hourlyPrice === "" ? undefined : Number(form.hourlyPrice),
+      minutePrice,
+      hourlyPrice,
+      acrePrice,
+      bighaPrice,
     });
 
     if (!val.success) {
@@ -416,7 +446,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest w-20">Icon</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Category Name</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Parent Category</th>
-                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">1 Hr Rate</th>
+                <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Pricing Rates</th>
                 <th className="text-left py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Hierarchy</th>
                 <th className="text-center py-3 px-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
@@ -487,9 +517,31 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="inline-block whitespace-nowrap px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs font-black border border-amber-200">
-                        ₹{c.hourlyPrice || 0}/hr
-                      </span>
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {c.hourlyPrice > 0 && (
+                          <span className="inline-block whitespace-nowrap px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[11px] font-black border border-amber-200">
+                            ₹{c.hourlyPrice}/hr
+                          </span>
+                        )}
+                        {c.minutePrice > 0 && (
+                          <span className="inline-block whitespace-nowrap px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black border border-emerald-200">
+                            ₹{c.minutePrice}/min
+                          </span>
+                        )}
+                        {c.acrePrice > 0 && (
+                          <span className="inline-block whitespace-nowrap px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[11px] font-black border border-blue-200">
+                            ₹{c.acrePrice}/acre
+                          </span>
+                        )}
+                        {c.bighaPrice > 0 && (
+                          <span className="inline-block whitespace-nowrap px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[11px] font-black border border-indigo-200">
+                            ₹{c.bighaPrice}/bigha
+                          </span>
+                        )}
+                        {(!c.hourlyPrice && !c.minutePrice && !c.acrePrice && !c.bighaPrice) && (
+                          <span className="text-xs text-gray-400 font-bold italic">₹0/hr</span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex flex-col gap-1.5">
@@ -532,7 +584,7 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
         </div>
       </CardShell>
 
-      <Modal isOpen={isModalOpen} onClose={reset} title={editing ? "Edit Category" : "Add Category"} size="md">
+      <Modal isOpen={isModalOpen} onClose={reset} title={editing ? "Edit Category" : "Add Category"} size="lg">
         <div className="space-y-4">
           {/* Home Page Tab Section (First) */}
           <div>
@@ -596,23 +648,119 @@ const CategoriesPage = ({ catalog, setCatalog, selectedCity }) => {
             </div>
           </div>
 
-          {/* Hourly Price (1 Hour Rate) */}
-          <div>
-            <label className="block text-sm font-bold text-gray-800 mb-1">
-              1 Hour Price (₹) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">₹</span>
-              <input
-                type="number"
-                min="1"
-                value={form.hourlyPrice}
-                onChange={e => setForm({ ...form, hourlyPrice: e.target.value === '' ? '' : Number(e.target.value) })}
-                className="w-full pl-8 pr-3.5 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm"
-                placeholder="Enter 1 hour rate (e.g. 500)"
-              />
+          {/* Pricing Rates (Min, Hour, Acre, Bigha) */}
+          <div className="bg-slate-50/90 rounded-2xl p-4 border border-slate-200/90 space-y-3.5">
+            <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+              <div>
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                  Pricing Rates <span className="text-red-500">*</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Set prices by unit (at least one rate is required)
+                </p>
+              </div>
             </div>
-            <p className="text-[11px] text-gray-400 mt-0.5">Kitna charge legi yeh category 1 hour ka (Hourly rate)</p>
+
+            {/* Time Based Rates */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                ⏱ Time Based Rates
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Minute Price */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Per Minute Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={form.minutePrice}
+                      onChange={e => setForm({ ...form, minutePrice: e.target.value === '' ? '' : e.target.value })}
+                      className="w-full pl-7 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm bg-white shadow-sm"
+                      placeholder="e.g. 10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-bold">/min</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Rate per minute</p>
+                </div>
+
+                {/* Hour Price */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    1 Hour Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={form.hourlyPrice}
+                      onChange={e => setForm({ ...form, hourlyPrice: e.target.value === '' ? '' : e.target.value })}
+                      className="w-full pl-7 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm bg-white shadow-sm"
+                      placeholder="e.g. 500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-bold">/hr</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Rate per hour (Hourly)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Land Area Based Rates */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                🌾 Land Area Based Rates
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Acre Price */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Per Acre Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={form.acrePrice}
+                      onChange={e => setForm({ ...form, acrePrice: e.target.value === '' ? '' : e.target.value })}
+                      className="w-full pl-7 pr-14 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm bg-white shadow-sm"
+                      placeholder="e.g. 800"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-bold">/acre</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Rate per acre</p>
+                </div>
+
+                {/* Bigha Price */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Per Bigha Price (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={form.bighaPrice}
+                      onChange={e => setForm({ ...form, bighaPrice: e.target.value === '' ? '' : e.target.value })}
+                      className="w-full pl-7 pr-14 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-bold text-gray-800 text-sm bg-white shadow-sm"
+                      placeholder="e.g. 400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 font-bold">/bigha</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Rate per bigha</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">

@@ -29,7 +29,6 @@ const soilTestRequestSchema = new mongoose.Schema({
     },
     testType: {
         type: String,
-        enum: ['Basic', 'Advanced'],
         default: 'Basic'
     },
     phoneNumber: {

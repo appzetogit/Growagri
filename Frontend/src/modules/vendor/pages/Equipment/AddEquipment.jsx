@@ -44,7 +44,10 @@ const AddEquipment = () => {
     description: '',
     images: [],
     pricing: {
+      minute: { price: 0, isEnabled: true },
       hourly: { price: 0, isEnabled: true },
+      acre: { price: 0, isEnabled: true },
+      bigha: { price: 0, isEnabled: true },
       land_based: { price: 0, isEnabled: false },
       daily: { price: 0, isEnabled: false }
     },
@@ -418,9 +421,12 @@ const AddEquipment = () => {
                                       implements: [...p.implements, {
                                         subCategoryId: impl.id,
                                         pricing: {
-                                          hourly: { price: 0, isEnabled: form.pricing.hourly.isEnabled },
-                                          land_based: { price: 0, isEnabled: form.pricing.land_based.isEnabled },
-                                          daily: { price: 0, isEnabled: form.pricing.daily.isEnabled }
+                                          minute: { price: 0, isEnabled: true },
+                                          hourly: { price: 0, isEnabled: true },
+                                          acre: { price: 0, isEnabled: true },
+                                          bigha: { price: 0, isEnabled: true },
+                                          land_based: { price: 0, isEnabled: false },
+                                          daily: { price: 0, isEnabled: false }
                                         }
                                       }]
                                     }));
@@ -434,12 +440,16 @@ const AddEquipment = () => {
                             {/* Per-implement Pricing Inputs */}
                             {selected && (
                               <div className="mt-2 pl-2 space-y-1.5">
-                                {['hourly', 'land_based', 'daily'].map(key => {
-                                  if (!form.pricing[key].isEnabled) return null;
+                                {[
+                                  { key: 'minute', label: 'Minute Rate' },
+                                  { key: 'hourly', label: 'Hourly Rate' },
+                                  { key: 'acre', label: 'Per Acre Rate' },
+                                  { key: 'bigha', label: 'Per Bigha Rate' }
+                                ].map(({ key, label }) => {
                                   return (
                                     <div key={key} className="flex items-center justify-between py-1 border-t border-slate-50/50">
                                       <span className="text-[10px] font-black text-slate-400 uppercase">
-                                        {key === 'land_based' ? 'Per Acre' : key === 'hourly' ? 'Hourly' : 'Daily'} Rate
+                                        {label}
                                       </span>
                                       <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 max-w-[120px] transition-all">
                                         <span className="text-slate-500 font-bold text-xs">₹</span>
@@ -447,14 +457,15 @@ const AddEquipment = () => {
                                           type="number"
                                           className="w-full bg-transparent border-none p-0 text-xs font-black text-slate-800 outline-none text-right placeholder:text-slate-400"
                                           placeholder="0"
-                                          value={selected.pricing[key]?.price || ""}
+                                          value={selected.pricing?.[key]?.price ?? ""}
                                           onFocus={(e) => e.target.select()}
                                           onChange={e => {
+                                            const val = parseFloat(e.target.value) || 0;
                                             setForm(p => ({
                                               ...p,
                                               implements: p.implements.map(i =>
                                                 i.subCategoryId === impl.id
-                                                  ? { ...i, pricing: { ...i.pricing, [key]: { ...i.pricing[key], price: parseFloat(e.target.value) || 0 } } }
+                                                  ? { ...i, pricing: { ...i.pricing, [key]: { price: val, isEnabled: true } } }
                                                   : i
                                               )
                                             }));

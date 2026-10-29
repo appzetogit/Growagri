@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 
 // Sub-pages
 import StartupRecognitionAdmin from './StartupRecognitionAdmin';
+import ManageTeamAdmin from './ManageTeamAdmin';
 import Blogs from './Blogs';
 import Articles from './Articles';
 import Reviews from './Reviews';
@@ -26,6 +27,7 @@ const WebsiteSettings = () => {
         <Routes>
           <Route path="/" element={<Navigate to="startup-recognition" replace />} />
           <Route path="startup-recognition" element={<StartupRecognitionAdmin />} />
+          <Route path="manage-team" element={<ManageTeamAdmin />} />
           <Route path="banners" element={<Navigate to="../startup-recognition" replace />} />
           <Route path="blogs" element={<Blogs />} />
           <Route path="articles" element={<Articles />} />

@@ -23,6 +23,15 @@ const websiteService = {
   getStartupRecognition: () => API.get("/content/startup-recognition"),
   updateStartupRecognition: (data) => API.put("/content/startup-recognition", data),
 
+  // Team Members
+  getTeamMembers: () => API.get("/admin/website/team-member"),
+  createTeamMember: (data) => API.post("/admin/website/team-member", data),
+  updateTeamMember: (id, data) => API.put(`/admin/website/team-member/${id}`, data),
+  deleteTeamMember: (id) => API.delete(`/admin/website/team-member/${id}`),
+  uploadTeamMemberImage: (formData) => API.post("/admin/website/team-member/upload", formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+
   // Website Banners (legacy)
   getBanners: () => API.get("/admin/website/banner"),
   createBanner: (data) => API.post("/admin/website/banner", data),

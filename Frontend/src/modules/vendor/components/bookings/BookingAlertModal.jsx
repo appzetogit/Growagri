@@ -197,10 +197,15 @@ const BookingAlertCard = ({ booking, onAccept, onReject, onAssign, initialTimeLe
                       <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Duration:</span>
                       <span className="text-xs font-black text-blue-800">{booking.estimatedDuration} Hour(s)</span>
                     </div>
+                  ) : booking.rental_type === 'minute' && booking.estimatedDuration ? (
+                    <div className="bg-blue-50 px-2 py-1 rounded border border-blue-100 flex items-center gap-1.5">
+                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Duration:</span>
+                      <span className="text-xs font-black text-blue-800">{booking.estimatedDuration} Min(s)</span>
+                    </div>
                   ) : booking.landSize ? (
                     <div className="bg-emerald-50 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1.5">
                       <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Area:</span>
-                      <span className="text-xs font-black text-emerald-800">{booking.landSize} Acre(s)</span>
+                      <span className="text-xs font-black text-emerald-800">{booking.landSize} {booking.landUnit || (booking.rental_type === 'bigha' ? 'Bigha' : 'Acre(s)')}</span>
                     </div>
                   ) : null}
                   {booking.cropType && (

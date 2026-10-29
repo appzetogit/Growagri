@@ -220,9 +220,11 @@ const createBooking = async (req, res) => {
     if (isAgriService) {
       // ── Agriculture Dynamic Multiplier Logic ──
       let multiplier = 1;
-      if (rental_type === 'hourly') {
+      if (rental_type === 'minute') {
         multiplier = parseFloat(estimatedDuration) || 1;
-      } else if (rental_type === 'land_based') {
+      } else if (rental_type === 'hourly') {
+        multiplier = parseFloat(estimatedDuration) || 1;
+      } else if (rental_type === 'acre' || rental_type === 'bigha' || rental_type === 'land_based') {
         multiplier = parseFloat(String(landSize).replace(/[^\d.]/g, '')) || 1;
       } else if (rental_type === 'daily' || rental_type === 'monthly') {
         multiplier = parseFloat(estimatedDuration) || 1;
@@ -230,7 +232,10 @@ const createBooking = async (req, res) => {
 
       // Determine correct unit rate from service model
       let unitRate = service.basePrice || 500;
-      if (rental_type === 'hourly' && service.hourly_price) unitRate = service.hourly_price;
+      if (rental_type === 'minute' && (service.minute_price || category?.minutePrice)) unitRate = service.minute_price || category.minutePrice;
+      else if (rental_type === 'hourly' && (service.hourly_price || category?.hourlyPrice)) unitRate = service.hourly_price || category.hourlyPrice;
+      else if (rental_type === 'acre' && (service.acre_price || category?.acrePrice || service.land_price)) unitRate = service.acre_price || category?.acrePrice || service.land_price;
+      else if (rental_type === 'bigha' && (service.bigha_price || category?.bighaPrice)) unitRate = service.bigha_price || category?.bighaPrice;
       else if (rental_type === 'land_based' && service.land_price) unitRate = service.land_price;
       else if ((rental_type === 'daily' || rental_type === 'monthly') && service.daily_price) unitRate = service.daily_price;
       else if (service.basePrice) unitRate = service.basePrice;

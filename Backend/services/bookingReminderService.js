@@ -90,9 +90,11 @@ async function checkEndingSlotBookings() {
       const duration = booking.estimatedDuration || 1;
       
       // Calculate duration in milliseconds
-      const durationMs = booking.rental_type === 'daily'
-        ? duration * 24 * 60 * 60 * 1000
-        : duration * 60 * 60 * 1000; // Default to hourly duration calculations
+      const durationMs = booking.rental_type === 'minute'
+        ? duration * 60 * 1000
+        : booking.rental_type === 'daily'
+          ? duration * 24 * 60 * 60 * 1000
+          : duration * 60 * 60 * 1000;
 
       const endDateTime = startedTime + durationMs;
       const timeDiff = endDateTime - now;

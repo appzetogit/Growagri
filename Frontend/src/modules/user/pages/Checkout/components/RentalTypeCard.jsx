@@ -1,54 +1,79 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiClock, FiMap, FiCalendar, FiAlertTriangle, FiCheckCircle, FiLoader } from 'react-icons/fi';
+import { FiClock, FiAlertTriangle, FiCheckCircle, FiLoader, FiChevronDown } from 'react-icons/fi';
 import { bookingService } from '../../../../../services/bookingService';
 
 /**
  * RentalTypeCard - Agriculture Equipment Rental Type Selector
- * Displays: Hourly / Land Based / Monthly options
- * Also checks equipment availability and shows "Next Available Slot" if booked
- *
- * Props:
- *   serviceId       {string}   - The equipment/service ID
- *   selectedDate    {Date}     - Date selected from TimeSlotModal
- *   selectedTime    {string}   - Time slot selected (e.g. "09:00")
- *   onRentalChange  {(type: string) => void}  - Callback when type changes
+ * Allows user to select rental basis: Hour, Minute, Acre, Bigha from a dropdown
+ * and enters the corresponding duration or land area directly below.
+ * Also checks equipment availability and displays real-time slot status.
  */
 
-const RENTAL_OPTIONS = [
+const RENTAL_UNITS = [
     {
         value: 'hourly',
-        label: 'Hourly',
-        icon: FiClock,
-        color: '#2563eb',
-        bg: '#eff6ff',
-        border: '#bfdbfe',
-        desc: 'Pay per hour of usage'
+        label: 'Hour',
+        suffix: 'HRS',
+        helperUnit: 'hours',
+        placeholder: 'e.g. 1',
+        priceKey: 'hourly',
+        rateSuffix: '/hr',
+        defaultQty: 1
     },
     {
-        value: 'land_based',
-        label: 'Land Based',
-        icon: FiMap,
-        color: '#16a34a',
-        bg: '#f0fdf4',
-        border: '#bbf7d0',
-        desc: 'Pay per acre of land'
+        value: 'minute',
+        label: 'Minute',
+        suffix: 'MINS',
+        helperUnit: 'minutes',
+        placeholder: 'e.g. 30',
+        priceKey: 'minute',
+        rateSuffix: '/min',
+        defaultQty: 30
     },
     {
-        value: 'daily',
-        label: 'Daily',
-        icon: FiCalendar,
-        color: '#ea580c',
-        bg: '#fff7ed',
-        border: '#ffedd5',
-        desc: 'Pay per day of usage'
+        value: 'acre',
+        label: 'Acre',
+        suffix: 'ACRES',
+        helperUnit: 'acres',
+        placeholder: 'e.g. 5',
+        priceKey: 'acre',
+        rateSuffix: '/acre',
+        defaultQty: 1
+    },
+    {
+        value: 'bigha',
+        label: 'Bigha',
+        suffix: 'BIGHAS',
+        helperUnit: 'bighas',
+        placeholder: 'e.g. 2',
+        priceKey: 'bigha',
+        rateSuffix: '/bigha',
+        defaultQty: 1
     }
 ];
 
-const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange, initialRentalType, initialQuantity, landUnit = 'acre', pricing }) => {
-    const [selectedRental, setSelectedRental] = useState(initialRentalType || 'hourly');
-    const [quantity, setQuantity] = useState(initialQuantity || 1);
+const RentalTypeCard = ({
+    serviceId,
+    selectedDate,
+    selectedTime,
+    onRentalChange,
+    initialRentalType,
+    initialQuantity,
+    pricing
+}) => {
+    const normalizedInitial = initialRentalType === 'land_based' ? 'acre' : (initialRentalType || 'hourly');
+    const [selectedRental, setSelectedRental] = useState(normalizedInitial);
+    const [quantity, setQuantity] = useState(initialQuantity || (normalizedInitial === 'minute' ? 30 : 1));
     const [checking, setChecking] = useState(false);
     const [availability, setAvailability] = useState(null);
+
+    // Sync when initialRentalType changes
+    useEffect(() => {
+        if (initialRentalType) {
+            const norm = initialRentalType === 'land_based' ? 'acre' : initialRentalType;
+            setSelectedRental(norm);
+        }
+    }, [initialRentalType]);
 
     // Sync quantity when parent updates it (e.g. after TimeSlotModal saves)
     useEffect(() => {
@@ -91,121 +116,132 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
         checkAvailability();
     }, [checkAvailability]);
 
+    const options = [
+        ...RENTAL_UNITS,
+        ...(pricing?.daily > 0 || selectedRental === 'daily' ? [{
+            value: 'daily',
+            label: 'Day',
+            suffix: 'DAYS',
+            helperUnit: 'days',
+            placeholder: 'e.g. 1',
+            priceKey: 'daily',
+            rateSuffix: '/day',
+            defaultQty: 1
+        }] : [])
+    ];
+
+    const currentConfig = options.find(opt => opt.value === selectedRental) || options[0];
+
     const handleSelect = (value) => {
         setSelectedRental(value);
-        // Reset quantity to 1 for new type or keep existing if it makes sense
-        onRentalChange?.({ type: value, quantity: quantity });
+        let newQty = quantity;
+        if (value === 'minute' && (!quantity || Number(quantity) <= 1)) {
+            newQty = 30;
+        } else if (value !== 'minute' && Number(quantity) > 24) {
+            newQty = 1;
+        } else if (!newQty || Number(newQty) <= 0) {
+            newQty = 1;
+        }
+        setQuantity(newQty);
+        onRentalChange?.({ type: value, quantity: newQty });
     };
 
     const handleQuantityChange = (val) => {
-        const num = parseFloat(val) || 0;
-        setQuantity(num);
-        onRentalChange?.({ type: selectedRental, quantity: num });
+        if (val === '') {
+            setQuantity('');
+            onRentalChange?.({ type: selectedRental, quantity: 0 });
+            return;
+        }
+        const num = parseFloat(val);
+        setQuantity(val);
+        if (!isNaN(num)) {
+            onRentalChange?.({ type: selectedRental, quantity: num });
+        }
     };
 
-    // Filter available options based on pricing prop
-    const availableOptions = RENTAL_OPTIONS.filter(opt => {
-        if (!pricing) return true; // If no pricing provided, show all
-        // Return true if price is greater than 0
-        return pricing[opt.value] > 0;
-    });
-
-    // If no valid options based on pricing, fallback to showing all
-    const displayOptions = availableOptions.length > 0 ? availableOptions : RENTAL_OPTIONS;
-
-    // Ensure selectedRental is valid
-    useEffect(() => {
-        if (!displayOptions.find(opt => opt.value === selectedRental) && displayOptions.length > 0) {
-            handleSelect(displayOptions[0].value);
+    const handleQuantityBlur = () => {
+        if (!quantity || parseFloat(quantity) <= 0) {
+            const fallback = selectedRental === 'minute' ? 30 : 1;
+            setQuantity(fallback);
+            onRentalChange?.({ type: selectedRental, quantity: fallback });
         }
-    }, [pricing, selectedRental]);
-
-
-    // Format today's date (fixed, non-changeable current date)
-    const todayFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-xl p-3 mb-2.5 shadow-xs">
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 mb-2.5 shadow-xs">
             {/* Header */}
-            <div className="flex items-center gap-2 mb-2.5">
-                <div className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center">
-                    <span className="text-sm">🚜</span>
+            <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shadow-2xs">
+                    🚜
                 </div>
                 <div>
-                    <p className="text-xs font-extrabold text-gray-900 leading-tight">Equipment Rental Type</p>
-                    <p className="text-[9px] text-gray-400 font-medium">Select how you want to rent this equipment</p>
+                    <p className="text-xs font-black text-gray-900 leading-tight">Equipment Rental Type</p>
+                    <p className="text-[10px] text-gray-500 font-medium">Select how you want to rent this equipment</p>
                 </div>
             </div>
 
-            {/* Rental Type Pills */}
-            <div className={`grid gap-1.5 mb-2.5`} style={{ gridTemplateColumns: `repeat(${displayOptions.length}, minmax(0, 1fr))` }}>
-                {displayOptions.map((opt) => {
-                    const isHourly = opt.value === 'hourly';
-                    const Icon = isHourly ? FiCalendar : opt.icon;
-                    const labelText = isHourly ? todayFormatted : opt.label;
-                    const isSelected = selectedRental === opt.value;
-                    return (
-                        <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => handleSelect(opt.value)}
-                            className="flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all active:scale-95"
-                            style={{
-                                borderColor: isSelected ? opt.color : '#e5e7eb',
-                                background: isSelected ? opt.bg : '#fafafa',
-                            }}
-                        >
-                            <Icon
-                                className="w-4 h-4"
-                                style={{ color: isSelected ? opt.color : '#9ca3af' }}
-                            />
-                            <span
-                                className="text-[10px] font-black text-center leading-tight"
-                                style={{ color: isSelected ? opt.color : '#6b7280' }}
-                            >
-                                {labelText}
-                            </span>
-                        </button>
-                    );
-                })}
+            {/* 1. Dropdown: Minute, Hour, Acre, Bigha */}
+            <div className="mb-3">
+                <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                    Select Rental Basis
+                </label>
+                <div className="relative">
+                    <select
+                        value={selectedRental}
+                        onChange={(e) => handleSelect(e.target.value)}
+                        className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-300 rounded-lg py-2.5 pl-3 pr-10 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all appearance-none cursor-pointer"
+                    >
+                        {options.map((opt) => {
+                            const priceVal = pricing?.[opt.priceKey];
+                            const priceLabel = priceVal > 0 ? ` (₹${Number(priceVal).toLocaleString('en-IN')}${opt.rateSuffix})` : '';
+                            return (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}{priceLabel}
+                                </option>
+                            );
+                        })}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                        <FiChevronDown className="w-4 h-4" />
+                    </div>
+                </div>
             </div>
 
-            {/* Quantity Input based on Type */}
-            <div className="mb-2.5 pt-2 border-t border-gray-50">
+            {/* 2. Quantity Input Field Directly Below Dropdown */}
+            <div className="mb-3 pt-2.5 border-t border-slate-100">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">
-                            {selectedRental === 'hourly' && 'Estimated Hours'}
-                            {selectedRental === 'land_based' && `Total Area (${landUnit})`}
-                            {selectedRental === 'monthly' && 'Duration (Months)'}
-                            {selectedRental === 'daily' && 'Number of Days'}
+                        <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-wider mb-1.5 block">
+                            {currentConfig.value === 'minute' && 'Enter Estimated Minutes'}
+                            {currentConfig.value === 'hourly' && 'Enter Estimated Hours'}
+                            {currentConfig.value === 'acre' && 'Enter Land Area (Acres)'}
+                            {currentConfig.value === 'bigha' && 'Enter Land Area (Bighas)'}
+                            {currentConfig.value === 'daily' && 'Enter Number of Days'}
                         </label>
                         <div className="relative">
                             <input
                                 type="number"
-                                min="0.5"
-                                step="0.1"
+                                min={selectedRental === 'minute' ? "1" : "0.5"}
+                                step={selectedRental === 'minute' ? "1" : "0.5"}
                                 value={quantity}
                                 onChange={(e) => handleQuantityChange(e.target.value)}
-                                className="w-full pl-3 pr-10 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-                                placeholder={selectedRental === 'land_based' ? "e.g. 5" : "1"}
+                                onBlur={handleQuantityBlur}
+                                className="w-full pl-3 pr-16 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all shadow-2xs"
+                                placeholder={currentConfig.placeholder}
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-400 uppercase">
-                                {selectedRental === 'hourly' && 'Hrs'}
-                                {selectedRental === 'land_based' && landUnit}
-                                {selectedRental === 'monthly' && 'Mo'}
-                                {selectedRental === 'daily' && 'Days'}
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600 uppercase tracking-wider bg-slate-200/80 px-2 py-0.5 rounded">
+                                {currentConfig.suffix}
                             </span>
                         </div>
                     </div>
                 </div>
-                <p className="text-[8px] text-gray-400 mt-1 italic">
-                    * Final amount will be calculated by vendor based on actual {selectedRental === 'land_based' ? landUnit : 'usage'}.
+                <p className="text-[9px] text-gray-400 mt-1.5 italic">
+                    * Final amount will be calculated by vendor based on actual {currentConfig.helperUnit}.
                 </p>
             </div>
 
-            {/* Availability Status */}
-            {(selectedDate || selectedRental === 'hourly') ? (
+            {/* 3. Availability Status */}
+            {(selectedDate || selectedRental === 'hourly' || selectedRental === 'minute' || selectedRental === 'acre' || selectedRental === 'bigha') ? (
                 <div className="rounded-lg border overflow-hidden">
                     {checking ? (
                         <div className="flex items-center gap-2 p-2 bg-gray-50">
@@ -249,7 +285,7 @@ const RentalTypeCard = ({ serviceId, selectedDate, selectedTime, onRentalChange,
                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
                     <FiAlertTriangle className="w-3.5 h-3.5 text-gray-400" />
                     <p className="text-[10px] text-gray-500 font-medium">
-                        {selectedRental === 'monthly' ? 'Select a start date to check availability' : 'Select a date & time to check availability'}
+                        Select a date & time to check availability
                     </p>
                 </div>
             )}

@@ -50,7 +50,10 @@ const formatCategory = (cat) => ({
   trackingType: cat.trackingType || 'none',
   requiresDriver: cat.requiresDriver || false,
   sectionType: cat.sectionType || 'General',
+  minutePrice: cat.minutePrice !== undefined && cat.minutePrice !== null ? cat.minutePrice : 0,
   hourlyPrice: cat.hourlyPrice !== undefined && cat.hourlyPrice !== null ? cat.hourlyPrice : 0,
+  acrePrice: cat.acrePrice !== undefined && cat.acrePrice !== null ? cat.acrePrice : 0,
+  bighaPrice: cat.bighaPrice !== undefined && cat.bighaPrice !== null ? cat.bighaPrice : 0,
   metaTitle: cat.metaTitle,
   metaDescription: cat.metaDescription,
   createdAt: cat.createdAt,
@@ -180,7 +183,10 @@ const createCategory = async (req, res) => {
       trackingType,
       requiresDriver,
       sectionType,
-      hourlyPrice
+      minutePrice,
+      hourlyPrice,
+      acrePrice,
+      bighaPrice
     } = req.body;
 
     console.log('Creating category with payload:', req.body);
@@ -234,7 +240,10 @@ const createCategory = async (req, res) => {
       trackingType: trackingType || 'none',
       requiresDriver: Boolean(requiresDriver),
       sectionType: sectionType || 'General',
+      minutePrice: Number(minutePrice) || 0,
       hourlyPrice: Number(hourlyPrice) || 0,
+      acrePrice: Number(acrePrice) || 0,
+      bighaPrice: Number(bighaPrice) || 0,
       createdBy: req.user?._id || req.userId || null
     });
 
@@ -302,7 +311,10 @@ const updateCategory = async (req, res) => {
       trackingType,
       requiresDriver,
       sectionType,
-      hourlyPrice
+      minutePrice,
+      hourlyPrice,
+      acrePrice,
+      bighaPrice
     } = req.body;
 
     const category = await Category.findById(id);
@@ -381,7 +393,10 @@ const updateCategory = async (req, res) => {
     if (trackingType !== undefined) category.trackingType = trackingType;
     if (requiresDriver !== undefined) category.requiresDriver = Boolean(requiresDriver);
     if (sectionType !== undefined) category.sectionType = sectionType;
+    if (minutePrice !== undefined) category.minutePrice = Number(minutePrice) || 0;
     if (hourlyPrice !== undefined) category.hourlyPrice = Number(hourlyPrice) || 0;
+    if (acrePrice !== undefined) category.acrePrice = Number(acrePrice) || 0;
+    if (bighaPrice !== undefined) category.bighaPrice = Number(bighaPrice) || 0;
 
     if (updateCityIds !== undefined) {
       category.cityIds = updateCityIds;
@@ -389,6 +404,49 @@ const updateCategory = async (req, res) => {
     }
 
     await category.save();
+
+    // Sync updated prices to all existing user carts containing this category
+    try {
+      const Cart = require('../../models/Cart');
+      const updatedHourly = Number(category.hourlyPrice) || 0;
+      const updatedMinute = Number(category.minutePrice) || 0;
+      const updatedAcre = Number(category.acrePrice) || 0;
+      const updatedBigha = Number(category.bighaPrice) || 0;
+      const effectiveUnit = updatedHourly || updatedMinute || updatedAcre || 0;
+
+      await Cart.updateMany(
+        {
+          $or: [
+            { 'items.categoryId': category._id },
+            { 'items.serviceId': category._id },
+            { 'items.title': category.title }
+          ]
+        },
+        {
+          $set: {
+            'items.$[elem].minute_price': updatedMinute,
+            'items.$[elem].hourly_price': updatedHourly,
+            'items.$[elem].acre_price': updatedAcre,
+            'items.$[elem].bigha_price': updatedBigha,
+            'items.$[elem].unitPrice': effectiveUnit,
+            'items.$[elem].price': effectiveUnit
+          }
+        },
+        {
+          arrayFilters: [
+            {
+              $or: [
+                { 'elem.categoryId': category._id },
+                { 'elem.serviceId': category._id },
+                { 'elem.title': category.title }
+              ]
+            }
+          ]
+        }
+      );
+    } catch (cartSyncErr) {
+      console.error('[updateCategory] Error syncing carts:', cartSyncErr);
+    }
 
     const updatedCategory = await Category.findById(category._id)
       .populate('parentCategory', 'title slug')
