@@ -8,16 +8,8 @@
 importScripts('https://www.gstatic.com/firebasejs/9.14.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.14.0/firebase-messaging-compat.js');
 
-// Firebase configuration - Production values
-const firebaseConfig = {
-  apiKey: "AIzaSyAEy1vl4BORXfxz0Wl42A5njPAS-yh5UZw",
-  authDomain: "grooagri-d44da.firebaseapp.com",
-  projectId: "grooagri-d44da",
-  storageBucket: "grooagri-d44da.firebasestorage.app",
-  messagingSenderId: "730249243780",
-  appId: "1:730249243780:web:4e949df44f95c745c726d1",
-  measurementId: "G-BRNBN7DK0V"
-};
+// Firebase configuration - passed as query params by pushNotificationService (from VITE_FIREBASE_* env)
+const firebaseConfig = Object.fromEntries(new URLSearchParams(self.location.search));
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
@@ -38,6 +30,9 @@ const NOTIFICATION_SOUNDS = {
 // Handle background messages
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] 🔔 Background message received:', payload);
+
+  // The SDK already displays messages that carry a `notification` block; showing it here too would duplicate it
+  if (payload.notification) return;
 
   const data = payload.data || {};
   const notification = payload.notification || {};

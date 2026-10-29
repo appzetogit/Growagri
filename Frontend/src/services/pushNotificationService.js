@@ -7,9 +7,9 @@
  * All functions safely return/no-op on iOS to prevent hangs.
  */
 
-import { messaging, getToken, onMessage } from '../firebase';
+import { messaging, getToken, onMessage, firebaseConfig } from '../firebase';
 
-const VAPID_KEY = "BDhzn_g9ilMnVa2DuhfMoFxqXLZJhGv7NB2tWpQrdzRYlRoiU9ptryralC6IHuZ24AIm5CNP91AxePRf0GZw6Z8";
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 /**
  * Check if running on iOS (iPhone, iPad, iPod)
@@ -49,7 +49,8 @@ async function registerServiceWorker() {
 
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      // public/ SW can't read import.meta.env, so pass the config as query params
+      const registration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${new URLSearchParams(firebaseConfig)}`);
       // console.log('✅ Service Worker registered:', registration.scope);
       return registration;
     } catch (error) {

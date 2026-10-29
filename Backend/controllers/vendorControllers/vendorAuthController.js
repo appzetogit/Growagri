@@ -4,6 +4,7 @@ const { generateTokenPair, verifyRefreshToken, generateVerificationToken, verify
 const { sendOTP: sendSMSOTP } = require('../../services/smsService');
 const cloudinaryService = require('../../services/cloudinaryService');
 const { USER_ROLES, VENDOR_STATUS } = require('../../utils/constants');
+const { saveFcmToken } = require('../../services/firebaseAdmin');
 const { validationResult } = require('express-validator');
 
 /**
@@ -120,6 +121,8 @@ const verifyLogin = async (req, res) => {
           vendor: { adminApproval: 'pending' }
         });
       }
+
+      await saveFcmToken(Vendor, vendor._id, req.body.fcmToken, req.body.platform);
 
       const tokens = generateTokenPair({
         userId: vendor._id,
@@ -282,6 +285,9 @@ const register = async (req, res) => {
 
     const vendor = await Vendor.create(vendorData);
 
+    // Save device token now so the vendor gets push once approved
+    await saveFcmToken(Vendor, vendor._id, req.body.fcmToken, req.body.platform);
+
     // Notify Admins
     try {
       const { createNotification } = require('../notificationControllers/notificationController');
@@ -385,6 +391,8 @@ const login = async (req, res) => {
         message: 'Your account has been deactivated. Please contact support.'
       });
     }
+
+    await saveFcmToken(Vendor, vendor._id, req.body.fcmToken, req.body.platform);
 
     // Generate JWT tokens
     const tokens = generateTokenPair({

@@ -416,7 +416,28 @@ async function sendNotificationToAdmin(adminId, payload, includeMobile = true) {
   }
 }
 
+/**
+ * Save an FCM token sent along with login/signup (newest first, max 10 per platform)
+ * @param {Model} Model - User or Vendor model
+ * @param {string} id - Account _id
+ * @param {string} token - FCM token from the device
+ * @param {string} platform - 'web' or 'mobile' (default: 'mobile')
+ */
+async function saveFcmToken(Model, id, token, platform = 'mobile') {
+  if (!token || typeof token !== 'string') return;
+  const field = platform === 'web' ? 'fcmTokens' : 'fcmTokenMobile';
+  try {
+    // $pull and $push can't target the same field in one update
+    await Model.updateOne({ _id: id }, { $pull: { [field]: token } });
+    await Model.updateOne({ _id: id }, { $push: { [field]: { $each: [token], $position: 0, $slice: 10 } } });
+    console.log(`[FCM] ✅ ${field} saved on auth for ${Model.modelName} ${id}`);
+  } catch (error) {
+    console.error(`[FCM] ❌ Failed to save ${field} for ${Model.modelName} ${id}:`, error.message);
+  }
+}
+
 module.exports = {
+  saveFcmToken,
   sendPushNotification,
   sendNotificationToUser,
   sendNotificationToVendor,

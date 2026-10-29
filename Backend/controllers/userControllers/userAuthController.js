@@ -4,6 +4,7 @@ const { generateOTP, hashOTP, storeOTP, verifyOTP, checkRateLimit } = require('.
 const { sendOTP: sendSMSOTP } = require('../../services/smsService');
 const { sendOTPEmail, sendWelcomeEmail } = require('../../services/emailService');
 const { USER_ROLES } = require('../../utils/constants');
+const { saveFcmToken } = require('../../services/firebaseAdmin');
 const { validationResult } = require('express-validator');
 
 /**
@@ -108,6 +109,8 @@ const verifyLogin = async (req, res) => {
           message: 'Your account has been deactivated.'
         });
       }
+
+      await saveFcmToken(User, user._id, req.body.fcmToken, req.body.platform);
 
       const tokens = generateTokenPair({
         userId: user._id,
@@ -244,6 +247,8 @@ const register = async (req, res) => {
       sendWelcomeEmail(email, name).catch(err => console.error(err));
     }
 
+    await saveFcmToken(User, user._id, req.body.fcmToken, req.body.platform);
+
     // Generate JWT tokens
     const tokens = generateTokenPair({
       userId: user._id,
@@ -312,6 +317,8 @@ const login = async (req, res) => {
         message: 'Your account has been deactivated. Please contact support.'
       });
     }
+
+    await saveFcmToken(User, user._id, req.body.fcmToken, req.body.platform);
 
     // Generate JWT tokens
     const tokens = generateTokenPair({
