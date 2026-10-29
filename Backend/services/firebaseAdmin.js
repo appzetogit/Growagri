@@ -179,63 +179,15 @@ async function sendPushNotification(tokens, payload) {
 
     console.log(`✅ Push notification sent - Success: ${response.successCount}, Failed: ${response.failureCount}`);
 
-    // Log failed tokens for debugging and cleanup invalid ones
-    if (response.failureCount > 0) {
-      const invalidTokens = [];
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          const errorCode = resp.error?.code;
-          console.log(`❌ Failed token[${idx}]: ${errorCode} - ${resp.error?.message}`);
-
-          // invalid-argument usually means a bad payload, not a bad token — don't delete on it
-          if (errorCode === 'messaging/registration-token-not-registered' ||
-            errorCode === 'messaging/invalid-registration-token') {
-            invalidTokens.push(uniqueTokens[idx]);
-          }
-        }
-      });
-
-      // Cleanup invalid tokens
-      if (invalidTokens.length > 0) {
-        removeInvalidTokens(invalidTokens);
-      }
-    }
+    // Log failures only. Tokens are never auto-deleted; the per-account cap of 10 per platform pushes dead ones out.
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) console.log(`❌ Failed token[${idx}]: ${resp.error?.code} - ${resp.error?.message}`);
+    });
 
     return response;
   } catch (error) {
     console.error('❌ Error sending push notification:', error);
     throw error;
-  }
-}
-
-/**
- * Remove invalid FCM tokens from all collections
- * @param {string[]} tokens - Array of invalid tokens to remove
- */
-async function removeInvalidTokens(tokens) {
-  try {
-    console.log(`[FCM Cleanup] Removing ${tokens.length} invalid tokens...`);
-    const User = require('../models/User');
-    const Vendor = require('../models/Vendor');
-    const Worker = require('../models/Worker');
-
-    const updateQuery = {
-      $pull: {
-        fcmTokens: { $in: tokens },
-        fcmTokenMobile: { $in: tokens }
-      }
-    };
-
-    // We run updates in parallel for all collections as a token might belong to any
-    await Promise.all([
-      User.updateMany({ $or: [{ fcmTokens: { $in: tokens } }, { fcmTokenMobile: { $in: tokens } }] }, updateQuery),
-      Vendor.updateMany({ $or: [{ fcmTokens: { $in: tokens } }, { fcmTokenMobile: { $in: tokens } }] }, updateQuery),
-      Worker.updateMany({ $or: [{ fcmTokens: { $in: tokens } }, { fcmTokenMobile: { $in: tokens } }] }, updateQuery)
-    ]);
-
-    console.log('[FCM Cleanup] ✅ Invalid tokens removed from database');
-  } catch (err) {
-    console.error('[FCM Cleanup] ❌ Error removing tokens:', err);
   }
 }
 

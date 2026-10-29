@@ -46,6 +46,10 @@ const call = (handler, body) => new Promise((resolve) => {
   const none = await call(userAuth.verifyLogin, { phone, otp: '123456' });
   assert.strictEqual(none.code, 200);
 
+  // Logout must not wipe the account's tokens (other devices stay subscribed)
+  await new Promise((resolve) => userAuth.logout({ body: { platform: 'mobile' }, user: { _id: id } }, { status: () => ({ json: resolve }) }));
+  assert.strictEqual((await User.findById(id).lean()).fcmTokenMobile.length, 10, 'logout keeps tokens');
+
   console.log('fcmTokenAuth.test.js: all checks passed');
   await mongoose.disconnect();
   await mongo.stop();

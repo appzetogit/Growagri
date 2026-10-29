@@ -353,17 +353,7 @@ const login = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    const { platform = 'web' } = req.body;
-
-    // Clear FCM tokens based on platform
-    if (req.user && req.user._id) {
-      const updateQuery = platform === 'mobile'
-        ? { $set: { fcmTokenMobile: [] } }
-        : { $set: { fcmTokens: [] } };
-
-      await User.findByIdAndUpdate(req.user._id, updateQuery);
-      console.log(`[AUTH] ✅ ${platform} FCM tokens cleared for user: ${req.user._id}`);
-    }
+    // FCM tokens are kept; the client removes only this device's token before calling logout
 
     res.status(200).json({
       success: true,

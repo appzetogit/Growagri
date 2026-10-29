@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../../middleware/authMiddleware');
-const { sendPushNotification } = require('../../services/firebaseAdmin');
+const { sendPushNotification, saveFcmToken } = require('../../services/firebaseAdmin');
 const Worker = require('../../models/Worker');
 const User = require('../../models/User');
 const Vendor = require('../../models/Vendor');
@@ -27,29 +27,12 @@ router.post('/save', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Token is required' });
     }
 
-    // Use $addToSet to ensure uniqueness (prevent duplicates efficiently)
-    const updateQuery = platform === 'mobile'
-      ? { $addToSet: { fcmTokenMobile: token } }
-      : { $addToSet: { fcmTokens: token } };
-
-    const worker = await Worker.findByIdAndUpdate(workerId, updateQuery, { new: true });
-
-    // Optional: Trim array if too long (separate operation to keep response fast and main op safe)
-    // Only verify if length > MAX_TOKENS
-    const currentTokens = platform === 'mobile' ? worker.fcmTokenMobile : worker.fcmTokens;
-    if (currentTokens && currentTokens.length > MAX_TOKENS) {
-      const sliceQuery = platform === 'mobile'
-        ? { $push: { fcmTokenMobile: { $each: [], $slice: MAX_TOKENS } } } // Keep last 10 (or first 10?) - slice with positive keeps first N, negative keeps last N.
-        // Wait, $slice on existing array requires $push with empty $each.
-        // Actually, easiest to just keep it simple: $addToSet. 
-        // Array growth is acceptable for now compared to duplicates issue.
-        // We can just leave it as $addToSet.
-        : { $addToSet: { fcmTokens: token } };
-    }
-
+    // Newest first, capped at 10 per platform (same as user/vendor)
+    const worker = await Worker.exists({ _id: workerId });
     if (!worker) {
       return res.status(404).json({ success: false, error: 'Worker not found' });
     }
+    await saveFcmToken(Worker, workerId, token, platform);
 
     // Remove this token from User and Vendor collections to prevent cross-account notifications
     // COMMENTED OUT to allow testing on same device
