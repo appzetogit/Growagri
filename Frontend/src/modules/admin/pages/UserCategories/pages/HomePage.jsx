@@ -696,14 +696,15 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                             >
                               <FiEdit2 className="w-4 h-4" />
                             </button>
-                            <button
+                            {/* Market and Soil Testing are core actions and can't be deleted */}
+                            {!['/user/agri-marketplace', '/user/soil-testing'].includes(p.route) && <button
                               type="button"
                               onClick={() => patchHome({ premiumOfferings: (home.premiumOfferings || []).filter((x) => x.id !== p.id) })}
                               className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                               title="Delete"
                             >
                               <FiTrash2 className="w-4 h-4" />
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>
@@ -715,7 +716,7 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
           </div>
 
           {/* ======================================================== */}
-          {/* SECTION 3: Equipment Curations                           */}
+          {/* SECTION 3: Equipment Curations                          */}
           {/* ======================================================== */}
           <div>
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
