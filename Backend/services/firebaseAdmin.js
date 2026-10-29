@@ -105,7 +105,7 @@ async function sendPushNotification(tokens, payload) {
       tokens: uniqueTokens,
       // Android specific configuration for high priority
       android: {
-        priority: 'high', // HIGH priority for immediate delivery
+        priority: payload.highPriority !== false ? 'high' : 'normal',
         // notification block removed to ensure Data-Only message
       },
       // iOS/APNs specific configuration
@@ -133,8 +133,7 @@ async function sendPushNotification(tokens, payload) {
           link: payload.data?.link || '/'
         }
         // notification block removed to ensure Data-Only message
-      },
-      priority: payload.highPriority !== false ? 'high' : 'normal'
+      }
     };
 
     if (!payload.dataOnly) {
@@ -188,9 +187,9 @@ async function sendPushNotification(tokens, payload) {
           const errorCode = resp.error?.code;
           console.log(`❌ Failed token[${idx}]: ${errorCode} - ${resp.error?.message}`);
 
+          // invalid-argument usually means a bad payload, not a bad token — don't delete on it
           if (errorCode === 'messaging/registration-token-not-registered' ||
-            errorCode === 'messaging/invalid-registration-token' ||
-            errorCode === 'messaging/invalid-argument') {
+            errorCode === 'messaging/invalid-registration-token') {
             invalidTokens.push(uniqueTokens[idx]);
           }
         }

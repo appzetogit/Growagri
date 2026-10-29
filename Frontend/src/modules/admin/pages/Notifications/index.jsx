@@ -12,7 +12,7 @@ const BroadcastForm = () => {
 
   const send = async (e) => {
     e.preventDefault();
-    if (!window.confirm(`Send this notification to all ${form.audience === 'users' ? 'farmers' : 'equipment owners'}?`)) return;
+    if (!window.confirm(`Send this notification to all ${form.audience === 'users' ? 'users' : 'vendors'}?`)) return;
     try {
       setSending(true);
       const res = await api.post('/notifications/admin/broadcast', form);
@@ -30,8 +30,8 @@ const BroadcastForm = () => {
       <h2 className="font-bold text-gray-800">Send Push Notification</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} className="p-2 border border-gray-200 rounded-lg text-sm">
-          <option value="users">Farmers</option>
-          <option value="vendors">Equipment Owners</option>
+          <option value="users">User</option>
+          <option value="vendors">Vendor</option>
         </select>
         <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="flex-1 p-2 border border-gray-200 rounded-lg text-sm" />
       </div>
