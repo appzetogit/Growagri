@@ -1376,6 +1376,19 @@ const checkEquipmentAvailability = async (req, res) => {
 
     const { BOOKING_STATUS } = require('../../utils/constants');
 
+    // Only a specific vendor's machine can be "already booked". Catalog services/categories
+    // are fulfilled by whichever nearby vendor accepts, so they are always bookable.
+    const mongoose = require('mongoose');
+    const VendorEquipment = require('../../models/VendorEquipment');
+    const isSpecificMachine = mongoose.isValidObjectId(equipmentId) && await VendorEquipment.exists({ _id: equipmentId });
+    if (!isSpecificMachine) {
+      return res.status(200).json({
+        success: true,
+        available: true,
+        message: 'Available. Nearby vendors will be searched for your booking.'
+      });
+    }
+
     // Set up date boundaries for the requested date
     const reqDate = new Date(requestedDate);
     const startOfDay = new Date(reqDate.setHours(0, 0, 0, 0));
@@ -1416,7 +1429,8 @@ const checkEquipmentAvailability = async (req, res) => {
         bDate.getMonth() === reqDate.getMonth() &&
         bDate.getDate() === reqDate.getDate()
       ) {
-        if (!requestedTime || booking.scheduledTime === requestedTime || (booking.timeSlot && booking.timeSlot.start === requestedTime)) {
+        // No time chosen yet = can't conflict; don't block the whole day
+        if (requestedTime && (booking.scheduledTime === requestedTime || (booking.timeSlot && booking.timeSlot.start === requestedTime))) {
           isAvailable = false;
           break;
         }
