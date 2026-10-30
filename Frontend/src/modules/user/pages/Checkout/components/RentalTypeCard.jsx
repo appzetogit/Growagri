@@ -91,8 +91,9 @@ const RentalTypeCard = ({
             setChecking(true);
             setAvailability(null);
 
+            // Local calendar day (toISOString would give the previous day before 5:30 AM IST)
             const dateStr = dateToUse instanceof Date
-                ? dateToUse.toISOString().split('T')[0]
+                ? `${dateToUse.getFullYear()}-${String(dateToUse.getMonth() + 1).padStart(2, '0')}-${String(dateToUse.getDate()).padStart(2, '0')}`
                 : dateToUse;
 
             const res = await bookingService.checkEquipmentAvailability(serviceId, dateStr, selectedTime);

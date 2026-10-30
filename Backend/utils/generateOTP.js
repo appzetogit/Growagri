@@ -1,15 +1,8 @@
 /**
  * Generate OTP and Token utilities
  */
-
-const TEST_NUMBERS = ['6268455485', '6260491554', '7610416911'];
-
-const isTestNumber = (phone) => {
-  if (!phone) return false;
-  const digitsOnly = String(phone).replace(/\D/g, '');
-  const last10 = digitsOnly.slice(-10);
-  return TEST_NUMBERS.includes(last10) || TEST_NUMBERS.includes(digitsOnly) || TEST_NUMBERS.includes(String(phone).trim());
-};
+const crypto = require('crypto');
+const { isTestNumber } = require('./redisOtp.util');
 
 /**
  * Generate a random OTP of specified length or default for test phone
@@ -27,10 +20,9 @@ const generateOTP = (lengthOrPhone = 6) => {
   }
 
   const length = typeof lengthOrPhone === 'number' ? lengthOrPhone : 6;
-  const digits = '0123456789';
   let OTP = '';
   for (let i = 0; i < length; i++) {
-    OTP += digits[Math.floor(Math.random() * 10)];
+    OTP += crypto.randomInt(10);
   }
   return OTP;
 };
@@ -44,7 +36,7 @@ const generateToken = (length = 32) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let token = '';
   for (let i = 0; i < length; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+    token += chars.charAt(crypto.randomInt(chars.length));
   }
   return token;
 };
@@ -53,4 +45,3 @@ module.exports = {
   generateOTP,
   generateToken
 };
-

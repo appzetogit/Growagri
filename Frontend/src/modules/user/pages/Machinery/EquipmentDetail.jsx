@@ -14,7 +14,23 @@ import ServiceSchema from '../../../../components/common/ServiceSchema';
 import { toast } from 'react-hot-toast';
 import { bookingService } from '../../../../services/bookingService';
 
-const SLOTS = ['Early Morning (6AM-10AM)', 'Forenoon (10AM-2PM)', 'Afternoon (2PM-6PM)'];
+// Times are farm-local; the server checks the machine is free for start-end
+const SLOTS = [
+  { label: 'Early Morning (6AM-10AM)', start: '06:00', end: '10:00' },
+  { label: 'Forenoon (10AM-2PM)', start: '10:00', end: '14:00' },
+  { label: 'Afternoon (2PM-6PM)', start: '14:00', end: '18:00' }
+];
+
+// Local calendar day as YYYY-MM-DD (toISOString would give yesterday before 5:30 AM IST)
+const localDateStr = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const slotHasStarted = (date, slot) => {
+  if (date !== localDateStr()) return false;
+  const [h, m] = slot.start.split(':').map(Number);
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes() >= h * 60 + m;
+};
 
 const EquipmentDetail = () => {
   const { id } = useParams();
@@ -32,9 +48,11 @@ const EquipmentDetail = () => {
     if (!selectedDate || !equipment?._id) return;
     let cancelled = false;
     Promise.all(SLOTS.map(slot =>
-      bookingService.checkEquipmentAvailability(equipment._id, selectedDate, slot)
-        .then(r => [slot, r.available === false ? (r.message || 'Not available') : null])
-        .catch(() => [slot, null])
+      slotHasStarted(selectedDate, slot)
+        ? Promise.resolve([slot.label, 'This slot has already started'])
+        : bookingService.checkEquipmentAvailability(equipment._id, selectedDate, slot.start, slot.end)
+          .then(r => [slot.label, r.available === false ? (r.message || 'Not available') : null])
+          .catch(() => [slot.label, null])
     )).then(results => {
       if (cancelled) return;
       const blocked = Object.fromEntries(results.filter(([, reason]) => reason));
@@ -373,23 +391,23 @@ const EquipmentDetail = () => {
                   type="date"
                   className="w-full bg-slate-50 border-slate-100 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
                   value={selectedDate}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={localDateStr()}
                   onChange={e => setSelectedDate(e.target.value)}
                 />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-2 block">Available Slots</label>
                 <div className="flex flex-wrap gap-2">
-                  {SLOTS.map(slot => (
+                  {SLOTS.map(({ label }) => (
                     <button
-                      key={slot}
-                      disabled={!!blockedSlots[slot]}
-                      title={blockedSlots[slot] || ''}
-                      onClick={() => setSelectedSlot(slot)}
+                      key={label}
+                      disabled={!!blockedSlots[label]}
+                      title={blockedSlots[label] || ''}
+                      onClick={() => setSelectedSlot(label)}
                       className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border disabled:opacity-40 disabled:line-through
-                              ${selectedSlot === slot ? 'bg-purple-600 border-purple-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}
+                              ${selectedSlot === label ? 'bg-purple-600 border-purple-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}
                     >
-                      {slot}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -438,8 +456,13 @@ const EquipmentDetail = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                if (!selectedDate || !selectedSlot) {
+                const slotInfo = SLOTS.find(s => s.label === selectedSlot);
+                if (!selectedDate || !slotInfo) {
                   toast.error('Please select date and slot');
+                  return;
+                }
+                if (blockedSlots[selectedSlot]) {
+                  toast.error(blockedSlots[selectedSlot]);
                   return;
                 }
                 navigate('/user/machinery/checkout', {
@@ -450,6 +473,8 @@ const EquipmentDetail = () => {
                       quantity,
                       date: selectedDate,
                       slot: selectedSlot,
+                      slotStart: slotInfo.start,
+                      slotEnd: slotInfo.end,
                       total,
                       selectedImplements  // NEW: pass selected implements
                     }

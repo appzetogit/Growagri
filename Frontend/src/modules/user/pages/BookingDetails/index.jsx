@@ -193,7 +193,7 @@ const BookingDetails = () => {
         const data = { ...response.data };
         // Calculate notional display values for plan_benefit
         if (data.paymentMethod === 'plan_benefit') {
-          if (!data.tax) data.tax = (data.basePrice || 0) * 0.18;
+          if (!data.tax) data.tax = 0; // GST is not charged
           if (!data.visitingCharges && !data.visitationFee) data.visitingCharges = 49;
         }
         setBooking(data);
@@ -272,7 +272,7 @@ const BookingDetails = () => {
 
             // Calculate notional display values for plan_benefit
             if (newData.paymentMethod === 'plan_benefit') {
-              if (!newData.tax) newData.tax = (newData.basePrice || 0) * 0.18;
+              if (!newData.tax) newData.tax = 0; // GST is not charged
               if (!newData.visitingCharges && !newData.visitationFee) newData.visitingCharges = 49;
             }
             return newData;
@@ -667,14 +667,14 @@ const BookingDetails = () => {
   });
 
   // Use bill.originalGST if available, else fallback to totalGST
-  const originalGST = bill ? (bill.originalGST || bill.totalGST || 0) : (originalBase * 0.18);
+  const originalGST = bill ? (bill.originalGST || bill.totalGST || 0) : (Number(booking?.tax) || 0);
   const totalGST = originalGST + extraServiceGST + partsGST;
 
   const serviceGstPercent = bill
-    ? (bill.payoutConfig?.serviceGstPercentage ?? bill.services?.[0]?.gstPercentage ?? 18)
+    ? (bill.payoutConfig?.serviceGstPercentage ?? bill.services?.[0]?.gstPercentage ?? 0)
     : 18;
   const partsGstPercent = bill
-    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 18)
+    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 0)
     : 18;
 
   // Final Total
@@ -1168,44 +1168,44 @@ const BookingDetails = () => {
             ].filter(p => p.src);
 
             return (
-            <section className="bg-white rounded-3xl p-6 shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-gray-100 space-y-4">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 uppercase tracking-wider">
-                <FiCamera className="text-teal-600" />
-                {isHandover ? 'Handover Evidence' : 'Equipment Trip Evidence'}
-              </h3>
+              <section className="bg-white rounded-3xl p-6 shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-gray-100 space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 uppercase tracking-wider">
+                  <FiCamera className="text-teal-600" />
+                  {isHandover ? 'Handover Evidence' : 'Equipment Trip Evidence'}
+                </h3>
 
-              <div className="grid grid-cols-2 gap-4">
-                {photos.map(({ src, label }) => (
-                  <div key={label} className="space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
-                    <div className="aspect-square rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 group relative">
-                      <img
-                        src={photoUrl(src)}
-                        alt={label}
-                        className="w-full h-full object-cover transition-transform group-hover:scale-110 cursor-pointer"
-                        onClick={() => window.open(photoUrl(src), '_blank')}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                        <span className="text-white text-[10px] font-bold">View Full</span>
+                <div className="grid grid-cols-2 gap-4">
+                  {photos.map(({ src, label }) => (
+                    <div key={label} className="space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
+                      <div className="aspect-square rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 group relative">
+                        <img
+                          src={photoUrl(src)}
+                          alt={label}
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110 cursor-pointer"
+                          onClick={() => window.open(photoUrl(src), '_blank')}
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                          <span className="text-white text-[10px] font-bold">View Full</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Trip Summary if both photos exist */}
-              {booking.start_kilometer_photo && booking.end_kilometer_photo && (
-                <div className="bg-teal-50 rounded-xl p-3 flex items-center gap-3">
-                  <FiCheckSquare className="text-teal-600 w-5 h-5 shrink-0" />
-                  <p className="text-[11px] font-medium text-teal-800">
-                    {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
-                      ? "The equipment's handover and return have been documented with photos. Please verify the condition."
-                      : "The equipment's usage has been verified via KM photos. You can raise a dispute if you notice any discrepancy."
-                    }
-                  </p>
+                  ))}
                 </div>
-              )}
-            </section>
+
+                {/* Trip Summary if both photos exist */}
+                {booking.start_kilometer_photo && booking.end_kilometer_photo && (
+                  <div className="bg-teal-50 rounded-xl p-3 flex items-center gap-3">
+                    <FiCheckSquare className="text-teal-600 w-5 h-5 shrink-0" />
+                    <p className="text-[11px] font-medium text-teal-800">
+                      {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
+                        ? "The equipment's handover and return have been documented with photos. Please verify the condition."
+                        : "The equipment's usage has been verified via KM photos. You can raise a dispute if you notice any discrepancy."
+                      }
+                    </p>
+                  </div>
+                )}
+              </section>
             );
           })()}
 
@@ -1630,22 +1630,6 @@ const BookingDetails = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center text-gray-600">
-                      <span>Convenience Fee</span>
-                      {booking.paymentMethod === 'plan_benefit' ? (
-                        <div className="flex items-center gap-2">
-                          <span className="line-through text-gray-400 text-xs">₹{(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}</span>
-                          <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">FREE ✓</span>
-                        </div>
-                      ) : (
-                        <span className={`font-medium ${(booking.visitingCharges || booking.visitationFee || 0) === 0 ? 'text-gray-400 font-normal italic' : 'text-gray-900'}`}>
-                          {(booking.visitingCharges || booking.visitationFee || 0) === 0
-                            ? 'Not Added'
-                            : `₹${(booking.visitingCharges || booking.visitationFee || 0).toLocaleString('en-IN')}`}
-                        </span>
-                      )}
-                    </div>
-
                     {booking.paymentMethod !== 'plan_benefit' && booking.discount > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-green-600">Discount</span>
@@ -1772,8 +1756,8 @@ const BookingDetails = () => {
               <span className="text-sm font-bold text-gray-700">Email Help</span>
             </button>
 
-            {/* Cancel */}
-            {!['cancelled', 'completed', 'work_done'].includes(booking.status?.toLowerCase()) && (
+            {/* Cancel - only until a vendor is assigned */}
+            {!(booking.vendorId || booking.workerId || booking.assignedTo) && !['cancelled', 'completed', 'work_done'].includes(booking.status?.toLowerCase()) && (
               <button
                 onClick={handleCancelBooking}
                 className="col-span-2 py-4 rounded-2xl text-red-600 font-bold text-sm bg-red-50 border border-red-100 hover:bg-red-100 transition-colors active:scale-95"

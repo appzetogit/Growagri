@@ -87,6 +87,15 @@ const sendOTP = async (req, res) => {
  */
 const verifyLogin = async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { phone, otp } = req.body;
 
     // 1. Verify OTP
@@ -183,7 +192,7 @@ const register = async (req, res) => {
       phone = verifiedPhone; // Trust the token's phone number
     } else {
       // Fallback to legacy OTP flow (if needed, but discouraged)
-      if (!req.body.otp) {
+      if (!req.body.otp || typeof phone !== 'string' || !/^\d{10}$/.test(phone)) {
         return res.status(400).json({ success: false, message: 'Verification token or OTP required.' });
       }
       const verification = await verifyOTP(phone, req.body.otp);
@@ -382,9 +391,14 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    // Verify refresh token
-    const decoded = verifyRefreshToken(refreshToken);
-    if (!decoded) {
+    // Verify refresh token (jwt.verify throws on a bad/expired token)
+    let decoded = null;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch (e) {
+      decoded = null;
+    }
+    if (!decoded || decoded.role !== USER_ROLES.USER) {
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired refresh token'

@@ -70,7 +70,7 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
     const data = {
       title: form.title,
       basePrice: Number(form.basePrice),
-      gstPercentage: Number(form.gstPercentage),
+      gstPercentage: 0, // GST is not charged on bookings
       discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
       pricing_context: form.pricing_context,
       parentSourceId: form.parentSourceId || null
@@ -147,7 +147,7 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
             {editingId ? 'Edit Equipment' : 'Add New Equipment'}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Equipment Title</label>
                 <input
@@ -164,16 +164,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
                   value={form.basePrice}
                   onChange={e => setForm(p => ({ ...p, basePrice: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">GST %</label>
-                <input
-                  type="number"
-                  value={form.gstPercentage}
-                  onChange={e => setForm(p => ({ ...p, gstPercentage: e.target.value }))}
-                  placeholder="18"
                   className="w-full px-3 py-2 border rounded-lg text-sm"
                 />
               </div>
@@ -236,7 +226,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Title</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Context</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Price</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">GST</th>
                 <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -259,7 +248,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 font-bold">₹{service.basePrice}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{service.gstPercentage}%</td>
                   <td className="px-4 py-3 text-right flex justify-end gap-2">
                     <button
                       onClick={() => handleEdit(service)}

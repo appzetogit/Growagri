@@ -4,9 +4,10 @@ const Vendor = require('../../models/Vendor');
 // Never sent to the browser
 const SECRET_FIELDS = '-razorpayKeySecret -razorpayWebhookSecret -cloudinaryApiSecret';
 
+// GST percentages are intentionally not updatable: GST is not charged on bookings
 const UPDATABLE_FIELDS = [
-  'visitedCharges', 'serviceGstPercentage', 'partsGstPercentage', 'servicePayoutPercentage', 'partsPayoutPercentage',
-  'rentalGstPercentage', 'rentalPayoutPercentage', 'tdsPercentage', 'platformFeePercentage', 'vendorCashLimit', 'minWithdrawalAmount',
+  'visitedCharges', 'servicePayoutPercentage', 'partsPayoutPercentage',
+  'rentalPayoutPercentage', 'tdsPercentage', 'platformFeePercentage', 'vendorCashLimit', 'minWithdrawalAmount',
   'cancellationPenalty', 'bookingCommissionPercentage',
   'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret', 'cloudinaryCloudName', 'cloudinaryApiKey', 'cloudinaryApiSecret',
   'companyName', 'companyGSTIN', 'companyPAN', 'companyAddress', 'companyCity', 'companyState', 'companyPincode',
@@ -68,16 +69,17 @@ exports.updateSettings = async (req, res, next) => {
 // Get Public Settings (Visited Charges, GST)
 exports.getPublicSettings = async (req, res, next) => {
   try {
-    let settings = await Settings.findOne({ type: 'global' }).select('visitedCharges serviceGstPercentage partsGstPercentage rentalGstPercentage supportEmail supportPhone supportWhatsapp cancellationPenalty bookingCommissionPercentage');
+    let settings = await Settings.findOne({ type: 'global' }).select('visitedCharges supportEmail supportPhone supportWhatsapp cancellationPenalty bookingCommissionPercentage').lean();
 
     // Default if not found (fallback values)
     if (!settings) {
-      settings = { visitedCharges: 29, serviceGstPercentage: 18, partsGstPercentage: 18, rentalGstPercentage: 5 };
+      settings = { visitedCharges: 29 };
     }
 
     res.status(200).json({
       success: true,
-      settings
+      // GST is not charged on bookings; 0 keeps older app builds from adding it
+      settings: { ...settings, serviceGstPercentage: 0, partsGstPercentage: 0, rentalGstPercentage: 0 }
     });
   } catch (error) {
     console.error('Error fetching public settings:', error);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   FiMapPin, FiTruck, FiCalendar, FiClock, 
@@ -7,6 +7,9 @@ import {
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { bookingService } from '../../../../services/bookingService';
+import { paymentService } from '../../../../services/paymentService';
+import { configService } from '../../../../services/configService';
+import { loadRazorpayScript } from '../../../../utils/razorpay';
 import AddressSelectionModal from '../Checkout/components/AddressSelectionModal';
 
 const MachineryCheckout = () => {
@@ -20,6 +23,14 @@ const MachineryCheckout = () => {
     const [paymentMethod, setPaymentMethod] = useState('cash'); // Defaulting to COD
     const [submitting, setSubmitting] = useState(false);
     const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState(false); // Payment confirmation modal
+    const [visitFee, setVisitFee] = useState(0);
+
+    // Same visit fee the server adds (no GST on bookings)
+    useEffect(() => {
+        configService.getSettings().then(res => {
+            if (res?.success) setVisitFee(Number(res.settings?.visitedCharges) || 0);
+        });
+    }, []);
 
     if (!equipment || !bookingData) {
         return (
@@ -31,7 +42,42 @@ const MachineryCheckout = () => {
         );
     }
 
-    const { rateType, quantity, date, slot, total } = bookingData;
+    const { rateType, quantity, date, slot, slotStart, slotEnd, total } = bookingData;
+    const payable = (Number(total) || 0) + (Number(total) > 0 ? visitFee : 0);
+
+    // Online: pay the held booking; it only becomes a real booking once the payment is verified
+    const payOnline = async (bookingId, order) => {
+        if (!(await loadRazorpayScript())) throw new Error('Unable to load payment gateway. Please check your internet connection.');
+        const orderData = order || (await paymentService.createOrder(bookingId))?.data;
+        if (!orderData?.orderId) throw new Error('Could not start the payment. Please try again.');
+
+        return new Promise((resolve, reject) => {
+            const rzp = new window.Razorpay({
+                key: orderData.key,
+                amount: Math.round(orderData.amount * 100),
+                currency: orderData.currency || 'INR',
+                name: 'GrooAgri',
+                description: `${equipment.name} rental`,
+                order_id: orderData.orderId,
+                theme: { color: '#7c3aed' },
+                handler: async (response) => {
+                    try {
+                        const verify = await paymentService.verifyPayment({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        });
+                        verify?.success ? resolve() : reject(new Error(verify?.message || 'Payment verification failed'));
+                    } catch (err) {
+                        reject(new Error(err.response?.data?.message || 'Payment verification failed'));
+                    }
+                },
+                modal: { ondismiss: () => reject(new Error('Payment cancelled. Your booking was not placed.')) }
+            });
+            rzp.on('payment.failed', (resp) => reject(new Error(resp?.error?.description || 'Payment failed')));
+            rzp.open();
+        });
+    };
 
     const handleConfirmBooking = async () => {
         if (!selectedAddress) {
@@ -44,7 +90,7 @@ const MachineryCheckout = () => {
             setSubmitting(true);
             const payload = {
                 serviceId: equipment._id,
-                vendorId: equipment.vendorId?._id || equipment.vendorId,
+                isDirectVendorBooking: true, // this exact machine, with its owner
                 categoryId: equipment.categoryId?._id || equipment.categoryId,
                 bookingType: date ? 'scheduled' : 'instant',
                 rental_type: rateType,
@@ -52,7 +98,7 @@ const MachineryCheckout = () => {
                 estimatedDuration: rateType !== 'land_based' ? quantity : undefined,
                 scheduledDate: date,
                 scheduledTime: slot,
-                timeSlot: { start: slot, end: slot, date, time: slot },
+                timeSlot: { start: slotStart || slot, end: slotEnd || slot, date, time: slot },
                 address: {
                     addressLine1: selectedAddress.addressLine1,
                     addressLine2: selectedAddress.addressLine2 || '',
@@ -63,8 +109,7 @@ const MachineryCheckout = () => {
                     lng: selectedAddress.lng
                 },
                 paymentMethod,
-                amount: total,
-                basePrice: total,
+                // Price is computed by the server from the machine's rates
                 // Selected implements (sub-categories like Rotavator, Cultivator etc.)
                 selectedImplements: selectedImplements.map(impl => ({
                     subCategoryId: impl.subCategoryId,
@@ -87,11 +132,14 @@ const MachineryCheckout = () => {
 
             const res = await bookingService.create(payload);
             if (res.success) {
+                if (paymentMethod === 'online' && res.data?.status === 'awaiting_payment') {
+                    await payOnline(res.data._id, res.razorpayOrder);
+                }
                 toast.success('Booking Successful!');
                 navigate('/user/my-bookings');
             }
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Booking failed');
+            toast.error(err.response?.data?.message || err.message || 'Booking failed');
         } finally {
             setSubmitting(false);
         }
@@ -214,7 +262,7 @@ const MachineryCheckout = () => {
                 <div className="max-w-xl mx-auto flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Final Amount</p>
-                        <h4 className="text-2xl font-black text-slate-800 leading-none">₹{total}</h4>
+                        <h4 className="text-2xl font-black text-slate-800 leading-none">₹{payable}</h4>
                     </div>
                     <button
                         onClick={() => setShowPaymentConfirmModal(true)}
@@ -271,7 +319,7 @@ const MachineryCheckout = () => {
                     <div className="rounded-2xl px-5 py-4 mb-5 flex items-center justify-between bg-slate-50 border border-slate-200">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Amount</p>
-                        <p className="text-2xl font-black text-slate-800">₹{total}</p>
+                        <p className="text-2xl font-black text-slate-800">₹{payable}</p>
                       </div>
                       <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-800">
                         <FiTruck className="w-6 h-6 text-white" />
@@ -356,8 +404,8 @@ const MachineryCheckout = () => {
                       }}
                     >
                       {submitting ? 'Processing...' : paymentMethod === 'online'
-                        ? `✦ Proceed to Pay ₹${total}`
-                        : `✦ Confirm Rental (Cash) ₹${total}`}
+                        ? `✦ Proceed to Pay ₹${payable}`
+                        : `✦ Confirm Rental (Cash) ₹${payable}`}
                     </button>
 
                     <p className="text-center text-[10px] text-slate-400 font-medium mt-3">

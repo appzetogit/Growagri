@@ -7,7 +7,7 @@ export const configService = {
       return response.data;
     } catch (error) {
       console.error('Error getting public settings', error);
-      return { success: false, settings: { visitedCharges: 29, serviceGstPercentage: 18, partsGstPercentage: 18 } };
+      return { success: false, settings: { visitedCharges: 29, serviceGstPercentage: 0, partsGstPercentage: 0, rentalGstPercentage: 0 } };
     }
   }
 };

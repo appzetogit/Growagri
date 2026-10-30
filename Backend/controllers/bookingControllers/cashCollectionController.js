@@ -389,7 +389,14 @@ exports.customerConfirmPayment = async (req, res) => {
 exports.getCashCollectionStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Booking.findById(id).select('cashCollected cashCollectedAt cashCollectedBy paymentStatus');
+    // Only a party to the booking (customer, assigned vendor/worker) or an admin
+    const partyField = { USER: 'userId', VENDOR: 'vendorId', WORKER: 'workerId' }[req.userRole];
+    const isAdmin = ['ADMIN', 'admin', 'super_admin'].includes(req.userRole);
+    if (!partyField && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const booking = await Booking.findOne({ _id: id, ...(isAdmin ? {} : { [partyField]: req.user._id }) })
+      .select('cashCollected cashCollectedAt cashCollectedBy paymentStatus');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });

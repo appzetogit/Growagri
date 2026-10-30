@@ -15,6 +15,15 @@ const { BOOKING_STATUS, PAYMENT_STATUS } = require('../../utils/constants');
 const { dispatchWave1 } = require('../../services/bookingDispatchService');
 const { createNotification } = require('../notificationControllers/notificationController');
 const { sendNotificationToUser, sendNotificationToVendor, sendNotificationToWorker } = require('../../services/firebaseAdmin');
+const { priceBooking } = require('../../services/bookingPricing');
+const { istDayKey, toMinutes, slotStartInstant, findEquipmentConflict } = require('../../services/bookingSlotService');
+
+const RENTAL_TYPES = ['hourly', 'minute', 'acre', 'bigha', 'land_based', 'monthly', 'daily'];
+const BOOKING_PAYMENT_METHODS = ['online', 'pay_at_home', 'cash', 'plan_benefit'];
+const MAX_ADVANCE_DAYS = 90;
+const SLOT_GRACE_MS = 15 * 60 * 1000; // a slot can still be booked up to 15 min after it starts
+// Once work has started the booking can't be cancelled (or refunded) by the user
+const NON_CANCELLABLE = [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.REJECTED, BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE];
 
 /**
  * Create a new booking
@@ -33,27 +42,18 @@ const createBooking = async (req, res) => {
     const userId = req.user.id;
     let {
       serviceId,
-      vendorId,
       address,
       scheduledDate,
       scheduledTime,
       timeSlot,
-      userNotes,
       paymentMethod,
-      amount,
-      isPlusAdded,
       bookedItems, // Array of specific items from cart
-      visitingCharges: reqVisitingCharges,
-      visitationFee: reqVisitationFee, // Backward compatibility
-      basePrice: reqBasePrice,
-      discount: reqDiscount,
-      tax: reqTax,
       // Metadata from frontend
       serviceCategory: reqServiceCategory,
       categoryIcon: reqCategoryIcon,
       brandName: reqBrandName,
       brandIcon: reqBrandIcon,
-      bookingType, // Extract bookingType
+      bookingType,
       rental_type,  // Agriculture: extract rental_type
       cropType,     // Agriculture: extract cropType
       chemicalUsed, // Agriculture: chemical to spray
@@ -62,35 +62,47 @@ const createBooking = async (req, res) => {
       estimatedDuration, // Agriculture: extract hours
       selectedImplements // MACHINERY: attachments chosen by user
     } = req.body;
+    // NOTE: amount / basePrice / discount / tax / visitingCharges sent by the app are ignored;
+    // the price is always computed on the server (services/bookingPricing.js).
 
-    let visitingCharges = reqVisitingCharges !== undefined ? reqVisitingCharges : (reqVisitationFee || 0);
-
-    // Calculate total value from booked items or fallback to base (Move to top)
-    let totalServiceValue = 0;
-    if (bookedItems && bookedItems.length > 0) {
-      totalServiceValue = bookedItems.reduce((sum, item) => {
-        const itemPrice = item.card?.price || item.price || 0;
-        return sum + (itemPrice * (item.quantity || 1));
-      }, 0);
+    if (rental_type && !RENTAL_TYPES.includes(rental_type)) {
+      return res.status(400).json({ success: false, message: 'Invalid rental type' });
     }
-    // Note: Fallback to service.basePrice is done later if totalServiceValue is 0 AND service is loaded.
-    // But we need 'service' to define fallback.
-    // 'service' is loaded at line 46.
-    // So we must calculate it AFTER loading service but BEFORE usage.
-    // Usage is at line 98. Service loaded at 46.
-    // So distinct placement: AFTER line 52.
+    if (bookedItems !== undefined && !Array.isArray(bookedItems)) {
+      return res.status(400).json({ success: false, message: 'Invalid booked items' });
+    }
 
     // Handle serviceId if it's an object (from populated cart data)
-    if (typeof serviceId === 'object' && serviceId._id) {
+    if (serviceId && typeof serviceId === 'object' && serviceId._id) {
       serviceId = serviceId._id;
     }
 
+    // ── Slot validation (dates/times are farm-local IST) ──
+    const isInstant = bookingType === 'instant';
+    const todayKey = istDayKey(new Date());
+    const dayKey = istDayKey(scheduledDate);
+    if (!dayKey || dayKey < todayKey) {
+      return res.status(400).json({ success: false, message: 'Please choose today or a future date for your booking.' });
+    }
+    if (dayKey > istDayKey(new Date(Date.now() + MAX_ADVANCE_DAYS * 86400000))) {
+      return res.status(400).json({ success: false, message: `Bookings can be made up to ${MAX_ADVANCE_DAYS} days in advance.` });
+    }
+    if (!isInstant && toMinutes(timeSlot?.start) !== null) {
+      const slotStart = slotStartInstant(scheduledDate, timeSlot.start);
+      if (slotStart.getTime() < Date.now() - SLOT_GRACE_MS) {
+        return res.status(400).json({ success: false, message: 'This time slot has already passed. Please pick a later slot.' });
+      }
+    }
+    if (endDate && (isNaN(new Date(endDate).getTime()) || istDayKey(endDate) < dayKey)) {
+      return res.status(400).json({ success: false, message: 'End date must be on or after the start date.' });
+    }
+
     // Verify service exists (Service collection, or VendorEquipment / Product machinery fallback)
-    let service = await Service.findById(serviceId);
+    let service = mongoose.isValidObjectId(serviceId) ? await Service.findById(serviceId) : null;
     let isVendorEquipmentBooking = false;
     let vendorEquipmentDoc = null;
 
-    if (!service) {
+    if (!service && mongoose.isValidObjectId(serviceId)) {
       const VendorEquipment = require('../../models/VendorEquipment');
       vendorEquipmentDoc = await VendorEquipment.findById(serviceId).populate('vendorId').populate('categoryId');
       if (vendorEquipmentDoc) {
@@ -101,37 +113,25 @@ const createBooking = async (req, res) => {
             message: 'This equipment is currently not available for booking.'
           });
         }
-        // Owner blocked by admin: no new bookings for them
-        if (req.body.isDirectVendorBooking && vendorEquipmentDoc.vendorId?.wallet?.isBlocked) {
+        // A specific machine is booked with its owner, so the owner must be able to take jobs
+        const owner = vendorEquipmentDoc.vendorId;
+        if (!owner || owner.approvalStatus !== 'approved' || owner.isActive === false || owner.wallet?.isBlocked) {
           return res.status(400).json({
             success: false,
             message: 'This owner is not taking bookings right now. Please choose another equipment.'
           });
         }
         isVendorEquipmentBooking = true;
-        const getRate = (p) => {
-          if (!p || p.isEnabled === false) return 0;
-          return Number(p.price) || 0;
-        };
-        const hRate = getRate(vendorEquipmentDoc.pricing?.hourly);
-        const lRate = getRate(vendorEquipmentDoc.pricing?.land_based);
-        const dRate = getRate(vendorEquipmentDoc.pricing?.daily);
-        const bRate = hRate || lRate || dRate || 500;
 
         service = {
           _id: vendorEquipmentDoc._id,
           title: vendorEquipmentDoc.name,
           category: vendorEquipmentDoc.categoryId?.title || vendorEquipmentDoc.requestedCategoryName || 'Agriculture',
           categoryId: vendorEquipmentDoc.categoryId?._id || vendorEquipmentDoc.categoryId,
-          basePrice: bRate,
-          hourly_price: hRate,
-          land_price: lRate,
-          land_unit: 'bigha',
-          daily_price: dRate,
           iconUrl: (vendorEquipmentDoc.images && vendorEquipmentDoc.images.length > 0) ? vendorEquipmentDoc.images[0] : '',
           images: vendorEquipmentDoc.images || [],
           rental_type: rental_type || 'hourly',
-          vendorId: vendorEquipmentDoc.vendorId?._id || vendorEquipmentDoc.vendorId,
+          vendorId: owner._id,
           isVendorEquipment: true
         };
       } else {
@@ -143,11 +143,6 @@ const createBooking = async (req, res) => {
             title: prodDoc.title,
             category: prodDoc.categoryId?.title || 'Agriculture',
             categoryId: prodDoc.categoryId?._id || prodDoc.categoryId,
-            basePrice: prodDoc.price || 500,
-            hourly_price: prodDoc.unit === 'hour' ? prodDoc.price : 0,
-            land_price: (prodDoc.unit === 'acre' || prodDoc.unit === 'bigha') ? prodDoc.price : 0,
-            land_unit: prodDoc.unit === 'bigha' ? 'bigha' : 'acre',
-            daily_price: prodDoc.unit === 'day' ? prodDoc.price : 0,
             iconUrl: prodDoc.imageUrl || (prodDoc.images && prodDoc.images[0]) || '',
             images: prodDoc.images || (prodDoc.imageUrl ? [prodDoc.imageUrl] : []),
             rental_type: rental_type || 'hourly',
@@ -157,21 +152,11 @@ const createBooking = async (req, res) => {
           // Fallback to Category collection (when services/equipment are listed under categories)
           const catDoc = await Category.findById(serviceId);
           if (catDoc) {
-            const hRate = catDoc.hourlyPrice || 0;
-            const lRate = catDoc.landPrice || 0;
-            const dRate = catDoc.dailyPrice || 0;
-            const bRate = hRate || lRate || dRate || catDoc.price || 500;
-
             service = {
               _id: catDoc._id,
               title: catDoc.title,
               category: catDoc.title,
               categoryId: catDoc._id,
-              basePrice: bRate,
-              hourly_price: hRate,
-              land_price: lRate,
-              land_unit: catDoc.landUnit || 'acre',
-              daily_price: dRate,
               iconUrl: catDoc.homeIconUrl || catDoc.imageUrl || '',
               images: catDoc.imageUrl ? [catDoc.imageUrl] : [],
               rental_type: rental_type || 'hourly',
@@ -182,20 +167,15 @@ const createBooking = async (req, res) => {
       }
     }
 
-    // Safety fallback: if not found in collections, synthesize from bookedItems or request metadata
-    if (!service && (reqServiceCategory || (Array.isArray(bookedItems) && bookedItems.length > 0))) {
-      const fallbackItem = (Array.isArray(bookedItems) && bookedItems.length > 0) ? bookedItems[0] : null;
-      const bPrice = fallbackItem?.price || fallbackItem?.unitPrice || 500;
+    // Booking several cart items whose main id isn't a catalog entry: describe it from the first item
+    // (each item is still priced from its own catalog entry below)
+    if (!service && Array.isArray(bookedItems) && bookedItems.length > 0) {
+      const fallbackItem = bookedItems[0];
       service = {
         _id: serviceId,
-        title: fallbackItem?.title || reqServiceCategory || 'Agricultural Service',
+        title: fallbackItem?.card?.title || fallbackItem?.title || reqServiceCategory || 'Agricultural Service',
         category: reqServiceCategory || fallbackItem?.category || 'Agriculture',
-        categoryId: serviceId,
-        basePrice: bPrice,
-        hourly_price: fallbackItem?.hourly_price || bPrice,
-        land_price: fallbackItem?.land_price || 0,
-        land_unit: fallbackItem?.land_unit || 'acre',
-        daily_price: fallbackItem?.daily_price || 0,
+        categoryId: mongoose.isValidObjectId(serviceId) ? serviceId : null,
         iconUrl: reqCategoryIcon || fallbackItem?.icon || '',
         images: [],
         rental_type: rental_type || 'hourly',
@@ -210,80 +190,27 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // Get category for the service FIRST (needed for Agri check)
+    // Get category for the service
     const categoryId = service.categoryId || service.categoryIds?.[0];
-    const category = categoryId ? await Category.findById(categoryId) : null;
+    const category = categoryId && mongoose.isValidObjectId(categoryId) ? await Category.findById(categoryId) : null;
 
-    // Calculate total value from booked items or fallback to service base price immediately after service load
-    const isAgriService = service.category === 'Agriculture' || (category && category.title === 'Agriculture') || reqServiceCategory === 'Agriculture' || isVendorEquipmentBooking || service.isCategoryService || service.isVirtualService;
-
-    if (isAgriService) {
-      // ── Agriculture Dynamic Multiplier Logic ──
-      let multiplier = 1;
-      if (rental_type === 'minute') {
-        multiplier = parseFloat(estimatedDuration) || 1;
-      } else if (rental_type === 'hourly') {
-        multiplier = parseFloat(estimatedDuration) || 1;
-      } else if (rental_type === 'acre' || rental_type === 'bigha' || rental_type === 'land_based') {
-        multiplier = parseFloat(String(landSize).replace(/[^\d.]/g, '')) || 1;
-      } else if (rental_type === 'daily' || rental_type === 'monthly') {
-        multiplier = parseFloat(estimatedDuration) || 1;
-      }
-
-      // Determine correct unit rate from service model
-      let unitRate = service.basePrice || 500;
-      if (rental_type === 'minute' && (service.minute_price || category?.minutePrice)) unitRate = service.minute_price || category.minutePrice;
-      else if (rental_type === 'hourly' && (service.hourly_price || category?.hourlyPrice)) unitRate = service.hourly_price || category.hourlyPrice;
-      else if (rental_type === 'acre' && (service.acre_price || category?.acrePrice || service.land_price)) unitRate = service.acre_price || category?.acrePrice || service.land_price;
-      else if (rental_type === 'bigha' && (service.bigha_price || category?.bighaPrice)) unitRate = service.bigha_price || category?.bighaPrice;
-      else if (rental_type === 'land_based' && service.land_price) unitRate = service.land_price;
-      else if ((rental_type === 'daily' || rental_type === 'monthly') && service.daily_price) unitRate = service.daily_price;
-      else if (service.basePrice) unitRate = service.basePrice;
-
-      let finalMultiplier = multiplier;
-      if (rental_type === 'monthly') finalMultiplier = multiplier * 30;
-
-      const mainAgriPrice = Math.round(unitRate * finalMultiplier);
-      
-      // Update the price of the main service in bookedItems to reflect the calculated Agri price
-      // This ensures the items list and basePrice are consistent.
-      if (Array.isArray(bookedItems) && bookedItems.length > 0) {
-        let mainItemHandled = false;
-        bookedItems.forEach(item => {
-          const itemTitle = item.card?.title || item.title;
-          if (itemTitle === service.title && !mainItemHandled) {
-            // Update this item's price with the calculated agri price
-            if (item.card) item.card.price = mainAgriPrice;
-            else item.price = mainAgriPrice;
-            item.quantity = 1; // mainAgriPrice already includes the hours/acres/days multiplier
-            mainItemHandled = true;
-          }
-        });
-
-        // Recalculate totalServiceValue from the updated items
-        totalServiceValue = bookedItems.reduce((sum, item) => {
-          const itemPrice = item.card?.price || item.price || 0;
-          return sum + (itemPrice * (item.quantity || 1));
-        }, 0);
-      } else {
-        totalServiceValue = mainAgriPrice;
-      }
-      
-      // --- ADD IMPLEMENT PRICING ---
-      if (Array.isArray(selectedImplements) && selectedImplements.length > 0) {
-        selectedImplements.forEach(impl => {
-          const implPriceObj = impl.pricing?.[rental_type];
-          if (implPriceObj && implPriceObj.isEnabled) {
-            const implRate = implPriceObj.price || 0;
-            totalServiceValue += Math.round(implRate * finalMultiplier);
-          }
+    // A specific machine can only be in one place per slot
+    if (isVendorEquipmentBooking) {
+      const conflict = await findEquipmentConflict({
+        equipmentId: vendorEquipmentDoc._id,
+        scheduledDate,
+        endDate,
+        timeSlot
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          slotUnavailable: true,
+          message: conflict.maintenance
+            ? `This equipment is under maintenance (${conflict.maintenance.reason || 'scheduled service'}) on the selected date. Please pick another date.`
+            : 'This equipment is already booked for the selected slot. Please pick another slot.'
         });
       }
-      
-      console.log(`[AgriPricing] unitRate=${unitRate}, multiplier=${multiplier}, totalServiceValue=${totalServiceValue}`);
-    } else if (totalServiceValue === 0) { 
-      // Standard services
-      totalServiceValue = service.basePrice || 500;
     }
 
     // Verify user exists
@@ -295,224 +222,86 @@ const createBooking = async (req, res) => {
       });
     }
 
+    // Expired plan: mark it inactive (pricing below already ignores it)
+    if (user.plans?.isActive && user.plans.expiry && new Date() > new Date(user.plans.expiry)) {
+      user.plans.isActive = false;
+      await user.save();
+    }
+
+    // ── Price (server is the only source of truth) ──
+    let price;
+    try {
+      price = await priceBooking({
+        serviceId,
+        bookedItems,
+        selectedImplements,
+        rentalType: rental_type,
+        estimatedDuration,
+        landSize,
+        user
+      });
+    } catch (priceError) {
+      if (priceError.status) {
+        return res.status(priceError.status).json({ success: false, message: priceError.message });
+      }
+      throw priceError;
+    }
+
     // Check for Pending Penalty
     const pendingPenalty = user.wallet?.penalty || 0;
+    const finalAmount = price.finalAmount + pendingPenalty;
 
-    // Don't assign vendor initially - send to nearby vendors instead
-    // Vendor will be assigned when a vendor accepts the booking
+    // Payment method: a fully plan-covered booking is 'plan_benefit'; nothing else can claim it
+    if (!BOOKING_PAYMENT_METHODS.includes(paymentMethod)) paymentMethod = 'pay_at_home';
+    if (finalAmount === 0) paymentMethod = 'plan_benefit';
+    else if (paymentMethod === 'plan_benefit') paymentMethod = 'pay_at_home';
 
-    // --- MOVE VENDOR SEARCH UP HERE ---
-    // Find nearby vendors using location service
-    const { findNearbyVendors, geocodeAddress } = require('../../services/locationService');
-
-    // ... (Vendor Search Logic Omitted/Unchanged - keeping context)
-    // Determine booking location (prioritize frontend coordinates)
-    let bookingLocation;
-    if (address.lat && address.lng) {
-      bookingLocation = { lat: address.lat, lng: address.lng };
-      console.log('Using provided coordinates for vendor search:', bookingLocation);
-    } else {
-      bookingLocation = await geocodeAddress(
-        `${address.addressLine1}, ${address.city}, ${address.state} ${address.pincode}`
-      );
-      console.log('Geocoded address for vendor search:', bookingLocation);
-    }
-
-    // Find vendors within dynamic radius (2km -> 5km -> 8km -> 10km -> 15km -> 20km -> 30km)
-    // CUSTOM - Check Cash Limit only if payment method is CASH
-    const vendorFilters = {
-      ...(category ? { service: category.title, categoryId: category._id } : (service?.category ? { service: service.category } : {})),
-      ...(service?.categoryId && !category ? { categoryId: service.categoryId } : {}),
-      checkCashLimit: ['cash', 'pay_at_home'].includes(paymentMethod)
-    };
-
-    let nearbyVendors = [];
-    let usedRadius = 2;
-    const searchRadii = [2, 5, 8, 10, 15, 20, 30];
-
-    for (const radius of searchRadii) {
-      usedRadius = radius;
-      nearbyVendors = await findNearbyVendors(bookingLocation, radius, vendorFilters);
-      
-      // We allow isOnline to be false so that we can send FCM background pushes to wake them up.
-      nearbyVendors = nearbyVendors.filter(v => v.availability === 'AVAILABLE' || v.availability === 'OFFLINE');
-
-      if (nearbyVendors && nearbyVendors.length > 0) {
-        break; // Stop expanding radius if we found available vendors
-      }
-    }
-
-    // Deduplicate nearbyVendors by _id to prevent duplicate notifications
-    const uniqueVendorIds = new Set();
-    nearbyVendors = nearbyVendors.filter(vendor => {
-      const idStr = vendor._id.toString();
-      if (uniqueVendorIds.has(idStr)) return false;
-      uniqueVendorIds.add(idStr);
-      return true;
-    });
-
-    console.log(`[CreateBooking] Found ${nearbyVendors.length} ONLINE nearby vendors for booking within ${usedRadius}km`);
-    // --- END VENDOR SEARCH BLOCK ---
-
-    // Calculate pricing - use amount from frontend if provided, otherwise calculate
-    let basePrice, discount, tax, finalAmount;
-    let bookingStatus = BOOKING_STATUS.SEARCHING;
-    let bookingPaymentStatus = PAYMENT_STATUS.PENDING;
-
-    // -------------------------------------------------------------------------
-    // PRICING CALCULATION LOGIC
-    // -------------------------------------------------------------------------
-
-    // 1. Determine if we can use Plan Benefits
-    let usePlanBenefits = false;
-    if (paymentMethod === 'plan_benefit') {
-      if (user.plans && user.plans.isActive) {
-        if (user.plans.expiry && new Date() > new Date(user.plans.expiry)) {
-          // Plan expired - update status and FALLBACK to normal
-          console.log(`[CreateBooking] Plan expired for user ${userId}. Falling back to normal booking.`);
-          user.plans.isActive = false;
-          await user.save();
-          paymentMethod = 'pay_at_home'; // Fallback to Pay at Home
-        } else {
-          usePlanBenefits = true;
-        }
-      } else {
-        // No active plan or invalid status - Fallback
-        paymentMethod = 'pay_at_home';
-      }
-    }
-
-    // 2. Logic Branch: Plan Benefit vs Standard
-    if (usePlanBenefits) {
-      // Prioritize planId if available
-      let userPlan = null;
-      if (user.plans.planId) {
-          userPlan = await Plan.findById(user.plans.planId);
-      }
-      if (!userPlan && user.plans.name) {
-          userPlan = await Plan.findOne({ name: user.plans.name });
-      }
-
-      if (!userPlan) {
-        // Fallback if data missing
-        usePlanBenefits = false;
-        paymentMethod = 'pay_at_home';
-      } else {
-        // --- IMPROVED PLAN LOGIC: PERCENTAGE DISCOUNTS & FREE DELIVERY & FREE SERVICES ---
-
-        // Helper to normalize ObjectIds for comparison
-        const normalizeId = (id) => {
-            if (!id) return null;
-            if (typeof id === 'string') return id;
-            if (id.toString) return id.toString();
-            return String(id);
-        };
-
-        const serviceIdStr = normalizeId(service._id);
-        const categoryIdStr = normalizeId(category?._id || categoryId);
-        
-        let isFreeBrand = false;
-        if (service.brandId) {
-            isFreeBrand = userPlan.freeBrands?.some(id => normalizeId(id) === normalizeId(service.brandId));
-        }
-
-        const isFreeService = userPlan.freeServices?.some(id => normalizeId(id) === serviceIdStr);
-        const isFreeCategory = userPlan.freeCategories?.some(id => normalizeId(id) === categoryIdStr);
-
-        // 1. Check if the core service itself is 100% Free
-        if (isFreeService || isFreeCategory || isFreeBrand) {
-            totalServiceValue = 0;
-            basePrice = 0;
-        }        
-        // 2. Equipment Rental Discount
-        const isRental = !!(rental_type || service.rental_type);
-        const rentalDiscount = isRental ? (userPlan.rentalDiscountPercentage || 0) : 0;
-
-        // 3. Marketplace Product Discount
-        let totalProductDiscount = 0;
-        if (bookedItems && bookedItems.length > 0 && userPlan.marketplaceDiscountPercentage > 0) {
-          bookedItems.forEach(item => {
-            if (item.type === 'product' || item.category === 'Marketplace') {
-              const itemPrice = item.card?.price || item.price || 0;
-              const itemTotal = itemPrice * (item.quantity || 1);
-              totalProductDiscount += (itemTotal * (userPlan.marketplaceDiscountPercentage / 100));
-            }
-          });
-        }
-
-        // 4. Apply calculated discounts
-        if (basePrice !== 0) {
-             basePrice = totalServiceValue > 0 ? totalServiceValue : (service.basePrice || 500);
-        }
-
-        const rentalDiscountAmount = (basePrice * (rentalDiscount / 100));
-        discount = Math.round(rentalDiscountAmount + totalProductDiscount);
-
-        // 5. Free Transport/Delivery Check
-        visitingCharges = (reqVisitingCharges !== undefined) ? reqVisitingCharges : (visitingCharges !== undefined ? visitingCharges : 49);
-        if (userPlan.freeTransport) {
-            visitingCharges = 0; // Waive transport fee
-        }
-
-        tax = Math.round((basePrice - discount) * 0.18);
-        finalAmount = (basePrice - discount + tax + visitingCharges) + pendingPenalty;
-
-        bookingStatus = BOOKING_STATUS.SEARCHING;
-        bookingPaymentStatus = PAYMENT_STATUS.PENDING;
-
-        console.log(`[PlanBenefit] Applied ${rentalDiscount}% Rental Disc and ₹${totalProductDiscount} Product Disc, Free Transport: ${userPlan.freeTransport}`);
-      }
-    }
-
-    // 3. Standard Pricing (Fallback) if NOT using Plan Benefits
-    if (!usePlanBenefits) {
-      if (amount && amount > 0) {
-        // Use amount from frontend logic
-        if (reqBasePrice !== undefined && reqTax !== undefined) {
-          // Use breakdown provided by frontend
-          visitingCharges = (reqVisitingCharges !== undefined) ? reqVisitingCharges : (visitingCharges !== undefined ? visitingCharges : 49);
-          discount = reqDiscount || 0;
-          tax = reqTax || 0;
-          
-          if (isAgriService) {
-             // For Agri, trust the server-side recalculated totalServiceValue but allow 
-             // frontend to pass the breakdown if it matches our logic.
-             // If frontend total is very different, we prioritize server logic for security.
-             basePrice = totalServiceValue;
-          } else {
-             basePrice = reqBasePrice;
-          }
-
-          finalAmount = (basePrice - discount + tax + visitingCharges) + pendingPenalty;
-        } else {
-          // Backward compatibility: Reverse calculate
-          if (visitingCharges === undefined || visitingCharges === null) visitingCharges = 49;
-          
-          if (isAgriService) {
-            basePrice = totalServiceValue;
-            tax = Math.round(basePrice * 0.18);
-            finalAmount = basePrice + tax + visitingCharges + pendingPenalty;
-          } else {
-            basePrice = Math.round((amount - visitingCharges) / 1.18);
-            tax = amount - basePrice - visitingCharges;
-            finalAmount = amount + pendingPenalty;
-          }
-          discount = 0;
-        }
-      } else {
-        // Fallback to service pricing (if no amount sent)
-        if (visitingCharges === undefined || visitingCharges === null) visitingCharges = 49;
-        basePrice = service.basePrice || 500;
-        discount = service.discountPrice ? (basePrice - service.discountPrice) : 0;
-        tax = Math.round(basePrice * 0.18);
-        finalAmount = (basePrice - discount + tax + visitingCharges) + pendingPenalty;
-      }
-    }
-
-    // NOTE: vendor earnings are NOT calculated at booking creation.
-    // They are computed ONLY at bill generation (completeSelfJob) and stored in VendorBill.
-    // This prevents inconsistency between Booking and VendorBill.
     console.log(`[CreateBooking] Payment=${paymentMethod}, FinalAmount=${finalAmount}, Penalty=${pendingPenalty}`);
+
+    // ── Who gets the request ──
+    let nearbyVendors = [];
+    let usedRadius = 0;
+    const { findNearbyVendors, geocodeAddress } = require('../../services/locationService');
+    const bookingLocation = (address.lat && address.lng)
+      ? { lat: address.lat, lng: address.lng }
+      : await geocodeAddress(`${address.addressLine1}, ${address.city}, ${address.state} ${address.pincode}`);
+
+    if (isVendorEquipmentBooking) {
+      // Direct machine booking: only the machine's owner is asked
+      nearbyVendors = [{ _id: vendorEquipmentDoc.vendorId._id, distance: 0 }];
+    } else {
+      // Find vendors within dynamic radius (2km -> 5km -> 8km -> 10km -> 15km -> 20km -> 30km)
+      // CUSTOM - Check Cash Limit only if payment method is CASH
+      const vendorFilters = {
+        ...(category ? { service: category.title, categoryId: category._id } : (service?.category ? { service: service.category } : {})),
+        ...(service?.categoryId && !category ? { categoryId: service.categoryId } : {}),
+        checkCashLimit: ['cash', 'pay_at_home'].includes(paymentMethod)
+      };
+
+      const searchRadii = [2, 5, 8, 10, 15, 20, 30];
+      for (const radius of searchRadii) {
+        usedRadius = radius;
+        nearbyVendors = await findNearbyVendors(bookingLocation, radius, vendorFilters);
+
+        // Offline vendors still get FCM pushes to wake them up. ON_JOB vendors can take other slots
+        // (machine clashes are checked when they accept); only vendors who set themselves BUSY are skipped.
+        nearbyVendors = nearbyVendors.filter(v => v.availability !== 'BUSY');
+
+        if (nearbyVendors && nearbyVendors.length > 0) {
+          break; // Stop expanding radius if we found available vendors
+        }
+      }
+
+      // Deduplicate nearbyVendors by _id to prevent duplicate notifications
+      const uniqueVendorIds = new Set();
+      nearbyVendors = nearbyVendors.filter(vendor => {
+        const idStr = vendor._id.toString();
+        if (uniqueVendorIds.has(idStr)) return false;
+        uniqueVendorIds.add(idStr);
+        return true;
+      });
+      console.log(`[CreateBooking] Found ${nearbyVendors.length} nearby vendors for booking within ${usedRadius}km`);
+    }
 
     // Clear penalty from user wallet if we charged it
     if (pendingPenalty > 0) {
@@ -520,40 +309,21 @@ const createBooking = async (req, res) => {
       await user.save();
     }
 
-    // Ensure minimum amount for Razorpay (₹1) for paid bookings
-    if (isNaN(finalAmount) || finalAmount < 1) {
-      if (paymentMethod !== 'plan_benefit') {
-        finalAmount = 1;
-      } else {
-        finalAmount = 0;
-      }
-    }
-    
-    // Ensure numeric fields are valid
-    basePrice = Number(basePrice) || 0;
-    discount = Number(discount) || 0;
-    tax = Number(tax) || 0;
-    visitingCharges = Number(visitingCharges) || 0;
-    finalAmount = Number(finalAmount) || 0;
-
-    // Create booking (bookingNumber BKGA### is assigned by the Booking model)
-
     // Improve Category Fetching if ID is missing (Fallback to title match)
     let finalCategory = category;
     if (!finalCategory && service.category) {
-      // Try finding by name if ID lookup failed
       finalCategory = await Category.findOne({ title: service.category });
     }
 
-    // Map booked items to new schema (sectionTitle -> brandName)
-    const formattedBookedItems = (Array.isArray(bookedItems) && bookedItems.length > 0) ? bookedItems.map(item => ({
-      brandName: item.brandName || item.sectionTitle || item.brand || '', // Robust fallback
-      brandIcon: item.brandIcon || item.sectionIcon || item.icon || null,
-      card: item.card || item,
-      quantity: item.quantity || 1
-    })) : [];
-
-    console.log('[CreateBooking] About to save with formatted items:', JSON.stringify(formattedBookedItems, null, 2));
+    // Booked items carry the server price (unit rate) the booking was charged at
+    const formattedBookedItems = (Array.isArray(bookedItems) && bookedItems.length > 0)
+      ? price.pricedItems.map(({ request: item, unitPrice, quantity }) => ({
+        brandName: item.brandName || item.sectionTitle || item.brand || '', // Robust fallback
+        brandIcon: item.brandIcon || item.sectionIcon || item.icon || null,
+        card: { ...(item.card || item), price: unitPrice },
+        quantity
+      }))
+      : [];
 
     // Extract Visual Identity Details
     const categoryIcon = finalCategory?.icon || finalCategory?.image || service.iconUrl || 'https://cdn-icons-png.flaticon.com/512/3500/3500833.png';
@@ -561,17 +331,15 @@ const createBooking = async (req, res) => {
     let brandIcon = null;
 
     if (formattedBookedItems.length > 0) {
-      // Try to find a distinct brand name
       const distinctBrands = [...new Set(formattedBookedItems.map(item => item.brandName).filter(Boolean))];
       if (distinctBrands.length > 0) {
         brandName = distinctBrands.join(', ');
       }
-
-      // Try to find brand icon
       brandIcon = formattedBookedItems[0].brandIcon || null;
     }
 
     // Online bookings are held until the payment is verified; vendors are alerted after that
+    let bookingStatus = BOOKING_STATUS.SEARCHING;
     if (paymentMethod === 'online' && finalAmount > 0) {
       bookingStatus = BOOKING_STATUS.AWAITING_PAYMENT;
     }
@@ -582,10 +350,8 @@ const createBooking = async (req, res) => {
 
     const booking = await BookingModel.create({
       userId,
-      vendorId: (isVendorEquipmentBooking && vendorEquipmentDoc?.vendorId && req.body.isDirectVendorBooking) 
-        ? (vendorEquipmentDoc.vendorId._id || vendorEquipmentDoc.vendorId) 
-        : null,
-      equipmentId: (isVendorEquipmentBooking && req.body.isDirectVendorBooking) ? vendorEquipmentDoc._id : null,
+      vendorId: isVendorEquipmentBooking ? vendorEquipmentDoc.vendorId._id : null,
+      equipmentId: isVendorEquipmentBooking ? vendorEquipmentDoc._id : null,
       serviceId,
       categoryId: finalCategory?._id || categoryId,
       serviceName: service.title,
@@ -599,16 +365,16 @@ const createBooking = async (req, res) => {
       cropType: cropType || null,
       chemicalUsed: chemicalUsed || null,
       landSize: landSize || null,
-      endDate: (endDate && !isNaN(new Date(endDate).getTime())) ? new Date(endDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
       estimatedDuration: (estimatedDuration !== undefined && estimatedDuration !== null && !isNaN(Number(estimatedDuration))) ? Number(estimatedDuration) : null,
 
       description: service.description,
       serviceImages: service.images || [],
       bookedItems: formattedBookedItems,
-      basePrice,
-      discount,
-      tax,
-      visitingCharges,
+      basePrice: price.basePrice,
+      discount: price.discount,
+      tax: price.tax,
+      visitingCharges: price.visitingCharges,
       penalty: pendingPenalty || 0,
       finalAmount,
       userPayableAmount: finalAmount,
@@ -627,33 +393,19 @@ const createBooking = async (req, res) => {
       scheduledTime,
       timeSlot: {
         start: timeSlot.start,
-        end: timeSlot.end
+        end: timeSlot.end,
+        ...(typeof timeSlot.date === 'string' ? { date: timeSlot.date } : {}),
+        ...(typeof timeSlot.time === 'string' ? { time: timeSlot.time } : {})
       },
-      // userNotes: userNotes || null, // Removed
-      // isPlusAdded: isPlusAdded || false, // Removed
-      paymentMethod: paymentMethod || null,
+      paymentMethod,
       paymentMode: paymentMethod === 'plan_benefit' ? 'plan'
         : ['pay_at_home', 'cash'].includes(paymentMethod) ? 'pay_at_home'
-        : paymentMethod ? 'online' : null,
+        : 'online',
       status: bookingStatus,
-      paymentStatus: bookingPaymentStatus,
-      selectedImplements: selectedImplements || []
+      paymentStatus: PAYMENT_STATUS.PENDING,
+      selectedImplements: Array.isArray(selectedImplements) ? selectedImplements : []
       // notifiedVendors will be set after wave sorting
     });
-
-    // If Plus membership was added, update user status
-    if (isPlusAdded) {
-      const expiryDate = new Date();
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1); // 1 year membership
-      user.plans = {
-        isActive: true,
-        name: 'Plus Membership',
-        expiry: expiryDate,
-        price: 999 // Or fetch based on constants if needed, hardcoding placeholder or 0
-      };
-      await user.save();
-      console.log(`User ${userId} upgraded to Plus Membership until ${expiryDate}`);
-    }
 
     // Save distance-sorted candidates; wave 1 is alerted now (or after online payment), later waves by bookingScheduler
     const sortedVendors = nearbyVendors.sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -693,8 +445,6 @@ const createBooking = async (req, res) => {
       .populate('serviceId', 'title iconUrl')
       .populate('categoryId', 'title slug requiresDriver');
 
-    // NOTIFY USER: Send actionable notification so they can track status
-
     // Online bookings held for payment: notify user, emails, and cart clearing happen after payment is verified
     if (booking.status !== BOOKING_STATUS.AWAITING_PAYMENT) {
       // Send notification to user
@@ -714,17 +464,16 @@ const createBooking = async (req, res) => {
 
       // Send notification to vendor only if assigned (Direct Booking)
       let vendorObj = null;
-      if (vendorId) {
+      if (booking.vendorId) {
         await createNotification({
-          vendorId,
+          vendorId: booking.vendorId,
           type: 'booking_created',
           title: 'New Booking Received',
           message: `You have received a new booking ${booking.bookingNumber} for ${service.title}.`,
           relatedId: booking._id,
           relatedType: 'booking'
         });
-        const Vendor = require('../../models/Vendor');
-        vendorObj = await Vendor.findById(vendorId);
+        vendorObj = await Vendor.findById(booking.vendorId);
       }
 
       // SEND EMAILS (Confirmation)
@@ -736,8 +485,6 @@ const createBooking = async (req, res) => {
         if (bookedItems && bookedItems.length > 0) {
           const userCart = await Cart.findOne({ userId });
           if (userCart && userCart.items.length > 0) {
-            console.log(`[CreateBooking] Clearing ${bookedItems.length} booked items from cart...`);
-
             const bookedTitles = new Set(bookedItems.map(item => item.card?.title || item.title));
             const originalCount = userCart.items.length;
             userCart.items = userCart.items.filter(item => {
@@ -749,21 +496,16 @@ const createBooking = async (req, res) => {
 
             if (userCart.items.length < originalCount) {
               await userCart.save();
-              console.log(`[CreateBooking] Removed ${originalCount - userCart.items.length} items from cart. Remaining: ${userCart.items.length}`);
             }
           }
         } else if (serviceId) {
           const userCart = await Cart.findOne({ userId });
           if (userCart) {
             const originalCount = userCart.items.length;
-            userCart.items = userCart.items.filter(item => {
-              if (item.serviceId && item.serviceId.toString() === serviceId.toString()) return false;
-              return true;
-            });
+            userCart.items = userCart.items.filter(item => !(item.serviceId && item.serviceId.toString() === serviceId.toString()));
 
             if (userCart.items.length < originalCount) {
               await userCart.save();
-              console.log(`[CreateBooking] Removed service ${serviceId} from cart.`);
             }
           }
         }
@@ -912,27 +654,33 @@ const cancelBooking = async (req, res) => {
     const { id } = req.params;
     const { cancellationReason } = req.body;
 
-    const booking = await Booking.findOne({ _id: id, userId });
+    // Atomically move the booking to CANCELLED so two parallel cancels can't both refund.
+    // The returned document is the state BEFORE cancelling (used for the refund decision).
+    const booking = await Booking.findOneAndUpdate(
+      { _id: id, userId, status: { $nin: NON_CANCELLABLE } },
+      {
+        $set: {
+          status: BOOKING_STATUS.CANCELLED,
+          cancelledAt: new Date(),
+          cancelledBy: 'user',
+          cancellationReason: (typeof cancellationReason === 'string' && cancellationReason.trim()) ? cancellationReason.trim().slice(0, 500) : 'Cancelled by user'
+        }
+      }
+    );
 
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
-
-    // Check if booking can be cancelled
-    if (booking.status === BOOKING_STATUS.CANCELLED) {
+      const existing = await Booking.findOne({ _id: id, userId }).select('status');
+      if (!existing) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
       return res.status(400).json({
         success: false,
-        message: 'Booking is already cancelled'
-      });
-    }
-
-    if (booking.status === BOOKING_STATUS.COMPLETED) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot cancel completed booking'
+        message: existing.status === BOOKING_STATUS.CANCELLED
+          ? 'Booking is already cancelled'
+          : `A booking that is ${existing.status.replace('_', ' ')} can't be cancelled. Please contact support if there is a problem.`
       });
     }
 
@@ -996,17 +744,23 @@ const cancelBooking = async (req, res) => {
       }
     }
 
-    // Update User Wallet
-    if (refundAmount > 0 || (cancellationFee > 0 && !isPaid)) {
-      const User = require('../../models/User');
-      const Transaction = require('../../models/Transaction');
+    // Update User Wallet (atomic $inc: no lost or doubled updates)
+    const Transaction = require('../../models/Transaction');
+    const walletInc = {};
 
-      const user = await User.findById(userId);
+    // 1. Process Refund
+    if (refundAmount > 0) walletInc['wallet.balance'] = refundAmount;
 
-      // 1. Process Refund
-      if (refundAmount > 0) {
-        user.wallet.balance = (user.wallet.balance || 0) + refundAmount;
+    // 2. Process Cancellation Fee and Restore Previous Unpaid Penalty
+    if (!isPaid) {
+      // If this booking had a previous unpaid penalty baked in, we must restore it to the user's bucket
+      const totalNewPenalty = cancellationFee + (booking.penalty || 0);
+      if (totalNewPenalty > 0) walletInc['wallet.penalty'] = totalNewPenalty;
+    }
 
+    if (Object.keys(walletInc).length > 0) {
+      const user = await User.findByIdAndUpdate(userId, { $inc: walletInc }, { new: true });
+      if (refundAmount > 0 && user) {
         await Transaction.create({
           userId: user._id,
           type: 'refund',
@@ -1017,32 +771,18 @@ const cancelBooking = async (req, res) => {
           bookingId: booking._id,
           balanceAfter: user.wallet.balance
         });
-
-        booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
       }
-
-      // 2. Process Cancellation Fee and Restore Previous Unpaid Penalty
-      if (!isPaid) {
-        // If this booking had a previous unpaid penalty baked in, we must restore it to the user's bucket
-        const previousPenalty = booking.penalty || 0;
-        const totalNewPenalty = cancellationFee + previousPenalty;
-        
-        if (totalNewPenalty > 0) {
-          user.wallet.penalty = (user.wallet.penalty || 0) + totalNewPenalty;
-          console.log(`[CancelBooking] Restored previous penalty ₹${previousPenalty} and added new penalty ₹${cancellationFee} for user ${userId}. Total Penalty: ${user.wallet.penalty}`);
-        }
-      }
-
-      await user.save();
     }
 
-    // Update booking status
+    // Record the outcome; a paid booking is settled here, so /payments/refund can't pay it out again
     booking.status = BOOKING_STATUS.CANCELLED;
-    booking.cancelledAt = new Date();
-    booking.cancelledBy = 'user';
-    booking.cancellationReason = cancellationReason || 'Cancelled by user';
-
-    await booking.save();
+    booking.cancellationFee = cancellationFee;
+    booking.cancellationSettled = isPaid;
+    if (refundAmount > 0) booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
+    await Booking.updateOne(
+      { _id: booking._id },
+      { $set: { cancellationFee, cancellationSettled: isPaid, ...(refundAmount > 0 ? { paymentStatus: PAYMENT_STATUS.REFUNDED } : {}) } }
+    );
 
     // Send notification to user
     await createNotification({
@@ -1138,50 +878,72 @@ const rescheduleBooking = async (req, res) => {
       });
     }
 
-    // Check if booking can be rescheduled
-    if (booking.status === BOOKING_STATUS.COMPLETED) {
+    // Only before the professional is on the way
+    const NOT_RESCHEDULABLE = [...NON_CANCELLABLE, BOOKING_STATUS.JOURNEY_STARTED, BOOKING_STATUS.VISITED];
+    if (NOT_RESCHEDULABLE.includes(booking.status) || booking.journeyStartedAt) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot reschedule completed booking'
+        message: `A booking that is ${booking.status.replace('_', ' ')} can't be rescheduled.`
       });
     }
 
-    if (booking.status === BOOKING_STATUS.CANCELLED) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot reschedule cancelled booking'
-      });
+    const dayKey = istDayKey(scheduledDate);
+    if (!dayKey || dayKey < istDayKey(new Date()) || dayKey > istDayKey(new Date(Date.now() + MAX_ADVANCE_DAYS * 86400000))) {
+      return res.status(400).json({ success: false, message: 'Please choose a valid upcoming date.' });
+    }
+    if (toMinutes(timeSlot?.start) !== null && slotStartInstant(scheduledDate, timeSlot.start).getTime() < Date.now() - SLOT_GRACE_MS) {
+      return res.status(400).json({ success: false, message: 'This time slot has already passed. Please pick a later slot.' });
     }
 
-    // Update booking
+    // Moving a multi-day rental keeps its length
+    let endDate = booking.endDate;
+    if (endDate && booking.scheduledDate) {
+      endDate = new Date(new Date(scheduledDate).getTime() + (booking.endDate - booking.scheduledDate));
+    }
+
+    // The booked machine must be free at the new slot
+    const machineId = booking.equipmentId;
+    if (machineId) {
+      const conflict = await findEquipmentConflict({ equipmentId: machineId, scheduledDate, endDate, timeSlot, excludeBookingId: booking._id });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          slotUnavailable: true,
+          message: conflict.maintenance
+            ? 'This equipment is under maintenance on the selected date. Please pick another date.'
+            : 'This equipment is already booked for the selected slot. Please pick another slot.'
+        });
+      }
+    }
+
+    // Update booking (status is kept: the assigned vendor stays assigned and is notified of the new time)
     booking.scheduledDate = new Date(scheduledDate);
     booking.scheduledTime = scheduledTime;
     booking.timeSlot = {
       start: timeSlot.start,
       end: timeSlot.end
     };
-
-    // Reset status to pending if it was confirmed
-    if (booking.status === BOOKING_STATUS.CONFIRMED) {
-      booking.status = BOOKING_STATUS.PENDING;
-    }
+    if (endDate) booking.endDate = endDate;
+    booking.startReminderSent = false;
 
     await booking.save();
 
     // Send notification to vendor
-    await createNotification({
-      vendorId: booking.vendorId,
-      type: 'booking_created', // Keeping type as is for now
-      title: 'Booking Rescheduled',
-      message: `Booking ${booking.bookingNumber} has been rescheduled.`,
-      relatedId: booking._id,
-      relatedType: 'booking',
-      pushData: {
-        type: 'booking_rescheduled',
-        bookingId: booking._id.toString(),
-        link: `/vendor/booking/${booking._id}`
-      }
-    });
+    if (booking.vendorId) {
+      await createNotification({
+        vendorId: booking.vendorId,
+        type: 'booking_created', // Keeping type as is for now
+        title: 'Booking Rescheduled',
+        message: `Booking ${booking.bookingNumber} has been rescheduled to ${dayKey} (${scheduledTime}).`,
+        relatedId: booking._id,
+        relatedType: 'booking',
+        pushData: {
+          type: 'booking_rescheduled',
+          bookingId: booking._id.toString(),
+          link: `/vendor/booking/${booking._id}`
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1365,20 +1127,17 @@ const getUserRatings = async (req, res) => {
  */
 const checkEquipmentAvailability = async (req, res) => {
   try {
-    const { equipmentId, requestedDate, requestedTime } = req.query;
+    const { equipmentId, requestedDate, requestedTime, requestedEndTime, endDate } = req.query;
 
-    if (!equipmentId || !requestedDate) {
+    if (typeof equipmentId !== 'string' || typeof requestedDate !== 'string' || !istDayKey(requestedDate)) {
       return res.status(400).json({
         success: false,
         message: 'Equipment ID and requested date are required'
       });
     }
 
-    const { BOOKING_STATUS } = require('../../utils/constants');
-
     // Only a specific vendor's machine can be "already booked". Catalog services/categories
     // are fulfilled by whichever nearby vendor accepts, so they are always bookable.
-    const mongoose = require('mongoose');
     const VendorEquipment = require('../../models/VendorEquipment');
     const isSpecificMachine = mongoose.isValidObjectId(equipmentId) && await VendorEquipment.exists({ _id: equipmentId });
     if (!isSpecificMachine) {
@@ -1389,76 +1148,48 @@ const checkEquipmentAvailability = async (req, res) => {
       });
     }
 
-    // Set up date boundaries for the requested date
-    const reqDate = new Date(requestedDate);
-    const startOfDay = new Date(reqDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(reqDate.setHours(23, 59, 59, 999));
-
-    // 1. CHECK MAINTENANCE OVERLAP (New Agriculture Feature)
-    const Maintenance = require('../../models/Maintenance');
-    const maintenanceRecord = await Maintenance.findOne({
+    // No time chosen yet = only maintenance (whole day) can block it
+    const slot = typeof requestedTime === 'string' && requestedTime
+      ? { start: requestedTime, end: typeof requestedEndTime === 'string' ? requestedEndTime : undefined }
+      : { start: '00:00', end: '00:01' };
+    const conflict = await findEquipmentConflict({
       equipmentId,
-      status: 'active',
-      startDate: { $lte: endOfDay },
-      endDate: { $gte: startOfDay }
+      scheduledDate: requestedDate,
+      endDate: typeof endDate === 'string' && istDayKey(endDate) ? endDate : undefined,
+      timeSlot: slot
     });
 
-    if (maintenanceRecord) {
+    if (conflict?.maintenance) {
       return res.status(200).json({
         success: true,
         available: false,
-        message: `Equipment is currently under maintenance (${maintenanceRecord.reason}). It will be available after ${new Date(maintenanceRecord.endDate).toLocaleDateString()}.`
+        message: `Equipment is currently under maintenance (${conflict.maintenance.reason}). It will be available after ${new Date(conflict.maintenance.endDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}.`
       });
     }
 
-    // 2. CHECK EXISTING BOOKINGS (Conflict Check)
-    const activeBookings = await Booking.find({
-      serviceId: equipmentId,
-      status: { $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.REJECTED] },
-      scheduledDate: { $gte: startOfDay }
-    }).sort({ scheduledDate: 1, 'timeSlot.start': 1 }); // Sort chronologically
-
-    let isAvailable = true;
-
-    // A simple check: if any active booking exists on the requested date with the exact same time slot
-    for (let booking of activeBookings) {
-      // Compare on same date 
-      const bDate = new Date(booking.scheduledDate);
-      if (
-        bDate.getFullYear() === reqDate.getFullYear() &&
-        bDate.getMonth() === reqDate.getMonth() &&
-        bDate.getDate() === reqDate.getDate()
-      ) {
-        // No time chosen yet = can't conflict; don't block the whole day
-        if (requestedTime && (booking.scheduledTime === requestedTime || (booking.timeSlot && booking.timeSlot.start === requestedTime))) {
-          isAvailable = false;
-          break;
-        }
-      }
-    }
-
-    if (isAvailable) {
+    if (!conflict || !requestedTime) {
       return res.status(200).json({
         success: true,
         available: true,
         message: 'Equipment is available for this slot.'
       });
-    } else {
-      // Find the next available day/time
-      // For a robust system, this involves scanning forward. Here is a simple fallback: Next day morning.
-      const nextDate = new Date(reqDate);
-      nextDate.setDate(nextDate.getDate() + 1);
-
-      const nextAvailableSlotDate = nextDate.toISOString().split('T')[0];
-      const nextAvailableSlotTime = "09:00";
-
-      return res.status(200).json({
-        success: true,
-        available: false,
-        nextAvailableSlot: `${nextAvailableSlotDate} ${nextAvailableSlotTime}`,
-        message: 'Equipment is already booked for the requested time. Please check the next available slot.'
-      });
     }
+
+    // Suggest the next free day for the same slot (scan up to 2 weeks ahead)
+    let nextAvailableSlot = null;
+    const startKey = istDayKey(requestedDate);
+    for (let i = 1; i <= 14 && !nextAvailableSlot; i++) {
+      const dayKey = new Date(Date.parse(`${startKey}T00:00:00Z`) + i * 86400000).toISOString().slice(0, 10);
+      const clash = await findEquipmentConflict({ equipmentId, scheduledDate: dayKey, timeSlot: slot });
+      if (!clash) nextAvailableSlot = `${dayKey} ${requestedTime}`;
+    }
+
+    return res.status(200).json({
+      success: true,
+      available: false,
+      nextAvailableSlot,
+      message: 'Equipment is already booked for the requested time. Please choose another slot.'
+    });
   } catch (error) {
     console.error('Check availability error:', error);
     res.status(500).json({

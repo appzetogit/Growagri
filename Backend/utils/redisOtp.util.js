@@ -10,18 +10,14 @@ const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_SECONDS) || 300;
 const MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS) || 3;
 const RATE_LIMIT_COUNT = parseInt(process.env.OTP_RATE_LIMIT) || 3;
 const RATE_LIMIT_WINDOW = parseInt(process.env.OTP_RATE_WINDOW) || 600;
-// Test / Demo numbers that always get default OTP (123456)
-const TEST_NUMBERS = ['6268455485', '6260491554', '7610416911'];
+// Test / Demo numbers (e.g. store-review accounts) that always get default OTP (123456).
+// Comma-separated 10-digit numbers in TEST_PHONE_NUMBERS; none unless configured.
+const TEST_NUMBERS = (process.env.TEST_PHONE_NUMBERS || '').split(',').map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
 
 /**
- * Check if phone is a designated test number
+ * Check if phone is a designated test number (exact match only, so "x6268455485" is not a test number)
  */
-const isTestNumber = (phone) => {
-  if (!phone) return false;
-  const digitsOnly = String(phone).replace(/\D/g, '');
-  const last10 = digitsOnly.slice(-10);
-  return TEST_NUMBERS.includes(last10) || TEST_NUMBERS.includes(digitsOnly) || TEST_NUMBERS.includes(String(phone).trim());
-};
+const isTestNumber = (phone) => typeof phone === 'string' && TEST_NUMBERS.includes(phone.trim());
 
 /**
  * Generate 6-digit OTP
@@ -34,8 +30,12 @@ const generateOTP = (phone) => {
   if (process.env.USE_DEFAULT_OTP === 'true') {
     return '123456';
   }
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 };
+
+// Used when Redis is down so OTP sending is still rate limited (per process)
+// ponytail: in-memory fallback, per-instance only; fine until several API instances run without Redis
+const memoryRateLimit = new Map();
 
 
 /**
@@ -48,21 +48,31 @@ const hashOTP = (otp) => {
 /**
  * Check rate limit for phone number
  * Returns true if allowed, false if limit exceeded
- * NOTE: Rate limiting primarily uses Redis. If Redis is down, we ALLOW the request 
- * to prevent blocking users during outages (fail-open), or we could implement basic memory/mongo limit.
- * For now: Fail-open for simple rate limiting if Redis is down.
+ * Uses Redis; if Redis is down, falls back to an in-memory counter instead of allowing unlimited sends.
  */
+const checkMemoryRateLimit = (phone) => {
+  const now = Date.now();
+  const entry = memoryRateLimit.get(phone);
+  if (!entry || entry.resetAt <= now) {
+    memoryRateLimit.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW * 1000 });
+    if (memoryRateLimit.size > 10000) {
+      for (const [key, value] of memoryRateLimit) if (value.resetAt <= now) memoryRateLimit.delete(key);
+    }
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= RATE_LIMIT_COUNT;
+};
+
 const checkRateLimit = async (phone) => {
   // Test Numbers - Always allow, never rate limit
   if (isTestNumber(phone)) {
-    console.log(`[OTP] Test number, skipping rate limit for ${phone}`);
     return true;
   }
 
   const redis = getRedis();
   if (!isRedisConnected() || !redis) {
-    console.warn('[OTP] Redis down, skipping rate limit check (fail-open)');
-    return true;
+    return checkMemoryRateLimit(phone);
   }
 
   const key = `rate:otp:${phone}`;
@@ -74,7 +84,7 @@ const checkRateLimit = async (phone) => {
     return current <= RATE_LIMIT_COUNT;
   } catch (err) {
     console.error('[OTP] Rate limit error:', err);
-    return true; // Fail open
+    return checkMemoryRateLimit(phone);
   }
 };
 
@@ -88,8 +98,9 @@ const storeOTP = async (phone, otpHash) => {
   if (isRedisConnected() && redis) {
     try {
       const key = `otp:${phone}`;
-      const data = JSON.stringify({ hash: otpHash, attempts: 0 });
+      const data = JSON.stringify({ hash: otpHash });
       await redis.set(key, data, 'EX', OTP_EXPIRY);
+      await redis.del(`otp_attempts:${phone}`);
       console.log(`[OTP] Stored in Redis for ${phone}`);
       return true;
     } catch (err) {
@@ -124,7 +135,10 @@ const storeOTP = async (phone, otpHash) => {
  * Returns: { success: true/false, message: string }
  */
 const verifyOTP = async (phone, plainOtp) => {
-  console.log(`[OTP] Verifying OTP for phone: ${phone}, OTP: ${plainOtp}`);
+  // Strings only: an object here would become a MongoDB operator in the fallback query
+  if (typeof phone !== 'string' || typeof plainOtp !== 'string' || !plainOtp) {
+    return { success: false, message: 'Invalid or expired OTP. Please request a new one.' };
+  }
 
   // Test Numbers - Bypass OTP verification with default OTP 123456
   if (isTestNumber(phone) && plainOtp === '123456') {
@@ -134,39 +148,33 @@ const verifyOTP = async (phone, plainOtp) => {
 
   const redis = getRedis();
   const inputHash = hashOTP(plainOtp);
-  console.log(`[OTP] Input OTP hash: ${inputHash.substring(0, 10)}...`);
 
   // 1. Try Redis
   if (isRedisConnected() && redis) {
     try {
       const key = `otp:${phone}`;
+      const attemptsKey = `otp_attempts:${phone}`;
       const data = await redis.get(key);
 
       if (data) {
-        console.log(`[OTP] Found in Redis for ${phone}`);
         const otpData = JSON.parse(data);
 
-        // Check attempts
-        if (otpData.attempts >= MAX_ATTEMPTS) {
-          await redis.del(key);
+        // Atomic counter: parallel guesses can't all see "0 attempts"
+        const attempts = await redis.incr(attemptsKey);
+        if (attempts === 1) await redis.expire(attemptsKey, OTP_EXPIRY);
+        if (attempts > MAX_ATTEMPTS) {
+          await redis.del(key, attemptsKey);
           console.log(`[OTP] Max attempts exceeded for ${phone}`);
           return { success: false, message: 'Too many attempts. Please request new OTP.' };
         }
 
-        // Verify Hash
         if (otpData.hash !== inputHash) {
-          otpData.attempts += 1;
-          // Update attempts, keep remaining TTL
-          const ttl = await redis.ttl(key);
-          if (ttl > 0) {
-            await redis.set(key, JSON.stringify(otpData), 'EX', ttl);
-          }
-          console.log(`[OTP] Invalid OTP for ${phone}, attempts: ${otpData.attempts}`);
+          console.log(`[OTP] Invalid OTP for ${phone}, attempts: ${attempts}`);
           return { success: false, message: 'Invalid OTP' };
         }
 
         // Success
-        await redis.del(key);
+        await redis.del(key, attemptsKey);
         console.log(`[OTP] ✅ Verification successful for ${phone}`);
         return { success: true };
       } else {
@@ -179,48 +187,26 @@ const verifyOTP = async (phone, plainOtp) => {
 
   // 2. Check MongoDB (Fallback)
   try {
-    const tokenDoc = await Token.findOne({
-      phone,
-      type: 'PHONE_VERIFICATION',
-      isUsed: false
-    });
+    // Count the attempt atomically before comparing, so parallel guesses share one budget
+    const tokenDoc = await Token.findOneAndUpdate(
+      {
+        phone,
+        type: 'PHONE_VERIFICATION',
+        isUsed: false,
+        expiresAt: { $gt: new Date() },
+        attempts: { $lt: MAX_ATTEMPTS }
+      },
+      { $inc: { attempts: 1 } },
+      { new: true }
+    );
 
     if (!tokenDoc) {
-      console.log(`[OTP] ❌ Not found in MongoDB for ${phone}`);
+      await Token.deleteMany({ phone, type: 'PHONE_VERIFICATION', $or: [{ expiresAt: { $lte: new Date() } }, { attempts: { $gte: MAX_ATTEMPTS } }] });
+      console.log(`[OTP] ❌ Not found, expired or out of attempts in MongoDB for ${phone}`);
       return { success: false, message: 'Invalid or expired OTP. Please request a new one.' };
     }
 
-    console.log(`[OTP] Found in MongoDB for ${phone}`);
-
-    // Check expiry
-    if (tokenDoc.expiresAt < new Date()) {
-      await Token.deleteOne({ _id: tokenDoc._id });
-      console.log(`[OTP] Expired in MongoDB for ${phone}`);
-      return { success: false, message: 'OTP expired. Please request a new one.' };
-    }
-
-    // Check attempts
-    if (tokenDoc.attempts >= MAX_ATTEMPTS) {
-      await Token.deleteOne({ _id: tokenDoc._id });
-      console.log(`[OTP] Max attempts exceeded in MongoDB for ${phone}`);
-      return { success: false, message: 'Too many attempts. Please request a new one.' };
-    }
-
-    // Verify Hash (Token stores hash in this new design)
-    // Note: Old implementation stored plain OTP. 
-    // This check supports both logic if needed, but we assume new OTPs are hashed.
-    // If migration needed: check length of stored OTP. SHA256 hex is 64 chars.
-    let isMatch = false;
-    if (tokenDoc.otp.length === 64) {
-      isMatch = tokenDoc.otp === inputHash;
-    } else {
-      // Old plain text fallback (for dev/legacy)
-      isMatch = tokenDoc.otp === plainOtp;
-    }
-
-    if (!isMatch) {
-      tokenDoc.attempts += 1;
-      await tokenDoc.save();
+    if (tokenDoc.otp !== inputHash) {
       console.log(`[OTP] Invalid OTP in MongoDB for ${phone}, attempts: ${tokenDoc.attempts}`);
       return { success: false, message: 'Invalid OTP' };
     }

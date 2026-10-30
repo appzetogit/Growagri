@@ -55,25 +55,16 @@ const createOrUpdateBill = async (req, res) => {
     );
 
     const serviceSplitPct = isRentalBooking
-      ? (settings?.rentalPayoutPercentage ?? 90)
+      ? await require('../../utils/constants').rentalSplitPct(settings, booking.equipmentId)
       : require('../../utils/constants').serviceSplitPct(settings);
     const partsSplitPct = settings?.partsPayoutPercentage ?? 10;
 
-    let serviceGstPct = isRentalBooking
-      ? (settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
-          ? Number(settings.rentalGstPercentage)
-          : (Number(settings?.serviceGstPercentage) || 18))
-      : (settings?.serviceGstPercentage !== undefined && settings?.serviceGstPercentage !== null
-          ? Number(settings.serviceGstPercentage)
-          : 18);
-
+    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
+    let serviceGstPct = 0;
     if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
-      if (bookingGstPct > 0) {
-        serviceGstPct = bookingGstPct;
-      }
+      serviceGstPct = Math.round((booking.tax * 100) / booking.basePrice);
     }
-    const partsGstPct = settings?.partsGstPercentage ?? 18;
+    const partsGstPct = 0;
 
     // ═══════════════════════════════════════
     // 1. ORIGINAL SERVICE (from booking)
@@ -85,7 +76,7 @@ const createOrUpdateBill = async (req, res) => {
       ? 0 
       : (booking.tax && booking.tax > 0)
         ? Number(booking.tax)
-        : parseFloat(((originalServiceBaseForBill * serviceGstPct) / 100).toFixed(2));
+        : 0;
     const visitingCharges = Number(booking.visitingCharges) || 0;
 
     // ═══════════════════════════════════════
@@ -102,14 +93,14 @@ const createOrUpdateBill = async (req, res) => {
         const quantity = Number(item.quantity) || 1;
 
         const base = unitBasePrice * quantity;
-        const gst = parseFloat(((base * serviceGstPct) / 100).toFixed(2));
+        const gst = 0; // no GST on services added by the vendor
         const totalInclusive = parseFloat((base + gst).toFixed(2));
 
         processedServices.push({
           catalogId: item.catalogId,
           name,
           price: unitBasePrice,
-          gstPercentage: serviceGstPct,
+          gstPercentage: 0,
           quantity,
           gstAmount: gst,
           total: totalInclusive,
@@ -133,7 +124,7 @@ const createOrUpdateBill = async (req, res) => {
         const name = item.name;
         const unitBasePrice = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 1;
-        const pGstPct = Number(item.gstPercentage) || partsGstPct;
+        const pGstPct = partsGstPct; // GST not charged
 
         const base = unitBasePrice * quantity;
         const gst = parseFloat(((base * pGstPct) / 100).toFixed(2));
@@ -163,8 +154,7 @@ const createOrUpdateBill = async (req, res) => {
         const name = item.name || 'Custom Item';
         const unitBasePrice = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 1;
-        // Default custom items to parts GST % if not provided (usually from settings)
-        const cGstPct = Number(item.gstPercentage) || partsGstPct;
+        const cGstPct = partsGstPct; // GST not charged
 
         const base = unitBasePrice * quantity;
         const gst = parseFloat(((base * cGstPct) / 100).toFixed(2));

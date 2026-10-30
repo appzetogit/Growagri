@@ -21,7 +21,7 @@ import adminProductService from '../../../../services/adminProductService';
 import adminEquipmentService from '../../../../services/adminEquipmentService';
 import { publicCatalogService, serviceService, homeContentService, categoryService } from '../../../../services/catalogService';
 import { cityService } from '../../services/cityService';
-import { getSettings, updateSettings } from '../../services/settingsService';
+import { getSettings } from '../../services/settingsService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
@@ -45,9 +45,6 @@ const ManageProducts = () => {
             setActiveTab(tab);
         }
     }, [searchParams]);
-    const [rentalGst, setRentalGst] = useState(5); // Default 5% for Agriculture
-    const [rentalGstInput, setRentalGstInput] = useState('5');
-    const [savingRentalGst, setSavingRentalGst] = useState(false);
     const [adminCommission, setAdminCommission] = useState(10); // Default 10% Platform Commission
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [approveTarget, setApproveTarget] = useState(null);
@@ -71,7 +68,7 @@ const ManageProducts = () => {
     const [showCatalogModal, setShowCatalogModal] = useState(false);
     const [catalogFormData, setCatalogFormData] = useState({
         title: "",
-        gstPercentage: 18,
+        gstPercentage: 0,
         categoryId: "",
         hourly_price: "",
         land_price: "",
@@ -116,12 +113,8 @@ const ManageProducts = () => {
 
     useEffect(() => {
         fetchData();
-        // Load rental GST and Commission from admin settings
+        // Load Commission from admin settings
         getSettings().then(res => {
-            if (res?.settings?.rentalGstPercentage !== undefined) {
-                setRentalGst(res.settings.rentalGstPercentage);
-                setRentalGstInput(String(res.settings.rentalGstPercentage));
-            }
             if (res?.settings?.bookingCommissionPercentage !== undefined) {
                 setAdminCommission(res.settings.bookingCommissionPercentage);
             }
@@ -234,34 +227,6 @@ const ManageProducts = () => {
         }
     };
 
-    const handleSaveRentalGst = async () => {
-        if (rentalGstInput === '' || isNaN(Number(rentalGstInput))) {
-            toast.error('Please enter a valid GST percentage');
-            return;
-        }
-        const val = Number(rentalGstInput);
-        if (val < 0 || val > 100) {
-            toast.error('GST must be between 0% and 100%');
-            return;
-        }
-
-        try {
-            setSavingRentalGst(true);
-            const res = await updateSettings({ rentalGstPercentage: val });
-            if (res.success) {
-                setRentalGst(val);
-                setRentalGstInput(String(val));
-                toast.success(`✅ Machinery Rental GST updated to ${val}%!`);
-            } else {
-                toast.error(res.message || 'Failed to update GST');
-            }
-        } catch (err) {
-            toast.error('Failed to update GST');
-        } finally {
-            setSavingRentalGst(false);
-        }
-    };
-
     const openApproveModal = (item) => {
         setApproveTarget(item);
         setCommissionModalMode('approve');
@@ -320,7 +285,7 @@ const ManageProducts = () => {
                 } else {
                     res = await adminProductService.approveProduct(approveTarget._id, {
                         commissionPercentage: commissionVal,
-                        gstPercentage: rentalGst
+                        gstPercentage: 0 // GST is not charged on bookings
                     });
                 }
 
@@ -371,7 +336,7 @@ const ManageProducts = () => {
         setCatalogFormData({
             title: vendorEq.requestedCategoryName || vendorEq.name || "",
             categoryId: vendorEq.categoryId?._id || vendorEq.categoryId || "",
-            gstPercentage: 18,
+            gstPercentage: 0,
             hourly_price: vendorEq.pricing?.hourly?.price || "",
             land_price: vendorEq.pricing?.land_based?.price || "",
             land_unit: "acre",
@@ -449,7 +414,7 @@ const ManageProducts = () => {
             const payload = {
                 title: catalogFormData.title,
                 basePrice: parseFloat(catalogFormData.hourly_price) || parseFloat(catalogFormData.daily_price) || parseFloat(catalogFormData.land_price) || 0,
-                gstPercentage: parseFloat(catalogFormData.gstPercentage) || 18,
+                gstPercentage: 0, // GST is not charged
                 ...(finalCategoryId ? { categoryId: finalCategoryId } : {}),
                 hourly_price: parseFloat(catalogFormData.hourly_price) || 0,
                 land_price: parseFloat(catalogFormData.land_price) || 0,
@@ -694,45 +659,6 @@ const ManageProducts = () => {
                         <p className="text-sm text-slate-500 font-medium">Manage Equipment & Heavy Machinery Approvals</p>
                     </div>
 
-                    {/* Dynamic Rental GST Field */}
-                    <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-2xl border border-slate-200 shadow-xs self-start sm:self-auto">
-                        <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
-                            <FiPercent className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                            <span>Rental GST:</span>
-                        </div>
-                        <div className="relative flex items-center">
-                            <input 
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.5"
-                                value={rentalGstInput}
-                                onChange={(e) => setRentalGstInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleSaveRentalGst();
-                                    }
-                                }}
-                                className="w-16 px-2.5 py-1 text-xs font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-center transition-all"
-                                placeholder="GST %"
-                            />
-                            <span className="text-xs font-black text-slate-400 ml-1">%</span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleSaveRentalGst}
-                            disabled={savingRentalGst || Number(rentalGstInput) === Number(rentalGst)}
-                            className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                                Number(rentalGstInput) !== Number(rentalGst)
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 active:scale-95 cursor-pointer'
-                                    : 'bg-slate-100 text-slate-400 cursor-default'
-                            }`}
-                            title="Save GST Percentage"
-                        >
-                            {savingRentalGst ? 'Saving...' : Number(rentalGstInput) !== Number(rentalGst) ? 'Save' : 'Saved'}
-                        </button>
-                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {selectedProductIds.length > 0 && (

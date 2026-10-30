@@ -170,7 +170,7 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
     const data = {
       title: form.title,
       basePrice: parseFloat(form.hourly_price) || parseFloat(form.daily_price) || parseFloat(form.land_price) || 0,
-      gstPercentage: parseFloat(form.gstPercentage) || 18,
+      gstPercentage: 0, // GST is not charged on bookings
       categoryId: form.categoryId,
       hourly_price: parseFloat(form.hourly_price) || 0,
       land_price: parseFloat(form.land_price) || 0,
@@ -356,11 +356,6 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
                                 </span>
                               )}
                             </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="bg-blue-50 text-blue-700 text-[10px] px-2 py-1 rounded-full font-black border border-blue-100 shadow-sm whitespace-nowrap">
-                              {service.gstPercentage}% GST
-                            </span>
                           </div>
                         </div>
 

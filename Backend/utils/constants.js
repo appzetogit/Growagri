@@ -89,6 +89,12 @@ module.exports = {
   BILL_STATUS,
   // Vendor's % share of the service base. One formula for bills, self-jobs and dashboards.
   serviceSplitPct: (settings) => 100 - (settings?.bookingCommissionPercentage ?? (100 - (settings?.servicePayoutPercentage ?? 90))),
+  // Vendor's % share on a machinery booking: the machine's own commission (set by admin) wins over the global rental payout.
+  rentalSplitPct: async (settings, equipmentId) => {
+    const id = equipmentId?._id || equipmentId;
+    const equipment = id && await require('../models/VendorEquipment').findById(id).select('commissionPercentage').lean();
+    return equipment?.commissionPercentage != null ? 100 - equipment.commissionPercentage : (settings?.rentalPayoutPercentage ?? 90);
+  },
   isPaymentSettled: (booking) => booking.cashCollected === true ||
     ['success', 'collected_by_vendor', 'plan_covered'].includes(booking.paymentStatus)
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const { uploadImage, uploadVideo, handleMulterError } = require('../../middleware/uploadMiddleware');
 const { getSignature } = require('../../controllers/cloudinaryController');
 const { authenticate } = require('../../middleware/authMiddleware');
+const { isAdmin } = require('../../middleware/roleMiddleware');
 
 // Get signature for direct signed upload
 router.get('/upload/sign-signature', authenticate, getSignature);
@@ -34,7 +35,8 @@ router.post('/upload', authenticate, uploadImage, handleMulterError, async (req,
 });
 
 // Upload single video to Cloudinary
-router.post('/upload-video', authenticate, uploadVideo, handleMulterError, async (req, res) => {
+// 100MB videos: admin only (not used by the user/vendor apps)
+router.post('/upload-video', authenticate, isAdmin, uploadVideo, handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({

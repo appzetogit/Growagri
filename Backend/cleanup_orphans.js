@@ -1,6 +1,8 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb+srv://grooagri_db_user:grooagri_db_user@cluster0.zbhhozr.mongodb.net/groo')
+// Connection string comes from .env (never commit credentials)
+mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     const Category = require('./models/Category');
     const Service = require('./models/Service');

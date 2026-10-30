@@ -105,11 +105,12 @@ class BookingScheduler {
             continue;
           }
 
-          // Filter to available, busy and offline vendors (include OFFLINE so they can receive push notifications)
+          // Filter to available, busy, on-job and offline vendors (include OFFLINE so they can receive push
+          // notifications; ON_JOB vendors can still take other slots)
           const vendorIds = vendorsToNotify.map(v => v.vendorId);
           const onlineVendors = await Vendor.find({
             _id: { $in: vendorIds },
-            availability: { $in: ['AVAILABLE', 'BUSY', 'OFFLINE'] }
+            availability: { $in: ['AVAILABLE', 'BUSY', 'ON_JOB', 'OFFLINE'] }
           }).select('_id');
 
           const onlineVendorIds = new Set(onlineVendors.map(v => v._id.toString()));

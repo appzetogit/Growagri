@@ -41,6 +41,9 @@ const addToCart = async (req, res) => {
         if (!productId) {
             return res.status(400).json({ success: false, message: 'Product ID is required' });
         }
+        if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1 || Number(quantity) > 1000) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid quantity' });
+        }
 
         const product = await Product.findById(productId);
         if (!product || product.approvalStatus !== 'approved' || product.status !== 'active') {
@@ -87,7 +90,7 @@ const updateCartItem = async (req, res) => {
         const { itemId } = req.params;
         const { quantity } = req.body;
 
-        if (quantity < 1) {
+        if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1 || Number(quantity) > 1000) {
             return res.status(400).json({
                 success: false,
                 message: 'Quantity must be at least 1'

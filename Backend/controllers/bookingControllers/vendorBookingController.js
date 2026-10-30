@@ -141,6 +141,42 @@ const acceptBooking = async (req, res) => {
       });
     }
 
+    // --- PICK A MACHINE THAT IS FREE FOR THIS SLOT ---
+    // Direct bookings already name the machine; for catalog bookings use one of the vendor's
+    // matching machines that isn't booked/under maintenance at that time.
+    const pending = await Booking.findById(id).select('equipmentId categoryId scheduledDate endDate timeSlot scheduledTime');
+    if (!pending) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    let chosenEquipmentId = pending.equipmentId || null;
+    const { findEquipmentConflict } = require('../../services/bookingSlotService');
+    const slot = { scheduledDate: pending.scheduledDate, endDate: pending.endDate, timeSlot: pending.timeSlot?.start ? pending.timeSlot : { start: pending.scheduledTime }, excludeBookingId: pending._id };
+    if (chosenEquipmentId) {
+      if (await findEquipmentConflict({ equipmentId: chosenEquipmentId, ...slot })) {
+        return res.status(409).json({ success: false, message: 'This machine is already booked (or under maintenance) for this slot.' });
+      }
+    } else if (pending.categoryId) {
+      const VendorEquipment = require('../../models/VendorEquipment');
+      const machines = await VendorEquipment.find({
+        vendorId,
+        isAvailable: { $ne: false },
+        $or: [
+          { categoryId: pending.categoryId },
+          { 'implements.subCategoryId': pending.categoryId },
+          { subCategoryIds: pending.categoryId }
+        ]
+      }).select('_id');
+      for (const machine of machines) {
+        if (!(await findEquipmentConflict({ equipmentId: machine._id, ...slot }))) {
+          chosenEquipmentId = machine._id;
+          break;
+        }
+      }
+      if (machines.length > 0 && !chosenEquipmentId) {
+        return res.status(409).json({ success: false, message: 'All your machines for this service are already booked for this slot.' });
+      }
+    }
+
     // ATOMIC UPDATE: Check status and vendorId in query to prevent race conditions
     // Only accept if status is REQUESTED/SEARCHING and NO vendor is assigned yet
     const updatedBooking = await Booking.findOneAndUpdate(
@@ -181,24 +217,9 @@ const acceptBooking = async (req, res) => {
     // Booking successfully accepted by THIS vendor
     const booking = updatedBooking;
     
-    // --- LINK EQUIPMENT IF AGRI OR MACHINERY ---
-    if (booking.categoryId) {
-      try {
-        const VendorEquipment = require('../../models/VendorEquipment');
-        const eq = await VendorEquipment.findOne({
-          vendorId: vendorId,
-          $or: [
-            { categoryId: booking.categoryId },
-            { 'implements.subCategoryId': booking.categoryId },
-            { subCategoryIds: booking.categoryId }
-          ]
-        });
-        if (eq) {
-          booking.equipmentId = eq._id;
-        }
-      } catch (linkErr) {
-        console.error('[AcceptBooking] Error linking equipment:', linkErr);
-      }
+    // --- LINK EQUIPMENT IF AGRI OR MACHINERY (the free machine picked above) ---
+    if (chosenEquipmentId) {
+      booking.equipmentId = chosenEquipmentId;
     }
 
     // Automatically generate Handover OTP (driver_start_otp) for Standalone Machinery (ANY category)
@@ -229,9 +250,8 @@ const acceptBooking = async (req, res) => {
 
     await booking.save();
 
-    // Update vendor availability to ON_JOB
-    const Vendor = require('../../models/Vendor');
-    await Vendor.findByIdAndUpdate(vendorId, { availability: 'ON_JOB' });
+    // Vendor availability is NOT set to ON_JOB here: nothing ever reset it, so one accepted
+    // (possibly future) slot stopped all new requests. Slot clashes are checked per machine above.
 
     // Update BookingRequest statuses
     const BookingRequest = require('../../models/BookingRequest');
@@ -1090,25 +1110,16 @@ const completeSelfJob = async (req, res) => {
     );
 
     let serviceSplitPct = isRentalBooking
-      ? (settings?.rentalPayoutPercentage ?? 90)
+      ? await require('../../utils/constants').rentalSplitPct(settings, booking.equipmentId)
       : require('../../utils/constants').serviceSplitPct(settings);
     let partsSplitPct = settings?.partsPayoutPercentage ?? 10;
     
-    let serviceGstPct = isRentalBooking
-      ? (settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
-          ? Number(settings.rentalGstPercentage)
-          : (Number(settings?.serviceGstPercentage) || 18))
-      : (settings?.serviceGstPercentage !== undefined && settings?.serviceGstPercentage !== null
-          ? Number(settings.serviceGstPercentage)
-          : 18);
-
+    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
+    let serviceGstPct = 0;
     if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
-      if (bookingGstPct > 0) {
-        serviceGstPct = bookingGstPct;
-      }
+      serviceGstPct = Math.round((booking.tax * 100) / booking.basePrice);
     }
-    let partsGstPct = settings?.partsGstPercentage ?? 18;
+    let partsGstPct = 0;
 
     // ═══════════════════════════════════════════
     // STEP 1: BUILD LINE ITEMS
@@ -1125,12 +1136,12 @@ const completeSelfJob = async (req, res) => {
       const price = Number(svc.price) || 0;
       const qty = Number(svc.quantity) || 1;
       const base = price * qty;
-      const gst = parseFloat(((base * serviceGstPct) / 100).toFixed(2));
+      const gst = 0; // no GST on services added by the vendor
       return {
         catalogId: svc.catalogId || undefined,
         name: svc.name || 'Service',
         price,
-        gstPercentage: serviceGstPct,
+        gstPercentage: 0,
         quantity: qty,
         gstAmount: gst,
         total: parseFloat((base + gst).toFixed(2)),
@@ -1142,7 +1153,7 @@ const completeSelfJob = async (req, res) => {
     const billParts = (billDetails?.parts || []).map(part => {
       const price = Number(part.price) || 0;
       const qty = Number(part.quantity) || 1;
-      const pGstPct = (part.gstPercentage != null) ? Number(part.gstPercentage) : partsGstPct;
+      const pGstPct = partsGstPct; // GST not charged
       const base = price * qty;
       const gst = parseFloat(((base * pGstPct) / 100).toFixed(2));
       return {
@@ -1637,19 +1648,14 @@ const endTrip = async (req, res) => {
 
     // 2. FETCH SPLIT CONFIG
     const settings = await Settings.findOne({ type: 'global' });
-    const serviceSplitPct = settings?.rentalPayoutPercentage ?? 90;
-    let gstPct = settings?.rentalGstPercentage !== undefined && settings?.rentalGstPercentage !== null
-      ? Number(settings.rentalGstPercentage)
-      : (Number(settings?.serviceGstPercentage) || 18);
-
+    const serviceSplitPct = await require('../../utils/constants').rentalSplitPct(settings, booking.equipmentId);
+    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
+    let gstPct = 0;
     if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      const bookingGstPct = Math.round((booking.tax * 100) / booking.basePrice);
-      if (bookingGstPct > 0) {
-        gstPct = bookingGstPct;
-      }
+      gstPct = Math.round((booking.tax * 100) / booking.basePrice);
     }
 
-    const gstAmount = (booking.tax && booking.tax > 0) ? Number(booking.tax) : parseFloat(((baseAmount * gstPct) / 100).toFixed(2));
+    const gstAmount = (booking.tax && booking.tax > 0) ? Number(booking.tax) : 0;
     const finalAmount = parseFloat((baseAmount + gstAmount).toFixed(2));
     const vendorEarning = parseFloat(((baseAmount * serviceSplitPct) / 100).toFixed(2));
 

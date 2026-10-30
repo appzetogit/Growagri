@@ -410,6 +410,9 @@ const bookingSchema = new mongoose.Schema({
   cancelledAt: { type: Date, default: null },
   cancellationReason: { type: String, default: null },
   cancelledBy: { type: String, default: null },
+  cancellationFee: { type: Number, default: 0 },
+  // True once the user's cancellation has refunded/charged the payment, so /payments/refund can't pay out again
+  cancellationSettled: { type: Boolean, default: false },
 
   // ==========================================
   // 11. REVIEW & RATING

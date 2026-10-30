@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret';
+process.env.TEST_PHONE_NUMBERS = '6268455485';
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const { saveFcmToken } = require('../services/firebaseAdmin');

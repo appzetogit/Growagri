@@ -61,8 +61,6 @@ const Checkout = () => {
 
   const [selectedTime, setSelectedTime] = useState(null);
   const [visitedFee, setVisitedFee] = useState(0);
-  const [gstPercentage, setGstPercentage] = useState(18);
-  const [rentalGstPercentage, setRentalGstPercentage] = useState(5);
   const [bookingType, setBookingType] = useState('instant'); // 'instant' | 'scheduled'
   // ── Agriculture: Rental Type State (pre-filled from Cart navigation state) ──
   const [rentalType, setRentalType] = useState(location.state?.rentalType || 'hourly'); // 'hourly' | 'land_based' | 'daily'
@@ -149,8 +147,6 @@ const Checkout = () => {
           const settings = configRes.value.settings;
           if (!plan) setVisitedFee(settings.visitedCharges !== undefined ? settings.visitedCharges : 0);
           else setVisitedFee(0);
-          setGstPercentage(settings.serviceGstPercentage || 18);
-          setRentalGstPercentage(settings.rentalGstPercentage !== undefined ? settings.rentalGstPercentage : 5);
         }
 
         // Apply profile / addresses
@@ -346,7 +342,10 @@ const Checkout = () => {
           imageUrl: item.card?.imageUrl || item.icon || '',
           features: item.card?.features || []
         },
-        quantity: item.serviceCount || 1
+        quantity: item.serviceCount || 1,
+        // The server prices each item from its catalog entry
+        serviceId: item.serviceId?._id || item.serviceId?.id || item.serviceId,
+        pricing_context: item.pricing_context || 'any'
       }));
 
       // Calculate Scheduled Data for Instant
@@ -411,7 +410,8 @@ const Checkout = () => {
         landUnit: rentalType === 'bigha' ? 'bigha' : 'acre',
         cropType: cropType || '',
         chemicalUsed: chemicalUsed || '',
-        estimatedDuration: (rentalType === 'hourly' || rentalType === 'minute') ? (Number(estimatedDuration) || 1) : undefined,
+        endDate: (rentalType === 'monthly' || rentalType === 'daily') && endDate ? endDate.toISOString() : undefined,
+        estimatedDuration: (rentalType === 'hourly' || rentalType === 'minute') ? (Number(estimatedDuration) || 1) : (['daily', 'monthly'].includes(rentalType) ? (Number(localDays) || undefined) : undefined),
         selectedImplements: cartItems
           .filter(item => item.pricing_context === 'sub-category')
           .map(impl => ({
@@ -445,7 +445,7 @@ const Checkout = () => {
         }
       }
     } catch (error) {
-      toast.error('Failed to initiate booking request. Please try again.');
+      toast.error(error?.response?.data?.message || 'Failed to initiate booking request. Please try again.');
       setShowVendorModal(false);
       setSearchingVendors(false);
     }
@@ -796,7 +796,9 @@ const Checkout = () => {
     } catch (error) {
       toast.dismiss();
       console.error('Search vendors error:', error);
-      toast.error('Failed to search for vendors. Please try again.');
+      // e.g. "This equipment is already booked for the selected slot"
+      toast.error(error?.response?.data?.message || 'Failed to search for vendors. Please try again.');
+      if (error?.response?.data?.slotUnavailable) setShowTimeSlotModal(true);
       setCurrentStep('details');
       setSearchingVendors(false);
       setShowVendorModal(false);
@@ -1367,7 +1369,8 @@ const Checkout = () => {
               freeBrands: activePlan.freeBrands || [],
               freeServices: activePlan.freeServices || [],
               marketplaceDiscountPercentage: activePlan.marketplaceDiscountPercentage || 0,
-              rentalDiscountPercentage: activePlan.rentalDiscountPercentage || 0
+              rentalDiscountPercentage: activePlan.rentalDiscountPercentage || 0,
+              freeTransport: !!activePlan.freeTransport
             });
 
           }
@@ -1508,23 +1511,18 @@ const Checkout = () => {
       item.type === 'machinery' || item.type === 'equipment' ||
       svc.type === 'machinery' || svc.type === 'equipment');
   });
-  const isMachineryOrRental = hasAgriItems || !!rentalType || location.state?.rentalType || location.state?.isRental;
-  const currentGst = isMachineryOrRental ? (rentalGstPercentage !== undefined ? rentalGstPercentage : 5) : gstPercentage;
-  const taxesAndFee = Math.round((itemTotal * currentGst) / 100);
-  // Visited fee logic: if Total is 0 (All free), user might still pay visited fee?
-  // User says "no payemtn". So maybe visited fee also waived? Or user pays visited fee?
-  // "ask direct servicebooking" -> implies fully free.
-  // I'll set visitedFee to 0 if itemTotal is 0?
-  // Configurable?
-  // Assuming "Free under plan" means NO Payment.
-  const finalVisitedFee = itemTotal === 0 ? 0 : visitedFee;
+  // GST is not charged on bookings
+  const taxesAndFee = 0;
+  // Visit fee is waived when everything is free under the plan, or the plan includes free transport
+  // (same rule as the server's bookingPricing.js)
+  const finalVisitedFee = itemTotal === 0 || planBenefits.freeTransport ? 0 : visitedFee;
 
   const totalAmount = itemTotal + taxesAndFee + finalVisitedFee;
   const amountToPay = totalAmount;
 
   // Helper for Free Plan Full Breakdown Display
-  // If the booking is free, we still want to show what the Tax/Fee WOULD have been
-  const displayTax = totalAmount === 0 ? Math.round((totalOriginalPrice * currentGst) / 100) : taxesAndFee;
+  // If the booking is free, we still want to show what the Fee WOULD have been
+  const displayTax = 0;
   const displayFee = totalAmount === 0 ? visitedFee : finalVisitedFee;
   const displaySavings = totalAmount === 0 ? (totalOriginalPrice + displayTax + displayFee) : savings;
 
@@ -1936,13 +1934,6 @@ const Checkout = () => {
               </div>
             )}
 
-            {/* Taxes */}
-            {displayTax > 0 && (
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500">GST ({currentGst}%)</span>
-                <span className="font-medium text-slate-700">₹{displayTax.toLocaleString('en-IN')}</span>
-              </div>
-            )}
 
             {/* Divider */}
             <div className="border-t border-slate-200 pt-2.5 mt-1.5">

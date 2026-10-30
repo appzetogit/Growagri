@@ -84,7 +84,7 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
   }
 
   const partsGstPercent = bill
-    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 18)
+    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 0)
     : 18;
 
   // Use bill.originalGST if available and > 0, else booking.tax, else calculated

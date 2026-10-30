@@ -163,7 +163,7 @@ const syncPlatformEarnings = async () => {
   }
 };
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://homecareofficialsolution:Admin123@cluster0.1tk4tkp.mongodb.net/Homster', {
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })

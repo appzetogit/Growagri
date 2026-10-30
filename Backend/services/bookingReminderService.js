@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const { createNotification } = require('../controllers/notificationControllers/notificationController');
+const { BOOKING_STATUS } = require('../utils/constants');
+const { slotStartInstant } = require('./bookingSlotService');
 
 /**
  * Booking Reminder Service
@@ -10,28 +12,21 @@ const { createNotification } = require('../controllers/notificationControllers/n
 async function checkUpcomingSlotBookings() {
   try {
     const now = Date.now();
-    // Query bookings that are scheduled/accepted and haven't had a start reminder sent
+    // Accepted bookings are 'confirmed'/'assigned' (there is no 'scheduled' status); only
+    // upcoming ones (from yesterday on) need scanning
     const bookings = await Booking.find({
-      status: { $in: ['scheduled', 'accepted'] },
-      startReminderSent: { $ne: true }
+      status: { $in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.ACCEPTED, BOOKING_STATUS.ASSIGNED] },
+      startReminderSent: { $ne: true },
+      scheduledDate: { $gte: new Date(now - 24 * 60 * 60 * 1000) }
     });
 
     for (const booking of bookings) {
       if (!booking.scheduledDate) continue;
 
-      // Construct start Date object by merging scheduledDate and scheduledTime/timeSlot.start
-      const startDateTime = new Date(booking.scheduledDate);
+      // Slot times are IST whatever timezone the server runs in (defaults to 9:00 AM)
       const startStr = booking.timeSlot?.start || booking.scheduledTime || '';
-      const match = startStr.match(/(\d{1,2}):(\d{2})/);
-      
-      if (match) {
-        const hours = parseInt(match[1], 10);
-        const minutes = parseInt(match[2], 10);
-        startDateTime.setHours(hours, minutes, 0, 0);
-      } else {
-        // Fallback to start of day if time cannot be parsed
-        startDateTime.setHours(9, 0, 0, 0); // Default to 9:00 AM
-      }
+      const startDateTime = slotStartInstant(booking.scheduledDate, startStr, '09:00');
+      if (!startDateTime) continue;
 
       const timeDiff = startDateTime.getTime() - now;
       

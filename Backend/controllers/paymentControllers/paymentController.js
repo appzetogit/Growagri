@@ -588,22 +588,27 @@ const processRefund = async (req, res) => {
     // Users can only refund their own cancelled bookings, always for the paid amount
     const amount = null;
 
-    const booking = await Booking.findOne({ _id: bookingId, userId: req.user.id, status: BOOKING_STATUS.CANCELLED });
+    // Atomically claim the refund (SUCCESS -> REFUNDED) so parallel requests can't refund twice.
+    // Bookings whose cancellation already settled the money (cancellationSettled) are excluded.
+    const booking = await Booking.findOneAndUpdate(
+      {
+        _id: bookingId,
+        userId: req.user.id,
+        status: BOOKING_STATUS.CANCELLED,
+        paymentStatus: PAYMENT_STATUS.SUCCESS,
+        cancellationSettled: { $ne: true }
+      },
+      { $set: { paymentStatus: PAYMENT_STATUS.REFUNDED } },
+      { new: true }
+    );
 
     if (!booking) {
       return res.status(404).json({
         success: false,
-        message: 'Booking not found'
+        message: 'No refundable payment found for this booking'
       });
     }
-
-    // Check if payment was successful
-    if (booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment not completed for this booking'
-      });
-    }
+    const unclaim = () => Booking.updateOne({ _id: booking._id }, { $set: { paymentStatus: PAYMENT_STATUS.SUCCESS } });
 
     // Process refund based on payment method
     if (booking.paymentMethod === 'razorpay' && booking.razorpayPaymentId) {
@@ -618,14 +623,12 @@ const processRefund = async (req, res) => {
       );
 
       if (!refundResult.success) {
+        await unclaim();
         return res.status(500).json({
           success: false,
           message: 'Failed to process refund'
         });
       }
-
-      // Update booking payment status
-      booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
     } else if (booking.paymentMethod === 'wallet') {
       // Wallet refund - add back to user wallet
       const user = await User.findByIdAndUpdate(booking.userId, { $inc: { 'wallet.balance': booking.finalAmount } }, { new: true });
@@ -641,17 +644,13 @@ const processRefund = async (req, res) => {
           balanceAfter: user.wallet.balance
         });
       }
-
-      // Update booking payment status
-      booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
     } else {
+      await unclaim();
       return res.status(400).json({
         success: false,
         message: 'Refund not supported for this payment method'
       });
     }
-
-    await booking.save();
 
     res.status(200).json({
       success: true,
@@ -742,23 +741,42 @@ const confirmPayAtHome = async (req, res) => {
       });
     }
 
-    // Update booking status — NO earnings set (VendorBill handles that later)
+    if ([BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.REJECTED].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Booking is already ${booking.status}`
+      });
+    }
+
+    // A held Pay Now booking without a vendor starts its vendor search now (same as after online payment)
+    const startVendorSearch = booking.status === BOOKING_STATUS.AWAITING_PAYMENT && !booking.vendorId;
+
+    // Update payment mode — NO earnings set (VendorBill handles that later).
+    // Only pre-work statuses move forward; a job already in progress keeps its status.
     booking.paymentMethod = 'pay_at_home';
     booking.paymentMode = 'pay_at_home';
     booking.paymentStatus = PAYMENT_STATUS.PENDING;
-    booking.status = BOOKING_STATUS.CONFIRMED;
+    if ([BOOKING_STATUS.AWAITING_PAYMENT, BOOKING_STATUS.PENDING, BOOKING_STATUS.SEARCHING].includes(booking.status)) {
+      booking.status = booking.vendorId ? BOOKING_STATUS.CONFIRMED : BOOKING_STATUS.SEARCHING;
+    }
 
     await booking.save();
 
+    if (startVendorSearch) {
+      await dispatchWave1(booking._id, req.app.get('io'));
+    }
+
     // Notify Vendor that booking is confirmed
-    await createNotification({
-      vendorId: booking.vendorId,
-      type: 'booking_confirmed',
-      title: 'Booking Confirmed (Pay at Home)',
-      message: `Booking ${booking.bookingNumber} has been confirmed. Payment method: Pay at Home.`,
-      relatedId: booking._id,
-      relatedType: 'booking'
-    });
+    if (booking.vendorId) {
+      await createNotification({
+        vendorId: booking.vendorId,
+        type: 'booking_confirmed',
+        title: 'Booking Confirmed (Pay at Home)',
+        message: `Booking ${booking.bookingNumber} has been confirmed. Payment method: Pay at Home.`,
+        relatedId: booking._id,
+        relatedType: 'booking'
+      });
+    }
 
     res.status(200).json({
       success: true,

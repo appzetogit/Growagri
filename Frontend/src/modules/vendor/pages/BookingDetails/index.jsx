@@ -194,7 +194,7 @@ export default function BookingDetails() {
           },
           // Price Breakdown
           basePrice: parseFloat(apiData.basePrice || 0),
-          tax: parseFloat(apiData.tax || (apiData.paymentMethod === 'plan_benefit' ? (apiData.basePrice || 0) * 0.18 : 0)),
+          tax: parseFloat(apiData.tax || 0),
           visitingCharges: parseFloat(apiData.visitingCharges || apiData.visitationFee || (apiData.paymentMethod === 'plan_benefit' ? 49 : 0)),
           discount: parseFloat(apiData.discount || 0),
           platformCommission: parseFloat(apiData.adminCommission || apiData.platformFee || apiData.commission || 0),
@@ -756,47 +756,20 @@ export default function BookingDetails() {
   const customItems = bill?.customItems || [];
 
   let extraServiceBase = 0;
-  let extraServiceGST = 0;
   services.forEach(s => {
     const qty = parseFloat(s.quantity) || 1;
-    const base = (parseFloat(s.price) || 0) * qty;
-    const gst = parseFloat(s.gstAmount) || 0;
-    extraServiceBase += base;
-    extraServiceGST += gst;
+    extraServiceBase += (parseFloat(s.price) || 0) * qty;
   });
 
   let partsBase = 0;
-  let partsGST = 0;
   parts.forEach(p => {
     const qty = parseFloat(p.quantity) || 1;
     partsBase += ((parseFloat(p.price) || 0) * qty);
-    partsGST += (parseFloat(p.gstAmount) || 0);
   });
   customItems.forEach(c => {
     const qty = parseFloat(c.quantity) || 1;
     partsBase += ((parseFloat(c.price) || 0) * qty);
-    partsGST += (parseFloat(c.gstAmount) || 0);
   });
-
-  // Tax Logic
-  const isRental = !!(booking?.rental_type || booking?.equipmentId || booking?.landSize || (booking?.serviceCategory && (booking.serviceCategory.toLowerCase().includes('machinery') || booking.serviceCategory.toLowerCase().includes('tractor') || booking.serviceCategory.toLowerCase().includes('equipment') || booking.serviceCategory.toLowerCase().includes('agriculture'))));
-
-  let serviceGstPercent = bill?.payoutConfig?.serviceGstPercentage ?? bill?.services?.[0]?.gstPercentage;
-  if ((!serviceGstPercent || serviceGstPercent === 0) && booking?.tax && booking?.basePrice) {
-    serviceGstPercent = Math.round((booking.tax * 100) / booking.basePrice);
-  }
-  if ((!serviceGstPercent || serviceGstPercent === 0) && isRental) {
-    serviceGstPercent = 18;
-  }
-  if (serviceGstPercent === undefined || serviceGstPercent === null) {
-    serviceGstPercent = 18;
-  }
-
-  const originalGST = (bill && bill.originalGST > 0)
-    ? bill.originalGST
-    : (booking?.tax && booking.tax > 0)
-      ? Number(booking.tax)
-      : parseFloat(((originalBase * serviceGstPercent) / 100).toFixed(2));
 
   const hasBill = !!bill;
 
@@ -1204,25 +1177,10 @@ export default function BookingDetails() {
                   </div>
                 )}
 
-                {/* Service GST */}
-                {(() => {
-                  const activeGST = bill ? (originalGST + extraServiceGST) : (booking.tax || originalGST);
-                  const activeBase = bill ? (originalBase - (booking.discount || 0) + extraServiceBase) : (originalBase - (booking.discount || 0));
-                  const dynamicGstPct = (activeGST > 0 && activeBase > 0)
-                    ? Math.round((activeGST * 100) / activeBase)
-                    : 18;
-                  return (
-                    <div className="flex justify-between text-xs text-gray-500 border-t border-dashed border-gray-100 pt-1 mt-1">
-                      <span>Service GST ({dynamicGstPct}%)</span>
-                      <span className="font-mono">₹{activeGST.toFixed(2)}</span>
-                    </div>
-                  );
-                })()}
-
                 {/* Service Subtotal */}
-                <div className="flex justify-between font-bold text-gray-800 pt-1">
+                <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-100 pt-2 mt-1">
                   <span>Total Service</span>
-                  <span>₹{(bill ? (originalBase + extraServiceBase + originalGST + extraServiceGST) : (originalBase - (booking.discount || 0) + (booking.tax || originalGST))).toFixed(2)}</span>
+                  <span>₹{(originalBase - (booking.discount || 0) + (bill ? extraServiceBase : 0)).toFixed(2)}</span>
                 </div>
 
                 {/* Payment status (cash collected at home counts as received) */}
@@ -1280,16 +1238,10 @@ export default function BookingDetails() {
                     </div>
                   ))}
 
-                  {/* Parts GST */}
-                  <div className="flex justify-between text-xs text-gray-500 border-t border-dashed border-gray-100 pt-1 mt-1">
-                    <span>Parts GST (18%)</span>
-                    <span className="font-mono">₹{partsGST.toFixed(2)}</span>
-                  </div>
-
                   {/* Parts Subtotal */}
-                  <div className="flex justify-between font-bold text-gray-800 pt-1">
+                  <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-100 pt-2 mt-1">
                     <span>Total Parts</span>
-                    <span>₹{(partsBase + partsGST).toFixed(2)}</span>
+                    <span>₹{partsBase.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

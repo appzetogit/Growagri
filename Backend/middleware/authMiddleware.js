@@ -16,7 +16,8 @@ const authenticate = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     } else if (req.cookies && req.cookies.accessToken) {
       token = req.cookies.accessToken;
-    } else if (req.query && req.query.token) {
+    } else if (req.method === 'GET' && typeof req.query?.token === 'string' && req.originalUrl.split('?')[0].endsWith('/download')) {
+      // Only for browser file downloads (e.g. vendor bill PDF) that can't send headers; query tokens leak into logs
       token = req.query.token;
     }
 

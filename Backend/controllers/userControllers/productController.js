@@ -36,11 +36,13 @@ const getApprovedProducts = async (req, res) => {
             status: 'active'
         };
 
-        if (categoryId) filter.categoryId = categoryId;
-        if (query) {
+        if (typeof categoryId === 'string') filter.categoryId = categoryId;
+        if (typeof query === 'string' && query.trim()) {
+            // Literal search: escape regex syntax so user input can't run a costly pattern on the DB
+            const safeQuery = query.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             filter.$or = [
-                { title: { $regex: query, $options: 'i' } },
-                { description: { $regex: query, $options: 'i' } }
+                { title: { $regex: safeQuery, $options: 'i' } },
+                { description: { $regex: safeQuery, $options: 'i' } }
             ];
         }
 
@@ -84,7 +86,7 @@ const getApprovedProducts = async (req, res) => {
         }
 
         // City-based filtering logic
-        if (cityId) {
+        if (typeof cityId === 'string' && cityId) {
             const Vendor = require('../../models/Vendor');
             const vendorsInCity = await Vendor.find({ cityId }).select('_id');
             const vendorIds = vendorsInCity.map(v => v._id);
@@ -149,13 +151,18 @@ const placeOrder = async (req, res) => {
 
         if (productId) {
             // Single Item Buy Flow
+            // Whole positive quantity only: a negative one made the wallet "debit" a credit
+            const qty = Number(quantity);
+            if (!Number.isInteger(qty) || qty < 1 || qty > 1000) {
+                return res.status(400).json({ success: false, message: 'Please enter a valid quantity' });
+            }
             const product = await Product.findById(productId);
-            if (!product || product.approvalStatus !== 'approved' || product.stock < quantity) {
+            if (!product || product.approvalStatus !== 'approved' || product.status !== 'active' || product.stock < qty) {
                 return res.status(400).json({ success: false, message: 'Product unavailable or out of stock' });
             }
             checkoutItems.push({
                 product,
-                quantity: Number(quantity)
+                quantity: qty
             });
         } else {
             // Cart Checkout Flow
@@ -167,6 +174,9 @@ const placeOrder = async (req, res) => {
                 const product = item.productId;
                 if (!product || product.approvalStatus !== 'approved' || product.status !== 'active') {
                     return res.status(400).json({ success: false, message: `Product ${product?.title || 'Unknown'} is unavailable` });
+                }
+                if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+                    return res.status(400).json({ success: false, message: `Invalid quantity for ${product.title}` });
                 }
                 if (product.stock < item.quantity) {
                     return res.status(400).json({ success: false, message: `Product ${product.title} does not have enough stock` });
@@ -684,7 +694,8 @@ const generateInvoice = async (req, res) => {
             .populate('vendorId', 'businessName phone name shopDetails')
             .populate('items.productId', 'title price unit bagWeight gstPercentage commissionPercentage brandName');
 
-        if (!order) {
+        // Only the buyer can download their invoice (it carries their name, phone and address)
+        if (!order || String(order.userId?._id || order.userId) !== String(req.user._id)) {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
 

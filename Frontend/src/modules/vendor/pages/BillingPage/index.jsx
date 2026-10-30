@@ -21,8 +21,8 @@ const BillingPage = () => {
 
   // Settings
   const [payoutSettings, setPayoutSettings] = useState({
-    serviceGstPct: 18,
-    partsGstPct: 18,
+    serviceGstPct: 0,
+    partsGstPct: 0,
     servicePayoutPct: 90,
     partsPayoutPct: 100
   });
@@ -64,13 +64,10 @@ const BillingPage = () => {
         if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
           gst = Math.round((bData.tax * 100) / bData.basePrice);
         }
-        if ((gst === 0 || gst === undefined) && isRental) {
-          gst = 18;
-        }
 
         setPayoutSettings({
-          serviceGstPct: gst ?? 18,
-          partsGstPct: pc.partsGstPercentage ?? 18,
+          serviceGstPct: gst ?? 0,
+          partsGstPct: pc.partsGstPercentage ?? 0,
           servicePayoutPct: isRental ? (pc.serviceSplitPercentage ?? 90) : (pc.serviceSplitPercentage ?? 90),
           partsPayoutPct: pc.partsSplitPercentage ?? 10
         });
@@ -82,17 +79,14 @@ const BillingPage = () => {
           const data = await res.json();
           if (data.success && data.data?.global) {
             const g = data.data.global;
-            let gst = isRental ? (g.rentalGstPercentage ?? 18) : (g.serviceGstPercentage ?? 18);
+            let gst = isRental ? (g.rentalGstPercentage ?? 0) : (g.serviceGstPercentage ?? 0);
             if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
               gst = Math.round((bData.tax * 100) / bData.basePrice);
-            }
-            if ((gst === 0 || gst === undefined) && isRental) {
-              gst = 18;
             }
 
             setPayoutSettings({
               serviceGstPct: gst,
-              partsGstPct: g.partsGstPercentage ?? 18,
+              partsGstPct: g.partsGstPercentage ?? 0,
               servicePayoutPct: isRental ? (g.rentalPayoutPercentage ?? 90) : (g.servicePayoutPercentage ?? 90),
               partsPayoutPct: g.partsPayoutPercentage ?? 10
             });
@@ -111,19 +105,14 @@ const BillingPage = () => {
   const calculations = useMemo(() => {
     if (!booking) return null;
 
-    const { serviceGstPct, servicePayoutPct } = payoutSettings;
+    const { servicePayoutPct } = payoutSettings;
 
     // Original booking base (service)
     const isPlanBooking = booking.paymentMethod === 'plan_benefit';
     const originalBase = isPlanBooking ? 0 : (booking.basePrice || 0);
-    const originalServiceGST = isPlanBooking 
-      ? 0 
-      : (booking.tax && booking.tax > 0 && (serviceGstPct === Math.round((booking.tax * 100) / originalBase) || serviceGstPct === 0))
-        ? Number(booking.tax)
-        : parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
     const visitingCharges = Number(booking.visitingCharges) || 0;
 
-    const finalBillAmount = parseFloat((originalBase + originalServiceGST + visitingCharges).toFixed(2));
+    const finalBillAmount = parseFloat((originalBase + visitingCharges).toFixed(2));
 
     // Vendor Earnings estimate
     const vendorServiceEarnings = parseFloat(((originalBase * servicePayoutPct) / 100).toFixed(2));
@@ -131,9 +120,6 @@ const BillingPage = () => {
 
     return {
       originalBase,
-      serviceGstPct,
-      totalServiceGST: originalServiceGST,
-      totalGST: originalServiceGST,
       visitingCharges,
       finalBillAmount,
       totalVendorEarnings,
@@ -271,14 +257,9 @@ const BillingPage = () => {
                       )}
                     </div>
 
-                    <div className="flex justify-between text-xs text-slate-500 border-t border-dashed border-slate-200 pt-1 mt-1">
-                      <span>Service GST ({calculations.serviceGstPct}%)</span>
-                      <span>₹{calculations.totalServiceGST.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between font-bold text-slate-800 pt-1">
+                    <div className="flex justify-between font-bold text-slate-800 border-t border-dashed border-slate-200 pt-2 mt-1">
                       <span>Total Service</span>
-                      <span>₹{(calculations.originalBase + calculations.totalServiceGST).toFixed(2)}</span>
+                      <span>₹{calculations.originalBase.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
