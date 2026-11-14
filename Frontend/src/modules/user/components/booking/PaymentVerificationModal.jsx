@@ -34,17 +34,9 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
   const originalServiceFromBill = allBillServices.find(s => s.isOriginal);
 
   let extraServiceBase = 0;
-  let extraServiceGST = 0;
 
   services.forEach(s => {
-    // s.price is UNIT BASE PRICE. s.total is INCLUSIVE.
-    // Use stored values directly to avoid rounding errors or tax assumption mismatches
-    const qty = parseFloat(s.quantity) || 1;
-    const base = (parseFloat(s.price) || 0) * qty;
-    const gst = parseFloat(s.gstAmount) || 0;
-
-    extraServiceBase += base;
-    extraServiceGST += gst;
+    extraServiceBase += (parseFloat(s.price) || 0) * (parseFloat(s.quantity) || 1);
   });
 
   const totalServiceBase = originalBase + extraServiceBase;
@@ -54,53 +46,15 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
   const customItems = bill?.customItems || [];
 
   let partsBase = 0;
-  let partsGST = 0;
 
-  // Calculate parts base & GST from stored values
-  parts.forEach(p => {
-    const qty = parseFloat(p.quantity) || 1;
-    partsBase += ((parseFloat(p.price) || 0) * qty);
-    partsGST += (parseFloat(p.gstAmount) || 0);
+  [...parts, ...customItems].forEach(p => {
+    partsBase += (parseFloat(p.price) || 0) * (parseFloat(p.quantity) || 1);
   });
-
-  customItems.forEach(c => {
-    const qty = parseFloat(c.quantity) || 1;
-    partsBase += ((parseFloat(c.price) || 0) * qty);
-    partsGST += (parseFloat(c.gstAmount) || 0);
-  });
-
-  // Tax Logic
-  const isRental = !!(booking.rental_type || booking.equipmentId || booking.landSize || (booking.serviceCategory && (booking.serviceCategory.toLowerCase().includes('machinery') || booking.serviceCategory.toLowerCase().includes('tractor') || booking.serviceCategory.toLowerCase().includes('equipment') || booking.serviceCategory.toLowerCase().includes('agriculture'))));
-
-  let serviceGstPercent = bill?.payoutConfig?.serviceGstPercentage ?? bill?.services?.[0]?.gstPercentage;
-  if ((!serviceGstPercent || serviceGstPercent === 0) && booking.tax && booking.basePrice) {
-    serviceGstPercent = Math.round((booking.tax * 100) / booking.basePrice);
-  }
-  if ((!serviceGstPercent || serviceGstPercent === 0) && isRental) {
-    serviceGstPercent = 18;
-  }
-  if (serviceGstPercent === undefined || serviceGstPercent === null) {
-    serviceGstPercent = 18;
-  }
-
-  const partsGstPercent = bill
-    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 0)
-    : 18;
-
-  // Use bill.originalGST if available and > 0, else booking.tax, else calculated
-  let originalGST = (bill && bill.originalGST > 0)
-    ? bill.originalGST
-    : (booking.tax && booking.tax > 0)
-      ? Number(booking.tax)
-      : parseFloat(((originalBase * serviceGstPercent) / 100).toFixed(2));
-
-  if (isPlanBenefit) originalGST = 0;
-  const totalGST = originalGST + extraServiceGST + partsGST;
 
   // Final Total
   let finalTotal = (bill && bill.grandTotal > originalBase)
     ? bill.grandTotal
-    : (totalServiceBase + totalGST + partsBase + (Number(booking.visitingCharges) || 0));
+    : (totalServiceBase + partsBase + (Number(booking.visitingCharges) || 0));
 
   if (!bill && booking.finalAmount && booking.finalAmount > originalBase) {
     finalTotal = booking.finalAmount;
@@ -212,16 +166,10 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
                     </div>
                   ))}
 
-                  {/* Service GST */}
-                  <div className="flex justify-between text-xs text-slate-500 border-t border-dashed border-slate-100 pt-1 mt-1">
-                    <span>GST ({serviceGstPercent}%)</span>
-                    <span className="font-mono">₹{(originalGST + extraServiceGST).toFixed(2)}</span>
-                  </div>
-
                   {/* Service Subtotal */}
-                  <div className="flex justify-between text-xs font-bold text-slate-800 pt-1">
+                  <div className="flex justify-between text-xs font-bold text-slate-800 border-t border-dashed border-slate-100 pt-1 mt-1">
                     <span>Total Service</span>
-                    <span>₹{(totalServiceBase + originalGST + extraServiceGST).toFixed(2)}</span>
+                    <span>₹{totalServiceBase.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -247,15 +195,9 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
                       </div>
                     ))}
 
-                    {/* Parts GST */}
-                    <div className="flex justify-between text-xs text-slate-500 border-t border-dashed border-slate-100 pt-1 mt-1">
-                      <span>GST ({partsGstPercent}%)</span>
-                      <span className="font-mono">₹{partsGST.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between text-xs font-bold text-slate-800 pt-1">
+                    <div className="flex justify-between text-xs font-bold text-slate-800 border-t border-dashed border-slate-100 pt-1 mt-1">
                       <span>Total Parts</span>
-                      <span>₹{(partsBase + partsGST).toFixed(2)}</span>
+                      <span>₹{partsBase.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

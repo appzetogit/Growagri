@@ -11,18 +11,6 @@ const settingsSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
-  serviceGstPercentage: {
-    type: Number,
-    default: 18,
-    min: 0,
-    max: 100
-  },
-  partsGstPercentage: {
-    type: Number,
-    default: 18,
-    min: 0,
-    max: 100
-  },
   servicePayoutPercentage: {
     type: Number,
     default: 90, // Vendor gets 90% of service base price
@@ -38,12 +26,6 @@ const settingsSchema = new mongoose.Schema({
   // ==========================================
   // AGRICULTURE / MACHINE RENTING SPECIFIC
   // ==========================================
-  rentalGstPercentage: {
-    type: Number,
-    default: 5, // Agriculture GST is 5% (NOT 18% like normal services)
-    min: 0,
-    max: 100
-  },
   rentalPayoutPercentage: {
     type: Number,
     default: 90, // Equipment Owner keeps 90% of rental charges
@@ -149,10 +131,6 @@ const settingsSchema = new mongoose.Schema({
     type: String,
     default: 'TodayMyDream'
   },
-  companyGSTIN: {
-    type: String,
-    default: ''
-  },
   companyPAN: {
     type: String,
     default: ''
@@ -186,10 +164,6 @@ const settingsSchema = new mongoose.Schema({
   invoicePrefix: {
     type: String,
     default: 'INV'
-  },
-  sacCode: {
-    type: String,
-    default: '998599'  // Event services SAC code
   },
   currentInvoiceNumber: {
     type: Number,

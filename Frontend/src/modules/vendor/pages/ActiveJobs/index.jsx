@@ -56,7 +56,7 @@ const ActiveJobs = memo(() => {
         location: {
           address: job.address?.addressLine1 || job.location?.address || 'Address not available'
         },
-        // Vendor's real earning from the bill (excludes GST & admin commission); unknown until billed
+        // Vendor's real earning from the bill (excludes admin commission); unknown until billed
         price: job.vendorBillId?.vendorTotalEarning != null ? Number(job.vendorBillId.vendorTotalEarning).toFixed(2) : null,
         status: job.status,
         paymentStatus: job.paymentStatus,

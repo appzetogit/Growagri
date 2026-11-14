@@ -144,7 +144,7 @@ const getBookingById = async (req, res) => {
       .populate('categoryId', 'title slug')
       .populate('workerId', 'name phone rating totalJobs completedJobs')
       .populate('equipmentId', 'name')
-      .populate('vendorBillId', 'grandTotal totalServiceBase totalPartsBase totalGST visitingCharges transportCharges vendorTotalEarning companyRevenue payoutConfig status');
+      .populate('vendorBillId', 'grandTotal totalServiceBase totalPartsBase visitingCharges transportCharges vendorTotalEarning companyRevenue payoutConfig status');
 
     if (!booking) {
       return res.status(404).json({

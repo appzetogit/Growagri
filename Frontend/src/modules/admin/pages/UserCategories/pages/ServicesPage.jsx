@@ -11,7 +11,6 @@ import { z } from "zod";
 const serviceSchema = z.object({
   title: z.string().min(2, "Title is required"),
   basePrice: z.number().optional(),
-  gstPercentage: z.number().min(0).max(100).default(18),
   categoryId: z.string().min(1, "Category is required"),
   hourly_price: z.number().optional(),
   land_price: z.number().optional(),
@@ -117,7 +116,6 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
-    gstPercentage: 18,
     categoryId: "",
     hourly_price: "",
     land_price: "",
@@ -134,7 +132,6 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
     setForm({
       title: "",
       basePrice: "",
-      gstPercentage: 18,
       categoryId: activeCategoryId || "",
       hourly_price: "",
       land_price: "",
@@ -151,7 +148,6 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
     setForm({
       title: s.title,
       basePrice: s.basePrice || "",
-      gstPercentage: s.gstPercentage || 18,
       categoryId: String(s.categoryId?._id || s.categoryId),
       hourly_price: s.hourly_price || "",
       land_price: s.land_price || "",
@@ -170,7 +166,6 @@ const ServicesPage = ({ catalog, setCatalog, selectedCity }) => {
     const data = {
       title: form.title,
       basePrice: parseFloat(form.hourly_price) || parseFloat(form.daily_price) || parseFloat(form.land_price) || 0,
-      gstPercentage: 0, // GST is not charged on bookings
       categoryId: form.categoryId,
       hourly_price: parseFloat(form.hourly_price) || 0,
       land_price: parseFloat(form.land_price) || 0,

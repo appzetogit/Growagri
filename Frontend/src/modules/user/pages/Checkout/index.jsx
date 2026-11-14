@@ -387,7 +387,6 @@ const Checkout = () => {
         // Pass Full Breakdown to Backend
         basePrice: totalOriginalPrice,
         discount: savings,
-        tax: taxesAndFee,
         visitationFee: finalVisitedFee,
 
         // Metadata for better data capture
@@ -725,7 +724,6 @@ const Checkout = () => {
         // Pass Full Breakdown to Backend
         basePrice: totalOriginalPrice,
         discount: savings,
-        tax: taxesAndFee,
         visitationFee: finalVisitedFee,
 
         // Metadata for better data capture
@@ -945,7 +943,6 @@ const Checkout = () => {
           amount: amountToPay,
           basePrice: totalOriginalPrice,
           discount: savings,
-          tax: taxesAndFee,
           visitationFee: finalVisitedFee,
           serviceCategory: firstItem.categoryTitle || firstItem.category || 'Agriculture',
           categoryIcon: firstItem.categoryIcon || firstItem.icon || null,
@@ -1511,13 +1508,11 @@ const Checkout = () => {
       item.type === 'machinery' || item.type === 'equipment' ||
       svc.type === 'machinery' || svc.type === 'equipment');
   });
-  // GST is not charged on bookings
-  const taxesAndFee = 0;
   // Visit fee is waived when everything is free under the plan, or the plan includes free transport
   // (same rule as the server's bookingPricing.js)
   const finalVisitedFee = itemTotal === 0 || planBenefits.freeTransport ? 0 : visitedFee;
 
-  const totalAmount = itemTotal + taxesAndFee + finalVisitedFee;
+  const totalAmount = itemTotal + finalVisitedFee;
   const amountToPay = totalAmount;
 
   // Helper for Free Plan Full Breakdown Display

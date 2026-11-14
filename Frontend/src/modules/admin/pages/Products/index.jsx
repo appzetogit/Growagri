@@ -68,7 +68,6 @@ const ManageProducts = () => {
     const [showCatalogModal, setShowCatalogModal] = useState(false);
     const [catalogFormData, setCatalogFormData] = useState({
         title: "",
-        gstPercentage: 0,
         categoryId: "",
         hourly_price: "",
         land_price: "",
@@ -284,8 +283,7 @@ const ManageProducts = () => {
                     });
                 } else {
                     res = await adminProductService.approveProduct(approveTarget._id, {
-                        commissionPercentage: commissionVal,
-                        gstPercentage: 0 // GST is not charged on bookings
+                        commissionPercentage: commissionVal
                     });
                 }
 
@@ -336,7 +334,6 @@ const ManageProducts = () => {
         setCatalogFormData({
             title: vendorEq.requestedCategoryName || vendorEq.name || "",
             categoryId: vendorEq.categoryId?._id || vendorEq.categoryId || "",
-            gstPercentage: 0,
             hourly_price: vendorEq.pricing?.hourly?.price || "",
             land_price: vendorEq.pricing?.land_based?.price || "",
             land_unit: "acre",
@@ -414,7 +411,6 @@ const ManageProducts = () => {
             const payload = {
                 title: catalogFormData.title,
                 basePrice: parseFloat(catalogFormData.hourly_price) || parseFloat(catalogFormData.daily_price) || parseFloat(catalogFormData.land_price) || 0,
-                gstPercentage: 0, // GST is not charged
                 ...(finalCategoryId ? { categoryId: finalCategoryId } : {}),
                 hourly_price: parseFloat(catalogFormData.hourly_price) || 0,
                 land_price: parseFloat(catalogFormData.land_price) || 0,

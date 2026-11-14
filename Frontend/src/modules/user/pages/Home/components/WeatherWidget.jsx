@@ -5,34 +5,51 @@ import { motion } from 'framer-motion';
 import weatherService from '../../../services/weatherService';
 import { useLanguage } from '../../../../../context/LanguageContext';
 
+// One fetch shared by WeatherWidget + WeatherBanner (module-level promise)
+let weatherPromise = null;
+const fetchWeather = () => {
+    if (!weatherPromise) {
+        weatherPromise = new Promise((resolve) => {
+            if (!("geolocation" in navigator)) return resolve(null);
+            navigator.geolocation.getCurrentPosition(
+                async ({ coords }) => {
+                    try {
+                        const res = await weatherService.getWeather(coords.latitude, coords.longitude);
+                        resolve(res.success ? res.data : null);
+                    } catch (err) {
+                        console.error("Weather error:", err);
+                        resolve(null);
+                    }
+                },
+                () => resolve(null)
+            );
+        }).then((data) => {
+            if (!data) weatherPromise = null; // retry on next mount
+            return data;
+        });
+    }
+    return weatherPromise;
+};
+
+export function useWeather() {
+    const [weather, setWeather] = useState(null);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        let alive = true;
+        fetchWeather().then((data) => {
+            if (!alive) return;
+            setWeather(data);
+            setLoading(false);
+        });
+        return () => { alive = false; };
+    }, []);
+    return { weather, loading };
+}
+
 export default function WeatherWidget() {
     const navigate = useNavigate();
     const { t } = useLanguage();
-    const [weather, setWeather] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    try {
-                        const { latitude, longitude } = position.coords;
-                        const res = await weatherService.getWeather(latitude, longitude);
-                        if (res.success) {
-                            setWeather(res.data);
-                        }
-                    } catch (err) {
-                        console.error("Weather error:", err);
-                    } finally {
-                        setLoading(false);
-                    }
-                },
-                () => setLoading(false)
-            );
-        } else {
-            setLoading(false);
-        }
-    }, []);
+    const { weather, loading } = useWeather();
 
     const getWeatherIcon = (description) => {
         const d = description?.toLowerCase() || '';
@@ -54,7 +71,7 @@ export default function WeatherWidget() {
             className="relative bg-white border border-slate-100/90 rounded-[20px] sm:rounded-[22px] px-1.5 py-3 sm:px-2.5 sm:py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-md transition-all active:scale-95 group flex flex-col items-center justify-between text-center cursor-pointer min-h-[114px] sm:min-h-[128px]"
         >
             {/* Circular Weather Badge Matching Reference */}
-            <div className="relative w-14 h-14 min-[390px]:w-15 min-[390px]:h-15 sm:w-16 sm:h-16 rounded-full p-1 flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-50 via-sky-50 to-blue-50 border border-sky-100 shadow-xs transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+            <div className="relative w-16 h-16 min-[390px]:w-[72px] min-[390px]:h-[72px] sm:w-20 sm:h-20 rounded-full p-1 flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-50 via-sky-50 to-blue-50 border border-sky-100 shadow-xs transition-transform duration-300 group-hover:scale-105 overflow-hidden">
                 <div className="flex items-center justify-center z-10">
                     {iconToRender}
                 </div>

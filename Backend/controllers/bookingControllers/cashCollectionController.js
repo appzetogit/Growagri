@@ -305,7 +305,6 @@ exports.confirmCashCollection = async (req, res) => {
       totalRevenue: bill ? bill.grandTotal : collectionAmount,
       platformCommission: bill ? bill.companyRevenue : (collectionAmount * 0.2),
       vendorEarnings: vendorEarning > 0 ? vendorEarning : (collectionAmount * 0.8),
-      totalGST: bill ? bill.totalGST : 0,
       totalTDS: 0 // Captured separately during withdrawal
     });
 

@@ -1,21 +1,17 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { FiBell, FiCheck, FiX, FiFilter, FiTrash2 } from 'react-icons/fi';
+import { FiBell, FiTrash2 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { vendorTheme as themeColors } from '../../../../theme';
 import Header from '../../components/layout/Header';
 import BottomNav from '../../components/layout/BottomNav';
 import {
   getNotifications,
-  markAsRead,
   markAllAsRead,
-  deleteNotification,
   deleteAllNotifications
 } from '../../services/notificationService';
 
 const Notifications = () => {
-  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -43,6 +39,11 @@ const Notifications = () => {
       setLoading(true);
       const data = await getNotifications();
       setNotifications(data || []);
+      // Opening the page marks everything read so the bell badge resets
+      if ((data || []).some(n => !n.read)) {
+        await markAllAsRead().catch(() => {});
+        window.dispatchEvent(new Event('vendorNotificationsUpdated'));
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -62,43 +63,6 @@ const Notifications = () => {
     };
   }, []);
 
-  const handleMarkAsRead = async (id) => {
-    try {
-      await markAsRead(id);
-      // Update local state to reflect change immediately
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-      toast.success('Notification marked as read');
-    } catch (error) {
-      console.error('Failed to mark as read', error);
-      toast.error('Failed to mark as read');
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    try {
-      await markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      toast.success('All marked as read');
-    } catch (error) {
-      console.error('Failed to mark all as read', error);
-      toast.error('Failed to mark all as read');
-    }
-  };
-
-  const handleDelete = async (e, id) => {
-    e.stopPropagation();
-    try {
-      await deleteNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      toast.success('Notification removed');
-    } catch (error) {
-      console.error('Failed to delete notification', error);
-      toast.error('Failed to delete');
-    }
-  };
-
   const handleClearAll = () => {
     setShowClearConfirm(true);
   };
@@ -113,37 +77,6 @@ const Notifications = () => {
       console.error('Failed to clear notifications', error);
       toast.error('Failed to clear');
       setShowClearConfirm(false);
-    }
-  };
-
-  const handleNotificationClick = (notif) => {
-    // Mark as read when clicked
-    if (!notif.read) {
-      handleMarkAsRead(notif.id);
-    }
-
-    // Extraction of path based on type or related metadata
-    const type = (notif.type || '').toLowerCase();
-    const relatedType = (notif.relatedType || '').toLowerCase();
-    const relatedId = notif.relatedId || notif.bookingId || notif.itemId;
-
-    if (relatedType === 'booking' || type.includes('booking') || type.includes('job') || type.includes('work')) {
-      if (relatedId) navigate(`/vendor/booking/${relatedId}`);
-      else navigate('/vendor/jobs');
-    } else if (type.includes('soil')) {
-      navigate('/vendor/soil-tests');
-    } else if (type.includes('payment') || type.includes('wallet') || type.includes('payout')) {
-      navigate('/vendor/wallet');
-    } else if (type.includes('compliance')) {
-      navigate('/vendor/compliance');
-    } else if (type.includes('profile')) {
-      navigate('/vendor/profile/details');
-    } else if (type.includes('ecommerce') || type.includes('order')) {
-      navigate('/vendor/store/orders');
-    } else if (type.includes('dispute') || relatedType === 'dispute') {
-      const bId = notif.data?.bookingId || notif.bookingId;
-      if (bId) navigate(`/vendor/booking/${bId}`);
-      else navigate('/vendor/jobs');
     }
   };
 
@@ -229,12 +162,6 @@ const Notifications = () => {
         {notifications.length > 0 && (
           <div className="flex justify-end gap-4 mb-4">
             <button
-              onClick={handleMarkAllRead}
-              className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors"
-            >
-              Mark All as Read
-            </button>
-            <button
               onClick={handleClearAll}
               className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1"
             >
@@ -261,13 +188,12 @@ const Notifications = () => {
             {filteredNotifications.map((notif) => (
               <div
                 key={notif.id}
-                className={`bg-white rounded-xl p-4 shadow-md transition-all relative group cursor-pointer active:scale-[0.98] ${!notif.read ? 'border-l-4' : ''
+                className={`bg-white rounded-xl p-4 shadow-md ${!notif.read ? 'border-l-4' : ''
                   }`}
                 style={{
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                   borderLeftColor: !notif.read ? getNotificationColor(notif.type) : 'transparent',
                 }}
-                onClick={() => handleNotificationClick(notif)}
               >
                 <div className="flex items-start gap-3">
                   <div
@@ -276,7 +202,7 @@ const Notifications = () => {
                   >
                     {getNotificationIcon(notif.type)}
                   </div>
-                  <div className="flex-1 pr-12">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-1">
                       <div>
                         <p className={`font-semibold text-gray-800 ${!notif.read ? 'font-bold' : ''}`}>{notif.title}</p>
@@ -287,38 +213,6 @@ const Notifications = () => {
                   </div>
                 </div>
 
-                {/* Actions: Mark Read & Delete - Positioned absolute top-right */}
-                <div className="absolute top-4 right-3 flex items-center gap-2">
-                  {!notif.read && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkAsRead(notif.id);
-                      }}
-                      className="p-1.5 rounded-full bg-gray-50 hover:bg-gray-100 text-green-600 transition-colors shadow-sm"
-                      title="Mark as read"
-                    >
-                      <FiCheck className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(e, notif.id);
-                    }}
-                    className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shadow-sm"
-                    title="Delete"
-                  >
-                    <FiX className="w-3.5 h-3.5" />
-                  </button>
-                  
-                  {/* Dedicated Arrow Icon for entire card click visual cue */}
-                  <div className="text-gray-300 group-hover:text-gray-500 transition-colors ml-1">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
               </div>
             ))}
           </div>

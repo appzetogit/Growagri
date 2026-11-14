@@ -31,7 +31,6 @@ const AdminDashboard = () => {
     completedBookings: 0,
     totalRevenue: 0,
     bookingRevenue: 0,
-    bookingGst: 0,
     soilTestRevenue: 0,
     ecommerceRevenue: 0,
     totalMachinery: 0,
@@ -76,7 +75,6 @@ const AdminDashboard = () => {
             completedBookings: s.completedBookings || 0,
             totalRevenue: s.totalRevenue || 0,
             bookingRevenue: s.bookingRevenue || 0,
-            bookingGst: s.bookingGst || 0,
             soilTestRevenue: s.soilTestRevenue || 0,
             ecommerceRevenue: s.ecommerceRevenue || 0,
             totalMachinery: s.totalMachinery || 0,
@@ -115,15 +113,6 @@ const AdminDashboard = () => {
       color: 'text-white',
       bgColor: 'bg-gradient-to-br from-indigo-500 to-blue-600',
       cardBg: 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-100/70',
-      link: '/admin/reports/revenue'
-    },
-    {
-      title: 'Booking GST Earning',
-      value: formatCurrency(stats.bookingGst || 0),
-      icon: FiDollarSign,
-      color: 'text-white',
-      bgColor: 'bg-gradient-to-br from-amber-500 to-yellow-600',
-      cardBg: 'bg-gradient-to-br from-amber-50/90 to-yellow-50/60 border-amber-200/70',
       link: '/admin/reports/revenue'
     },
     {

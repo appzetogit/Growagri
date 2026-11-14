@@ -258,7 +258,6 @@ const verifyPaymentWebhook = async (req, res) => {
       totalRevenue: bill ? bill.grandTotal : booking.finalAmount,
       platformCommission: bill ? bill.companyRevenue : (booking.finalAmount * 0.2),
       vendorEarnings: bill ? bill.vendorTotalEarning : (booking.finalAmount * 0.8),
-      totalGST: bill ? bill.totalGST : 0,
       totalTDS: 0 // Tracked in withdrawals
     });
 
@@ -503,7 +502,6 @@ const processWalletPayment = async (req, res) => {
       totalRevenue: bill ? bill.grandTotal : booking.finalAmount,
       platformCommission: bill ? bill.companyRevenue : (booking.finalAmount * 0.2),
       vendorEarnings: bill ? bill.vendorTotalEarning : (booking.finalAmount * 0.8),
-      totalGST: bill ? bill.totalGST : 0,
       totalTDS: 0 // Tracked in withdrawals
     });
 

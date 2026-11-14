@@ -193,7 +193,6 @@ const BookingDetails = () => {
         const data = { ...response.data };
         // Calculate notional display values for plan_benefit
         if (data.paymentMethod === 'plan_benefit') {
-          if (!data.tax) data.tax = 0; // GST is not charged
           if (!data.visitingCharges && !data.visitationFee) data.visitingCharges = 49;
         }
         setBooking(data);
@@ -272,7 +271,6 @@ const BookingDetails = () => {
 
             // Calculate notional display values for plan_benefit
             if (newData.paymentMethod === 'plan_benefit') {
-              if (!newData.tax) newData.tax = 0; // GST is not charged
               if (!newData.visitingCharges && !newData.visitationFee) newData.visitingCharges = 49;
             }
             return newData;
@@ -643,39 +641,14 @@ const BookingDetails = () => {
   const customItems = bill?.customItems || [];
 
   let extraServiceBase = 0;
-  let extraServiceGST = 0;
   services.forEach(s => {
-    // s.price is UNIT BASE PRICE. s.total is INCLUSIVE.
-    const qty = parseFloat(s.quantity) || 1;
-    const base = (parseFloat(s.price) || 0) * qty;
-    const gst = parseFloat(s.gstAmount) || 0;
-    extraServiceBase += base;
-    extraServiceGST += gst;
+    extraServiceBase += (parseFloat(s.price) || 0) * (parseFloat(s.quantity) || 1);
   });
 
   let partsBase = 0;
-  let partsGST = 0;
-  parts.forEach(p => {
-    const qty = parseFloat(p.quantity) || 1;
-    partsBase += ((parseFloat(p.price) || 0) * qty);
-    partsGST += (parseFloat(p.gstAmount) || 0);
+  [...parts, ...customItems].forEach(p => {
+    partsBase += (parseFloat(p.price) || 0) * (parseFloat(p.quantity) || 1);
   });
-  customItems.forEach(c => {
-    const qty = parseFloat(c.quantity) || 1;
-    partsBase += ((parseFloat(c.price) || 0) * qty);
-    partsGST += (parseFloat(c.gstAmount) || 0);
-  });
-
-  // Use bill.originalGST if available, else fallback to totalGST
-  const originalGST = bill ? (bill.originalGST || bill.totalGST || 0) : (Number(booking?.tax) || 0);
-  const totalGST = originalGST + extraServiceGST + partsGST;
-
-  const serviceGstPercent = bill
-    ? (bill.payoutConfig?.serviceGstPercentage ?? bill.services?.[0]?.gstPercentage ?? 0)
-    : 18;
-  const partsGstPercent = bill
-    ? (bill.payoutConfig?.partsGstPercentage ?? bill.parts?.[0]?.gstPercentage ?? bill.customItems?.[0]?.gstPercentage ?? 0)
-    : 18;
 
   // Final Total
   const hasBill = !!bill;
@@ -1513,16 +1486,10 @@ const BookingDetails = () => {
                           </div>
                         ))}
 
-                        {/* Service GST */}
-                        <div className="flex justify-between text-xs text-gray-500 border-t border-dashed border-gray-100 pt-1 mt-1">
-                          <span>GST ({serviceGstPercent}%)</span>
-                          <span className="font-mono">₹{(originalGST + extraServiceGST).toFixed(2)}</span>
-                        </div>
-
                         {/* Service Subtotal */}
-                        <div className="flex justify-between font-bold text-gray-800 pt-1">
+                        <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-100 pt-1 mt-1">
                           <span>Total Service</span>
-                          <span>₹{(originalBase + extraServiceBase + originalGST + extraServiceGST).toFixed(2)}</span>
+                          <span>₹{(originalBase + extraServiceBase).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -1544,22 +1511,15 @@ const BookingDetails = () => {
                             <div key={`c-${i}`} className="flex justify-between items-center text-gray-600">
                               <div>
                                 <span>{c.name} <span className="text-gray-400 text-xs">x{c.quantity}</span></span>
-                                {c.hsnCode && <span className="block text-[9px] text-gray-400">HSN: {c.hsnCode}</span>}
                               </div>
                               <span className="font-mono text-xs">₹{(c.price * c.quantity).toFixed(2)}</span>
                             </div>
                           ))}
 
-                          {/* Parts GST */}
-                          <div className="flex justify-between text-xs text-gray-500 border-t border-dashed border-gray-100 pt-1 mt-1">
-                            <span>GST ({partsGstPercent}%)</span>
-                            <span className="font-mono">₹{partsGST.toFixed(2)}</span>
-                          </div>
-
                           {/* Parts Subtotal */}
-                          <div className="flex justify-between font-bold text-gray-800 pt-1">
+                          <div className="flex justify-between font-bold text-gray-800 border-t border-dashed border-gray-100 pt-1 mt-1">
                             <span>Total Parts</span>
-                            <span>₹{(partsBase + partsGST).toFixed(2)}</span>
+                            <span>₹{partsBase.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -1611,24 +1571,6 @@ const BookingDetails = () => {
                         <span className="font-medium text-gray-900">₹{(booking.basePrice || 0).toLocaleString('en-IN')}</span>
                       )}
                     </div>
-
-                    {(booking.tax > 0 || booking.paymentMethod === 'plan_benefit') && (
-                      <div className="flex justify-between items-center text-gray-600">
-                        <span>
-                          GST ({booking.basePrice - booking.discount > 0
-                            ? Math.round((booking.tax * 100) / (booking.basePrice - booking.discount))
-                            : 18}%)
-                        </span>
-                        {booking.paymentMethod === 'plan_benefit' ? (
-                          <div className="flex items-center gap-2">
-                            <span className="line-through text-gray-400 text-xs">₹{(booking.tax || 0).toLocaleString('en-IN')}</span>
-                            <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">FREE ✓</span>
-                          </div>
-                        ) : (
-                          <span className="font-medium text-gray-900">₹{(booking.tax || 0).toLocaleString('en-IN')}</span>
-                        )}
-                      </div>
-                    )}
 
                     {booking.paymentMethod !== 'plan_benefit' && booking.discount > 0 && (
                       <div className="flex justify-between text-sm">

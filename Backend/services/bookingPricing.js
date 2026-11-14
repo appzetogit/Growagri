@@ -7,7 +7,6 @@ const mongoose = require('mongoose');
  * amount charged:
  *   item   = round(unitRate * (1 - planDiscount%)) * qty        (0 if the plan covers it)
  *   final  = itemTotal + visitedCharges (+ pending penalty, added by the caller)
- * GST is not charged on bookings (tax is always 0).
  */
 
 const RATE_KEYS = ['minute', 'hourly', 'acre', 'bigha', 'land_based', 'daily'];
@@ -128,7 +127,7 @@ const agriQuantity = ({ rentalType, estimatedDuration, landSize }) => {
 
 /**
  * Price a booking request.
- * @returns {{ basePrice, discount, tax, visitingCharges, itemTotal, finalAmount, pricedItems, isRental }}
+ * @returns {{ basePrice, discount, visitingCharges, itemTotal, finalAmount, pricedItems, isRental }}
  */
 const priceBooking = async ({ serviceId, bookedItems, selectedImplements, rentalType, estimatedDuration, landSize, user }) => {
   const Settings = require('../models/Settings');
@@ -199,7 +198,6 @@ const priceBooking = async ({ serviceId, bookedItems, selectedImplements, rental
     }
   }
 
-  const tax = 0; // GST is not charged on bookings
   const visitingCharges = itemTotal === 0 || plan?.freeTransport ? 0 : visitedCharges;
   const basePrice = Math.round(originalTotal);
   const discount = Math.max(0, basePrice - itemTotal);
@@ -207,10 +205,9 @@ const priceBooking = async ({ serviceId, bookedItems, selectedImplements, rental
   return {
     basePrice,
     discount,
-    tax,
     visitingCharges,
     itemTotal,
-    finalAmount: itemTotal + tax + visitingCharges,
+    finalAmount: itemTotal + visitingCharges,
     pricedItems,
     isRental,
     agriQuantity: qtyAgri

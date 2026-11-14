@@ -24,6 +24,9 @@ const getMyProducts = async (req, res) => {
  */
 const addProduct = async (req, res) => {
     try {
+        if (!['seeds', 'fertilizer', 'pesticide'].includes(req.body.productCategory)) {
+            return res.status(400).json({ success: false, message: 'Please select a category (Seeds, Fertilizer or Pesticide)' });
+        }
         const productData = {
             ...req.body,
             vendorId: req.user._id,
@@ -53,6 +56,8 @@ const updateMyProduct = async (req, res) => {
             if (existing?.approvalStatus !== 'approved') delete updateData.status;
         }
         
+        if (updateData.productCategory === "") delete updateData.productCategory;
+
         // Sanitize categoryId to prevent Mongoose conversion errors if arriving as empty string or object
         if (updateData.categoryId === "") {
             delete updateData.categoryId;

@@ -16,9 +16,14 @@ import {
 } from 'react-icons/fi';
 import adminProductService from '../../../../services/adminProductService';
 import { publicCatalogService } from '../../../../services/catalogService';
-import { configService } from '../../../../services/configService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const PRODUCT_CATEGORIES = [
+    { value: 'seeds', label: 'Seeds' },
+    { value: 'fertilizer', label: 'Fertilizer' },
+    { value: 'pesticide', label: 'Pesticide' }
+];
 
 const EcommerceManager = () => {
     const [products, setProducts] = useState([]);
@@ -31,11 +36,11 @@ const EcommerceManager = () => {
     const [editMode, setEditMode] = useState(false);
     const [currentProduct, setCurrentProduct] = useState(null);
     const [activeTab, setActiveTab] = useState('marketplace'); // 'marketplace' or 'pending'
-    const [platformGst, setPlatformGst] = useState(18); // Settings se aayegi GST
 
     const [formData, setFormData] = useState({
         title: '',
         categoryId: '',
+        productCategory: '',
         brandName: '',
         description: '',
         price: '',
@@ -46,22 +51,12 @@ const EcommerceManager = () => {
         images: [],
         isFeatured: false,
         specifications: [],
-        gstPercentage: platformGst,
         commissionPercentage: 10,
         shippingCharge: 0
     });
 
     useEffect(() => {
         fetchData();
-        // Settings se platform GST fetch karo
-        configService.getSettings().then(res => {
-            if (res.success && res.settings?.serviceGstPercentage != null) {
-                const gst = res.settings.serviceGstPercentage;
-                setPlatformGst(gst);
-                // formData mein bhi update karo taaki naye product form mein sahi GST aaye
-                setFormData(prev => ({ ...prev, gstPercentage: gst }));
-            }
-        });
     }, []);
 
     const fetchData = async () => {
@@ -140,12 +135,11 @@ const EcommerceManager = () => {
         }
     };
 
-    // Approve straight away with the product's own commission/GST (editable via View before approving)
+    // Approve straight away with the product's own commission (editable via View before approving)
     const handleApproveClick = async (product) => {
         try {
             const res = await adminProductService.approveProduct(product._id, {
-                commissionPercentage: product.commissionPercentage ?? 10,
-                gstPercentage: product.gstPercentage ?? platformGst
+                commissionPercentage: product.commissionPercentage ?? 10
             });
             if (res.success) {
                 toast.success("Product approved and live!");
@@ -215,6 +209,7 @@ const EcommerceManager = () => {
         setFormData({
             title: '',
             categoryId: '',
+            productCategory: '',
             brandName: '',
             description: '',
             price: '',
@@ -225,7 +220,6 @@ const EcommerceManager = () => {
             images: [],
             isFeatured: false,
             specifications: [],
-            gstPercentage: 18,
             commissionPercentage: 10,
             shippingCharge: 0
         });
@@ -238,6 +232,7 @@ const EcommerceManager = () => {
         setFormData({
             title: product.title,
             categoryId: product.categoryId?._id || product.categoryId,
+            productCategory: product.productCategory || '',
             brandName: product.brandName || '',
             description: product.description || '',
             price: product.price,
@@ -248,7 +243,6 @@ const EcommerceManager = () => {
             images: product.images || (product.imageUrl ? [product.imageUrl] : []),
             isFeatured: product.isFeatured || false,
             specifications: product.specifications || [],
-            gstPercentage: product.gstPercentage ?? 18,
             commissionPercentage: product.commissionPercentage ?? 10,
             shippingCharge: product.shippingCharge ?? 0
         });
@@ -274,17 +268,9 @@ const EcommerceManager = () => {
                 </div>
             </div>
 
-            {/* Stats & Search */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Live Products</p>
-                    <p className="text-2xl font-black text-slate-800">{products.length}</p>
-                </div>
-                <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vendor Entries</p>
-                    <p className="text-2xl font-black text-orange-600">{pendingProducts.length}</p>
-                </div>
-                <div className="md:col-span-2 bg-white px-5 py-2 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-3">
+            {/* Search */}
+            <div className="mb-8">
+                <div className="bg-white px-5 py-4 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-3">
                     <FiSearch className="text-slate-400 w-5 h-5" />
                     <input
                         type="text"
@@ -303,7 +289,7 @@ const EcommerceManager = () => {
                     className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative ${activeTab === 'marketplace' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'
                         }`}
                 >
-                    Store Catalog ({products.length})
+                    All Products ({products.length})
                     {activeTab === 'marketplace' && (
                         <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800 rounded-t-full" />
                     )}
@@ -313,7 +299,7 @@ const EcommerceManager = () => {
                     className={`pb-4 px-2 font-black text-sm uppercase tracking-wider transition-all relative flex items-center gap-2 ${activeTab === 'pending' ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
                         }`}
                 >
-                    Marketplace Approvals
+                    Pending Product Approval
                     {pendingProducts.length > 0 && (
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${activeTab === 'pending' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
                             {pendingProducts.length}
@@ -369,7 +355,7 @@ const EcommerceManager = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase">
-                                            {product.categoryId?.title || 'Agri Item'}
+                                            {PRODUCT_CATEGORIES.find(c => c.value === product.productCategory)?.label || product.categoryId?.title || 'Agri Item'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
@@ -496,6 +482,13 @@ const EcommerceManager = () => {
                                         <div>
                                             <label className={labelCls}>Title <span className="text-red-500">*</span></label>
                                             <input required className={inputCls} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Category <span className="text-red-500">*</span></label>
+                                            <select required className={inputCls} value={formData.productCategory || ''} onChange={e => setFormData({ ...formData, productCategory: e.target.value })}>
+                                                <option value="" disabled>Select category</option>
+                                                {PRODUCT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                            </select>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4">
                                             <div>

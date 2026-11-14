@@ -74,19 +74,17 @@ const getDashboardStats = async (req, res) => {
           _id: null,
           totalRevenue: { $sum: '$finalAmount' },
           totalBasePrice: {
-            $sum: { $ifNull: ['$basePrice', { $subtract: ['$finalAmount', { $ifNull: ['$tax', 0] }] }] }
+            $sum: { $ifNull: ['$basePrice', '$finalAmount'] }
           },
-          totalBookings: { $sum: 1 },
-          bookingGst: { $sum: { $ifNull: ['$tax', 0] } }
+          totalBookings: { $sum: 1 }
         }
       }
     ]);
 
-    const bookingRevData = revenueResult[0] || { totalRevenue: 0, totalBasePrice: 0, totalBookings: 0, bookingGst: 0 };
+    const bookingRevData = revenueResult[0] || { totalRevenue: 0, totalBasePrice: 0, totalBookings: 0 };
     const commissionRate = await getCommissionRate();
     const bookingCommission = parseFloat(((bookingRevData.totalBasePrice || 0) * commissionRate).toFixed(2));
     const bookingRevenue = bookingCommission;
-    const bookingGst = bookingRevData.bookingGst || 0;
 
     // Soil Test Revenue
     const soilTestRevenueResult = await SoilTestRequest.aggregate([
@@ -218,7 +216,6 @@ const getDashboardStats = async (req, res) => {
           cancelledBookings,
           totalRevenue: totalRevenue,
           bookingRevenue: bookingCommission,
-          bookingGst: bookingGst,
           soilTestRevenue: soilTestCommission,
           ecommerceRevenue: ecommerceCommission,
           platformCommission: totalRevenue,
@@ -294,7 +291,7 @@ const getRevenueAnalytics = async (req, res) => {
           platformCommission: {
             $sum: {
               $multiply: [
-                { $ifNull: ['$basePrice', { $subtract: ['$finalAmount', { $ifNull: ['$tax', 0] }] }] },
+                { $ifNull: ['$basePrice', '$finalAmount'] },
                 await getCommissionRate()
               ]
             }

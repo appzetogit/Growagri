@@ -125,6 +125,12 @@ const UserRoutes = () => {
     location.pathname.includes('/cancellation-policy') ||
     location.pathname.includes('/schemes');
 
+  // Hide every scrollbar inside the user app (incl. portaled modals); admin keeps its scrollbars
+  useEffect(() => {
+    document.documentElement.classList.add('user-app');
+    return () => document.documentElement.classList.remove('user-app');
+  }, []);
+
   // Predictive background prefetch for high-traffic subroutes when browser is idle
   useEffect(() => {
     if (!isPublicPage) {

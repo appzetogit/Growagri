@@ -9,6 +9,7 @@ import { publicCatalogService } from '../../../../services/catalogService';
 import { useCart } from '../../../../context/CartContext';
 import { useCity } from '../../../../context/CityContext';
 import { useSocket } from '../../../../context/SocketContext';
+import { useLanguage } from '../../../../context/LanguageContext';
 import { toast } from 'react-hot-toast';
 import { registerFCMToken } from '../../../../services/pushNotificationService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -58,6 +59,11 @@ const Home = () => {
   const [isLocationSupported, setIsLocationSupported] = useState(true);
   const [detectedCityName, setDetectedCityName] = useState(localStorage.getItem('currentCity') || null);
 
+
+  const { t } = useLanguage();
+  const userName = (() => {
+    try { return (JSON.parse(localStorage.getItem('userData') || '{}').name || '').trim().split(' ')[0]; } catch { return ''; }
+  })();
 
   const { cartCount, addToCart } = useCart();
   const { currentCity, cities, selectCity, loading: cityLoading } = useCity();
@@ -516,6 +522,26 @@ const Home = () => {
   };
 
   const handlePromoClick = (promo) => {
+    // Kisan Bazaar banner → exact product page, or marketplace filtered to a product category
+    if (promo.targetProductId) {
+      navigate(`/user/agri-marketplace/${promo.targetProductId}`);
+      return;
+    }
+    if (promo.targetProductCategory) {
+      navigate('/user/agri-marketplace', { state: { category: promo.targetProductCategory } });
+      return;
+    }
+    // Banner linked to a Category (Quick Action tab) → open that category
+    if (promo.targetSectionTab) {
+      // Tabs that are plain navigation tiles (e.g. Kisan Bazaar) open their route instead of a section
+      const offering = (homeContent?.premiumOfferings || []).find(o => (o.title || '').trim() === promo.targetSectionTab);
+      if (offering?.actionType === 'navigate' && offering.route?.trim()) {
+        navigate(offering.route.trim());
+        return;
+      }
+      setActiveSectionTab(promo.targetSectionTab);
+      return;
+    }
     if (promo.targetCategoryId) {
       const cat = categories.find(c => (c.id === promo.targetCategoryId || c._id === promo.targetCategoryId));
       if (cat) {
@@ -669,19 +695,18 @@ const Home = () => {
       >
         <motion.div
           variants={itemVariants}
-          className="backdrop-blur-xl sticky top-0 z-50 border-b border-black/[0.03] rounded-b-[24px] shadow-[0_4px_30px_rgba(0,0,0,0.03)] transition-all duration-300"
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.4)' }}
+          className="relative z-50"
         >
           <Header
             location={address}
             onLocationClick={handleLocationClick}
           />
-          <div className="px-5 pb-5 pt-1 max-w-lg mx-auto w-full">
+          <div className="px-5 pb-2 pt-1 max-w-lg mx-auto w-full">
             <SearchBar onInputClick={() => setIsSearchOpen(true)} categories={categories} />
           </div>
         </motion.div>
 
-        <main className="pt-6 space-y-6 pb-0 max-w-screen-xl mx-auto w-full">
+        <main className="pt-2 space-y-4 pb-0 max-w-screen-xl mx-auto w-full">
           {!isLocationSupported && (
             <div
               className="flex items-center justify-between gap-3 py-2.5 px-4 mx-4 rounded-2xl"
@@ -719,8 +744,13 @@ const Home = () => {
 
           <>
             {/* Hero Section - Promo Carousel */}
-            {homeContent?.isPromosVisible !== false && (homeContent?.promos || []).length > 0 && (
-              <motion.section variants={itemVariants} className="relative z-0 mb-0 pb-0">
+            {homeContent?.isPromosVisible !== false && (
+              <motion.section variants={itemVariants} className="relative z-0 mb-0 pb-0 pt-0">
+                {userName && (
+                  <h1 className="px-5 mb-2 text-[18px] sm:text-[20px] font-black text-slate-900 tracking-tight truncate">
+                    {t('Hello')}, {userName} 👋
+                  </h1>
+                )}
                 <Suspense fallback={<div className="h-44 bg-slate-50 animate-pulse rounded-2xl mx-4 my-1" />}>
                   <PromoCarousel
                     promos={(homeContent?.promos || []).map(promo => ({
@@ -731,6 +761,9 @@ const Home = () => {
                       className: promo.gradientClass || 'from-[#00A6A6] to-[#008a8a]',
                       image: toAssetUrl(promo.imageUrl, { width: 800 }),
                       targetCategoryId: promo.targetCategoryId,
+                      targetSectionTab: promo.targetSectionTab,
+                      targetProductCategory: promo.targetProductCategory,
+                      targetProductId: promo.targetProductId,
                       slug: promo.slug,
                       scrollToSection: promo.scrollToSection,
                       order: promo.order || 0,
@@ -794,15 +827,12 @@ const Home = () => {
                     >
                       {/* Circular Illustration / Image Badge */}
                       <div
-                        className="relative w-14 h-14 min-[390px]:w-15 min-[390px]:h-15 sm:w-16 sm:h-16 rounded-full p-1 flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 shadow-xs border overflow-hidden"
-                        style={{
-                          backgroundColor: item.colorCode ? `${item.colorCode}14` : '#f0fdf4',
-                          borderColor: item.colorCode ? `${item.colorCode}29` : '#dcfce7'
-                        }}
+                        className="relative w-16 h-16 min-[390px]:w-[72px] min-[390px]:h-[72px] sm:w-20 sm:h-20 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 overflow-hidden"
+                        style={{ backgroundColor: item.colorCode ? `${item.colorCode}14` : '#f0fdf4' }}
                       >
                         {item.imageUrl ? (
                           <img
-                            src={toAssetUrl(item.imageUrl, { width: 140, height: 140, crop: 'fill' })}
+                            src={toAssetUrl(item.imageUrl, { width: 180, height: 180, crop: 'fill' })}
                             alt={item.title}
                             loading="lazy"
                             decoding="async"
@@ -915,17 +945,17 @@ const Home = () => {
               </Suspense>
             </motion.div>
 
-            {/* Refer & Earn Section */}
-            <motion.div variants={itemVariants}>
-              <Suspense fallback={<div className="h-28 bg-emerald-50/50 animate-pulse rounded-2xl mx-4 my-2" />}>
-                <ReferEarnSection onReferClick={handleReferClick} />
-              </Suspense>
-            </motion.div>
-
-            {/* Machinery Discovery Section - Final bottom section */}
+            {/* Machinery Discovery Section */}
             <motion.div variants={itemVariants}>
               <Suspense fallback={<div className="h-44 bg-slate-50 animate-pulse rounded-3xl mx-4 my-2" />}>
                 <MachineryDiscoverySection />
+              </Suspense>
+            </motion.div>
+
+            {/* Refer & Earn Section - Final bottom section */}
+            <motion.div variants={itemVariants}>
+              <Suspense fallback={<div className="h-28 bg-emerald-50/50 animate-pulse rounded-2xl mx-4 my-2" />}>
+                <ReferEarnSection onReferClick={handleReferClick} />
               </Suspense>
             </motion.div>
 

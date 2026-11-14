@@ -1060,9 +1060,8 @@ const verifySelfVisit = async (req, res) => {
  * Complete Self Job & Generate Bill
  * ──────────────────────────────────
  * Revenue Model:
- *   Vendor → 70% of total service BASE (excl GST)
- *   Vendor → 10% of total parts BASE  (excl GST)
- *   GST    → 100% retained by company
+ *   Vendor → 70% of total service BASE
+ *   Vendor → 10% of total parts BASE
  *
  * CRITICAL: Vendor earnings are NOT written to Booking.
  *           VendorBill is the single source of truth.
@@ -1113,13 +1112,6 @@ const completeSelfJob = async (req, res) => {
       ? await require('../../utils/constants').rentalSplitPct(settings, booking.equipmentId)
       : require('../../utils/constants').serviceSplitPct(settings);
     let partsSplitPct = settings?.partsPayoutPercentage ?? 10;
-    
-    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
-    let serviceGstPct = 0;
-    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      serviceGstPct = Math.round((booking.tax * 100) / booking.basePrice);
-    }
-    let partsGstPct = 0;
 
     // ═══════════════════════════════════════════
     // STEP 1: BUILD LINE ITEMS
@@ -1127,24 +1119,17 @@ const completeSelfJob = async (req, res) => {
 
     // -- Original booking service (from basePrice) --
     const originalBase = Number(booking.basePrice) || 0;
-    const originalGST = (booking.tax && booking.tax > 0) 
-      ? Number(booking.tax) 
-      : parseFloat(((originalBase * serviceGstPct) / 100).toFixed(2));
 
     // -- Vendor-added services --
     const billServices = (billDetails?.services || []).map(svc => {
       const price = Number(svc.price) || 0;
       const qty = Number(svc.quantity) || 1;
-      const base = price * qty;
-      const gst = 0; // no GST on services added by the vendor
       return {
         catalogId: svc.catalogId || undefined,
         name: svc.name || 'Service',
         price,
-        gstPercentage: 0,
         quantity: qty,
-        gstAmount: gst,
-        total: parseFloat((base + gst).toFixed(2)),
+        total: parseFloat((price * qty).toFixed(2)),
         isOriginal: false
       };
     });
@@ -1153,17 +1138,12 @@ const completeSelfJob = async (req, res) => {
     const billParts = (billDetails?.parts || []).map(part => {
       const price = Number(part.price) || 0;
       const qty = Number(part.quantity) || 1;
-      const pGstPct = partsGstPct; // GST not charged
-      const base = price * qty;
-      const gst = parseFloat(((base * pGstPct) / 100).toFixed(2));
       return {
         catalogId: part.catalogId || undefined,
         name: part.name || 'Part',
         price,
-        gstPercentage: pGstPct,
         quantity: qty,
-        gstAmount: gst,
-        total: parseFloat((base + gst).toFixed(2))
+        total: parseFloat((price * qty).toFixed(2))
       };
     });
 
@@ -1176,24 +1156,15 @@ const completeSelfJob = async (req, res) => {
     const totalPartsBase = parseFloat(billParts.reduce((s, p) => s + (p.price * p.quantity), 0).toFixed(2));
 
     // ═══════════════════════════════════════════
-    // STEP 3: CALCULATE GST TOTALS
-    // ═══════════════════════════════════════════
-
-    const vendorServiceGST = parseFloat(billServices.reduce((s, sv) => s + sv.gstAmount, 0).toFixed(2));
-    const partsGST = parseFloat(billParts.reduce((s, p) => s + p.gstAmount, 0).toFixed(2));
-    const totalGST = parseFloat((originalGST + vendorServiceGST + partsGST).toFixed(2));
-
-    // ═══════════════════════════════════════════
     // STEP 4: FINAL BILL (what user pays)
     // ═══════════════════════════════════════════
 
     const visitingCharges = Number(booking.visitingCharges) || 0;
-    const grandTotal = parseFloat((totalServiceBase + totalPartsBase + totalGST + visitingCharges).toFixed(2));
+    const grandTotal = parseFloat((totalServiceBase + totalPartsBase + visitingCharges).toFixed(2));
 
     // ═══════════════════════════════════════════
     // STEP 5: REVENUE SPLIT (internal only)
     // ═══════════════════════════════════════════
-    // Vendor % is applied ONLY on base — never on GST
 
     const vendorServiceEarning = parseFloat(((totalServiceBase * serviceSplitPct) / 100).toFixed(2));
     const vendorPartsEarning = parseFloat(((totalPartsBase * partsSplitPct) / 100).toFixed(2));
@@ -1209,10 +1180,8 @@ const completeSelfJob = async (req, res) => {
       {
         name: booking.serviceName || 'Original Service',
         price: originalBase,
-        gstPercentage: serviceGstPct,
         quantity: 1,
-        gstAmount: originalGST,
-        total: parseFloat((originalBase + originalGST).toFixed(2)),
+        total: originalBase,
         isOriginal: true
       },
       ...billServices
@@ -1233,21 +1202,13 @@ const completeSelfJob = async (req, res) => {
       totalPartsBase,
       visitingCharges,
 
-      // GST totals
-      originalGST,
-      vendorServiceGST,
-      partsGST,
-      totalGST,
-
       // Bill total
       grandTotal,
 
       // Payout config snapshot
       payoutConfig: {
         serviceSplitPercentage: serviceSplitPct,
-        partsSplitPercentage: partsSplitPct,
-        serviceGstPercentage: serviceGstPct,
-        partsGstPercentage: partsGstPct
+        partsSplitPercentage: partsSplitPct
       },
 
       // Revenue split
@@ -1323,7 +1284,6 @@ const completeSelfJob = async (req, res) => {
         bill: {
           id: bill._id,
           grandTotal,
-          totalGST,
           totalServiceBase,
           totalPartsBase
         }
@@ -1649,14 +1609,7 @@ const endTrip = async (req, res) => {
     // 2. FETCH SPLIT CONFIG
     const settings = await Settings.findOne({ type: 'global' });
     const serviceSplitPct = await require('../../utils/constants').rentalSplitPct(settings, booking.equipmentId);
-    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
-    let gstPct = 0;
-    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      gstPct = Math.round((booking.tax * 100) / booking.basePrice);
-    }
-
-    const gstAmount = (booking.tax && booking.tax > 0) ? Number(booking.tax) : 0;
-    const finalAmount = parseFloat((baseAmount + gstAmount).toFixed(2));
+    const finalAmount = parseFloat(baseAmount.toFixed(2));
     const vendorEarning = parseFloat(((baseAmount * serviceSplitPct) / 100).toFixed(2));
 
     // 3. GENERATE VENDOR BILL (Idempotent: prevents E11000 duplicate error on retries)
@@ -1666,20 +1619,15 @@ const endTrip = async (req, res) => {
       services: [{
         name: `${service?.title || booking.serviceName || 'Equipment Rental'} (${booking.rental_type})`,
         price: baseAmount,
-        gstPercentage: gstPct,
         quantity: 1,
-        gstAmount: gstAmount,
         total: finalAmount,
         isOriginal: true
       }],
       originalServiceBase: baseAmount,
-      originalGST: gstAmount,
       totalServiceBase: baseAmount,
-      totalGST: gstAmount,
       grandTotal: finalAmount,
       payoutConfig: {
-        serviceSplitPercentage: serviceSplitPct,
-        serviceGstPercentage: gstPct
+        serviceSplitPercentage: serviceSplitPct
       },
       vendorServiceEarning: vendorEarning,
       vendorTotalEarning: vendorEarning,

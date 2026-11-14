@@ -234,7 +234,6 @@ const placeOrder = async (req, res) => {
         for (const [vendorId, items] of Object.entries(vendorGroups)) {
             let itemsTotal = 0;
             let adminCommission = 0;
-            let gstAmount = 0;
             let shippingCharges = 0;
 
             const orderItems = items.map(item => {
@@ -242,8 +241,6 @@ const placeOrder = async (req, res) => {
                 itemsTotal += subtotal;
                 const commPct = typeof item.product.commissionPercentage === 'number' ? item.product.commissionPercentage : 10;
                 adminCommission += (subtotal * (commPct / 100));
-                // GST is removed (0)
-                gstAmount = 0;
                 shippingCharges += ((item.product.shippingCharge || 0) * item.quantity);
 
                 return {
@@ -269,7 +266,6 @@ const placeOrder = async (req, res) => {
                 pricing: {
                     itemsTotal,
                     adminCommission,
-                    gstAmount,
                     platformFee,
                     vendorBalance,
                     shippingCharges,
@@ -465,7 +461,7 @@ const payPlatformFee = async (req, res) => {
                  status: 'completed',
                  paymentMethod: 'razorpay',
                  referenceId: razorpay_payment_id,
-                 description: order.paymentType === 'online_full' ? `Full payment for Ecommerce Order: ${order._id.toString().slice(-8)}` : `Platform fee (Comm+GST) for Ecommerce Order: ${order._id.toString().slice(-8)}`,
+                 description: order.paymentType === 'online_full' ? `Full payment for Ecommerce Order: ${order._id.toString().slice(-8)}` : `Platform fee for Ecommerce Order: ${order._id.toString().slice(-8)}`,
                  metadata: { 
                     orderId: order._id, 
                     razorpay_order_id,
@@ -537,7 +533,7 @@ const payPlatformFee = async (req, res) => {
             amount: amountToPay,
             status: 'completed',
             paymentMethod: 'wallet',
-            description: order.paymentType === 'online_full' ? `Full payment for Ecommerce Order: ${order._id.toString().slice(-8)}` : `Platform fee (Comm+GST) for Ecommerce Order: ${order._id.toString().slice(-8)}`,
+            description: order.paymentType === 'online_full' ? `Full payment for Ecommerce Order: ${order._id.toString().slice(-8)}` : `Platform fee for Ecommerce Order: ${order._id.toString().slice(-8)}`,
             metadata: { orderId: order._id }
         });
         await transaction.save();
@@ -692,7 +688,7 @@ const generateInvoice = async (req, res) => {
         const order = await EcommerceOrder.findById(req.params.id)
             .populate('userId', 'name phone email')
             .populate('vendorId', 'businessName phone name shopDetails')
-            .populate('items.productId', 'title price unit bagWeight gstPercentage commissionPercentage brandName');
+            .populate('items.productId', 'title price unit bagWeight commissionPercentage brandName');
 
         // Only the buyer can download their invoice (it carries their name, phone and address)
         if (!order || String(order.userId?._id || order.userId) !== String(req.user._id)) {
@@ -759,7 +755,6 @@ const generateInvoice = async (req, res) => {
         doc.text('Item Name', 60, doc.y + 5);
         doc.text('Qty', 280, doc.y + 5);
         doc.text('Price/Unit', 330, doc.y + 5);
-        doc.text('GST %', 400, doc.y + 5);
         doc.text('Subtotal', 480, doc.y + 5);
         
         doc.y = doc.y + 20;
@@ -769,8 +764,6 @@ const generateInvoice = async (req, res) => {
         doc.font('Helvetica').fillColor('#333333');
         let index = 0;
         for (const item of order.items) {
-            const product = item.productId;
-            const gstPercent = product?.gstPercentage || 5;
             const unitPrice = item.price;
             const subtotal = item.subtotal || (unitPrice * item.quantity);
             
@@ -783,7 +776,6 @@ const generateInvoice = async (req, res) => {
             doc.text(item.name || 'Product', 60, doc.y);
             doc.text(item.quantity.toString(), 280, doc.y);
             doc.text(`₹${unitPrice.toFixed(2)}`, 330, doc.y);
-            doc.text(`${gstPercent}%`, 400, doc.y);
             doc.text(`₹${subtotal.toFixed(2)}`, 480, doc.y);
             
             doc.y = doc.y + 18;
@@ -800,7 +792,7 @@ const generateInvoice = async (req, res) => {
         doc.text('Items Total:', 350, summaryY);
         doc.text(`₹${order.pricing.itemsTotal.toFixed(2)}`, 480, summaryY);
         
-        doc.text('Platform Fee (Comm+GST):', 350, summaryY + 15);
+        doc.text('Platform Fee:', 350, summaryY + 15);
         doc.text(`₹${order.pricing.platformFee.toFixed(2)}`, 480, summaryY + 15);
         
         doc.text('Shipping & Delivery:', 350, summaryY + 30);

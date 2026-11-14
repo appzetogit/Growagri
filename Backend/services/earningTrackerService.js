@@ -17,7 +17,6 @@ const recordBookingEarning = async ({
   totalRevenue = 0,
   platformCommission = 0,
   vendorEarnings = 0,
-  totalGST = 0,
   totalTDS = 0,
 }) => {
   try {
@@ -31,7 +30,6 @@ const recordBookingEarning = async ({
           totalBookings: 1,
           platformCommission: platformCommission,
           vendorEarnings: vendorEarnings,
-          totalGST: totalGST,
           totalTDS: totalTDS
         }
       },

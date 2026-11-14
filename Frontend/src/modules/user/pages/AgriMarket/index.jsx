@@ -9,30 +9,25 @@ import {
     FiMapPin,
     FiChevronDown
 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ecommerceService from '../../../../services/ecommerceService';
-import { publicCatalogService } from '../../../../services/catalogService';
 import { useEcommerceCart } from '../../../../context/EcommerceCartContext';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useCity } from '../../../../context/CityContext';
-import CitySelectorModal from '../../components/common/CitySelectorModal';
+
+const CATEGORY_TABS = [
+    { value: 'all', label: 'All' },
+    { value: 'seeds', label: 'Seeds' },
+    { value: 'fertilizer', label: 'Fertilizer' },
+    { value: 'pesticide', label: 'Pesticide' }
+];
 
 const AgriMarket = () => {
     const navigate = useNavigate();
-    const { currentCity } = useCity();
     const { addToCart, cartCount } = useEcommerceCart();
     const [products, setProducts] = useState(() => {
         try {
             const cached = localStorage.getItem('cached_agri_products');
-            return cached ? JSON.parse(cached) : [];
-        } catch {
-            return [];
-        }
-    });
-    const [categories, setCategories] = useState(() => {
-        try {
-            const cached = localStorage.getItem('cached_agri_categories');
             return cached ? JSON.parse(cached) : [];
         } catch {
             return [];
@@ -55,13 +50,13 @@ const AgriMarket = () => {
         }
     };
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    // Banners can deep-link here with a pre-selected product category
+    const location = useLocation();
+    const [selectedCategory, setSelectedCategory] = useState(location.state?.category || 'all');
     const [hasOrders, setHasOrders] = useState(false);
-    const [showCityModal, setShowCityModal] = useState(false);
-
     useEffect(() => {
         fetchData();
-    }, [currentCity]);
+    }, []);
 
     const fetchData = async () => {
         if (products.length === 0) {
@@ -71,11 +66,7 @@ const AgriMarket = () => {
 
         // Load products independently
         try {
-            const params = {};
-            if (currentCity) {
-                params.cityId = currentCity._id || currentCity.id;
-            }
-            const prodRes = await ecommerceService.getProducts(params);
+            const prodRes = await ecommerceService.getProducts({});
             if (prodRes.success) {
                 const pList = prodRes.data || [];
                 setProducts(pList);
@@ -86,30 +77,6 @@ const AgriMarket = () => {
         } catch (err) {
             console.error('Products fetch error:', err?.response?.data || err.message);
             hasError = true;
-        }
-
-        // Load categories independently (filter strictly for products)
-        try {
-            const catRes = await publicCatalogService.getCategories({ type: 'product' });
-            if (catRes.success) {
-                const allCats = catRes.categories || catRes.data || [];
-                // STRICT FILTER: Only show categories meant for Seeds & Fertilizers marketplace
-                // This hides any machinery or accidental test categories (like Tractor, Rotavator)
-                const allowedKeywords = ['seed', 'fertilizer', 'pesticide', 'chemical', 'urea', 'zinc', 'spray', 'nutrition', 'crop'];
-                const filteredCats = allCats.filter(cat => {
-                    const title = cat.title?.toLowerCase() || '';
-                    return allowedKeywords.some(kw => title.includes(kw));
-                });
-                setCategories(filteredCats);
-                try {
-                    localStorage.setItem('cached_agri_categories', JSON.stringify(filteredCats));
-                } catch {}
-                if (filteredCats.length > 0 && selectedCategory === 'all') {
-                    setSelectedCategory(filteredCats[0]._id);
-                }
-            }
-        } catch (err) {
-            console.error('Categories fetch error:', err.message);
         }
 
         if (hasError && products.length === 0) {
@@ -133,14 +100,14 @@ const AgriMarket = () => {
     const filteredProducts = products.filter(p => {
         const trimmedSearch = searchTerm.trim().toLowerCase();
         const matchesSearch = p.title.toLowerCase().includes(trimmedSearch);
-        const matchesCategory = selectedCategory === 'all' || p.categoryId?._id === selectedCategory;
+        const matchesCategory = selectedCategory === 'all' || p.productCategory === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Premium Header */}
-            <div className="bg-white px-6 pt-12 pb-6 rounded-b-[48px] shadow-sm border-b border-slate-100 sticky top-0 z-40">
+            <div className="bg-slate-50 px-6 pt-12 pb-4 sticky top-0 z-40">
                 <div className="flex items-center justify-between gap-4 mb-6 relative z-50">
                     <div className="flex items-center gap-3">
                         <button onClick={() => navigate('/user')} className="p-3 bg-slate-50 rounded-2xl relative z-50 cursor-pointer pointer-events-auto active:scale-95 transition-all">
@@ -153,15 +120,6 @@ const AgriMarket = () => {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 relative z-50">
-                        <button 
-                            onClick={() => setShowCityModal(true)} 
-                            className="px-3 py-2 bg-teal-50/50 hover:bg-teal-50 border border-teal-100 rounded-2xl flex items-center gap-1 text-[9px] font-black text-teal-700 uppercase tracking-wider transition-all active:scale-95 shadow-sm"
-                        >
-                            <span className="w-1 h-1 bg-teal-500 rounded-full animate-pulse" />
-                            {currentCity?.name || 'Select City'}
-                            <span className="text-[6px]">▼</span>
-                        </button>
-
                         <button 
                             onClick={() => navigate('/user/agri-cart')}
                             className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-2xl relative z-50 cursor-pointer active:scale-95 transition-all shadow-sm border border-slate-100"
@@ -177,7 +135,7 @@ const AgriMarket = () => {
                 </div>
 
                 <div className="flex gap-3">
-                    <div className="flex-1 bg-slate-50 rounded-2xl px-5 py-2 flex items-center gap-3 border border-slate-300">
+                    <div className="flex-1 bg-white rounded-2xl px-5 py-2 flex items-center gap-3 border border-slate-300">
                         <FiSearch className="text-slate-400" />
                         <input 
                             type="text" 
@@ -187,6 +145,22 @@ const AgriMarket = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                </div>
+
+                <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-hide">
+                    {CATEGORY_TABS.map(tab => (
+                        <button
+                            key={tab.value}
+                            onClick={() => setSelectedCategory(tab.value)}
+                            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all active:scale-95 ${
+                                selectedCategory === tab.value
+                                    ? 'bg-[#2E7D32] text-white border-[#2E7D32]'
+                                    : 'bg-white text-slate-600 border-slate-200'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -324,12 +298,6 @@ const AgriMarket = () => {
                     )}
                 </div>
             </div>
-            
-            {/* City Selector Modal Popup */}
-            <CitySelectorModal 
-                isOpen={showCityModal} 
-                onClose={() => setShowCityModal(false)} 
-            />
         </div>
     );
 };

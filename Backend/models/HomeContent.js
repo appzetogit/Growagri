@@ -88,6 +88,20 @@ const homeContentSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
+    // Quick-action tab title (matches Category.sectionType) the banner opens
+    targetSectionTab: {
+      type: String,
+      default: ''
+    },
+    // Kisan Bazaar banners: product bucket (seeds/fertilizer/pesticide) and exact product to open
+    targetProductCategory: {
+      type: String,
+      default: ''
+    },
+    targetProductId: {
+      type: String,
+      default: ''
+    },
     order: {
       type: Number,
       default: 0

@@ -140,11 +140,11 @@ const getVendorLedger = async (req, res) => {
       .limit(parseInt(limit))
       .populate({
         path: 'bookingId',
-        select: 'bookingNumber serviceName basePrice tax finalAmount status paymentMethod paymentMode paymentStatus cashCollected cashCollectedAt cashCollectedBy scheduledDate scheduledTime rental_type estimatedDuration landSize landUnit address bookedItems createdAt completedAt userId equipmentId vendorBillId',
+        select: 'bookingNumber serviceName basePrice finalAmount status paymentMethod paymentMode paymentStatus cashCollected cashCollectedAt cashCollectedBy scheduledDate scheduledTime rental_type estimatedDuration landSize landUnit address bookedItems createdAt completedAt userId equipmentId vendorBillId',
         populate: [
           { path: 'userId', select: 'name phone' },
           { path: 'equipmentId', select: 'name' },
-          { path: 'vendorBillId', select: 'grandTotal totalServiceBase totalGST vendorTotalEarning companyRevenue status' }
+          { path: 'vendorBillId', select: 'grandTotal totalServiceBase vendorTotalEarning companyRevenue status' }
         ]
       });
 

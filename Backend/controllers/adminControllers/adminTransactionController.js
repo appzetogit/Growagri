@@ -94,22 +94,7 @@ const getAllTransactions = async (req, res) => {
           });
         }
 
-        // 2. GST (from VendorBill)
-        if (shouldInclude('gst') && bill && bill.totalGST > 0) {
-          virtualTransactions.push({
-            _id: `${booking._id}_gst`,
-            referenceId: `GST-${booking.bookingNumber}`,
-            bookingId: booking,
-            type: 'gst',
-            amount: bill.totalGST,
-            status: 'completed',
-            paymentMethod: 'system',
-            createdAt: bill.paidAt || booking.completedAt || booking.updatedAt || booking.createdAt,
-            description: `GST for booking ${booking.bookingNumber}`
-          });
-        }
-
-        // 3. Convenience Fee (Visiting Charges)
+        // 2. Convenience Fee (Visiting Charges)
         if (shouldInclude('convenience_fee') && booking.visitingCharges > 0) {
           virtualTransactions.push({
             _id: `${booking._id}_conv`,
@@ -258,20 +243,18 @@ const getTransactionStats = async (req, res) => {
             _id: null,
             totalRevenue: { $sum: '$totalRevenue' },
             totalCommission: { $sum: '$platformCommission' },
-            totalGST: { $sum: '$totalGST' },
             totalVendorEarnings: { $sum: '$vendorEarnings' }
           }
         }
       ]);
 
-      const data = stats[0] || { totalRevenue: 0, totalCommission: 0, totalGST: 0, totalVendorEarnings: 0 };
+      const data = stats[0] || { totalRevenue: 0, totalCommission: 0, totalVendorEarnings: 0 };
 
       return res.status(200).json({
         success: true,
         data: {
           totalRevenue: data.totalRevenue,
           totalCommission: data.totalCommission,
-          totalGST: data.totalGST,
           totalVendorEarnings: data.totalVendorEarnings,
           netRevenue: data.totalCommission
         }
@@ -301,7 +284,7 @@ const getTransactionStats = async (req, res) => {
           _id: null,
           totalRevenue: {
             $sum: {
-              $cond: [{ $in: ['$type', ['credit', 'commission', 'cash_collected', 'payment', 'platform_fee', 'convenience_fee', 'gst', 'penalty', 'tds_deduction']] }, '$amount', 0]
+              $cond: [{ $in: ['$type', ['credit', 'commission', 'cash_collected', 'payment', 'platform_fee', 'convenience_fee', 'penalty', 'tds_deduction']] }, '$amount', 0]
             }
           },
           totalRefunds: {

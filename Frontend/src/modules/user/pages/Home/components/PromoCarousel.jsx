@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { gsap } from 'gsap';
 import PromoCard from '../../../components/common/PromoCard';
+import WeatherBanner from './WeatherBanner';
 import { themeColors } from '../../../../../theme';
 
 const PromoCarousel = memo(({ promos, onPromoClick }) => {
@@ -12,7 +13,8 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
 
 
 
-  const promotionalCards = promos || [];
+  // Static weather card is always slide 0, promos follow
+  const promotionalCards = [{ id: '__weather__' }, ...(promos || [])];
 
   // Simple auto-scroll functionality
   useEffect(() => {
@@ -78,10 +80,6 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
     };
   }, []);
 
-  if (!promos || promos.length === 0) {
-    return null;
-  }
-
   return (
     <div
       ref={carouselRef}
@@ -98,14 +96,14 @@ const PromoCarousel = memo(({ promos, onPromoClick }) => {
       >
         {promotionalCards.map((promo) => (
           <div key={promo.id} data-promo-card className="flex-shrink-0 snap-center">
-            <PromoCard
+            {promo.id === '__weather__' ? <WeatherBanner /> : <PromoCard
               title={promo.title}
               subtitle={promo.subtitle}
               buttonText={promo.buttonText}
               image={promo.image}
               className={promo.className}
               onClick={() => onPromoClick?.(promo)}
-            />
+            />}
           </div>
         ))}
       </div>

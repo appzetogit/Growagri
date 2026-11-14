@@ -15,6 +15,7 @@ const OptimizedImage = ({
   priority = false,      // If true, loads immediately (for above-the-fold images)
   quality = 'auto',      // Cloudinary quality setting
   placeholder = true,    // Show placeholder while loading
+  fit = 'cover',         // 'cover' crops to fill, 'contain' shows the whole image
   onLoad,
   onError,
   ...props
@@ -104,7 +105,7 @@ const OptimizedImage = ({
         decoding={priority ? 'sync' : 'async'}
         onLoad={handleLoad}
         onError={handleError}
-        className={`transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} w-full h-full object-cover`}
+        className={`transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         style={{ display: 'block' }}
         {...props}
       />

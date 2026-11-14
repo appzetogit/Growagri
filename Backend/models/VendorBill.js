@@ -7,10 +7,9 @@ const { BILL_STATUS } = require('../utils/constants');
  * Single source of truth for the final bill and revenue split.
  * 
  * Revenue Model:
- *   Vendor gets 70% of total service BASE (excl GST)
- *   Vendor gets 10% of total parts BASE (excl GST)
- *   GST is NEVER paid to vendor — 100% retained by company
- *   Company gets remainder (30% service + 90% parts + 100% GST)
+ *   Vendor gets 70% of total service BASE
+ *   Vendor gets 10% of total parts BASE
+ *   Company gets remainder (30% service + 90% parts)
  */
 const vendorBillSchema = new mongoose.Schema({
   bookingId: {
@@ -37,11 +36,9 @@ const vendorBillSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId
     },
     name: String,
-    price: Number,            // Unit base price (excl GST)
-    gstPercentage: Number,
+    price: Number,            // Unit price
     quantity: { type: Number, default: 1 },
-    gstAmount: Number,        // price × qty × gst%
-    total: Number,            // price × qty + gstAmount
+    total: Number,            // price × qty
     isOriginal: { type: Boolean, default: false } // true = from booking, false = vendor-added
   }],
 
@@ -51,20 +48,16 @@ const vendorBillSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId
     },
     name: String,
-    price: Number,            // Unit base price (excl GST)
-    gstPercentage: Number,
+    price: Number,            // Unit price
     quantity: { type: Number, default: 1 },
-    gstAmount: Number,
     total: Number
   }],
 
   /** Custom items added by vendor (ad-hoc parts/materials) */
   customItems: [{
     name: String,
-    price: Number,            // Unit base price (excl GST)
-    gstPercentage: Number,
+    price: Number,            // Unit price
     quantity: { type: Number, default: 1 },
-    gstAmount: Number,
     total: Number
   }],
 
@@ -86,12 +79,6 @@ const vendorBillSchema = new mongoose.Schema({
   // Transport Charges
   transportCharges: { type: Number, default: 0 },
 
-  // GST breakdown
-  originalGST: { type: Number, default: 0 },
-  vendorServiceGST: { type: Number, default: 0 },
-  partsGST: { type: Number, default: 0 },
-  totalGST: { type: Number, default: 0 },  // sum of all GST
-
   // ==========================================
   // 3. FINAL BILL (What user pays)
   // ==========================================
@@ -99,7 +86,7 @@ const vendorBillSchema = new mongoose.Schema({
   grandTotal: {
     type: Number,
     required: true
-    // = totalServiceBase + totalPartsBase + totalGST
+    // = totalServiceBase + totalPartsBase + visitingCharges + transportCharges
   },
 
   // ==========================================
@@ -109,12 +96,10 @@ const vendorBillSchema = new mongoose.Schema({
   /** Config snapshot — frozen at bill-generation time */
   payoutConfig: {
     serviceSplitPercentage: { type: Number, default: 70 },  // vendor gets 70%
-    partsSplitPercentage: { type: Number, default: 10 },  // vendor gets 10%
-    serviceGstPercentage: { type: Number, default: 18 },
-    partsGstPercentage: { type: Number, default: 18 }
+    partsSplitPercentage: { type: Number, default: 10 }  // vendor gets 10%
   },
 
-  /** Vendor earnings (calculated on BASE prices, never on GST) */
+  /** Vendor earnings (calculated on BASE prices) */
   vendorServiceEarning: { type: Number, default: 0 },  // totalServiceBase × 70%
   vendorPartsEarning: { type: Number, default: 0 },  // totalPartsBase  × 10%
   vendorTotalEarning: { type: Number, default: 0 },  // service + parts earning

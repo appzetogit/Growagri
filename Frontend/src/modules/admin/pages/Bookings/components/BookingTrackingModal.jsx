@@ -162,9 +162,8 @@ const BookingTrackingModal = ({ isOpen, onClose, booking: initialBooking }) => {
   // Money split comes from the vendor bill (source of truth); absent until the bill is generated
   const bill = booking.vendorBillId && typeof booking.vendorBillId === 'object' ? booking.vendorBillId : null;
   const totalAmount = bill?.grandTotal ?? booking.finalAmount ?? 0;
-  const gst = bill?.totalGST || 0;
   const extraCharges = (bill?.visitingCharges || 0) + (bill?.transportCharges || 0);
-  const commission = bill ? Math.max(0, bill.companyRevenue - gst) : 0;
+  const commission = bill?.companyRevenue || 0;
   const vendorPct = bill?.payoutConfig?.serviceSplitPercentage;
 
   return (
@@ -348,12 +347,9 @@ const BookingTrackingModal = ({ isOpen, onClose, booking: initialBooking }) => {
                     <MoneyRow label="Service charge" value={rupees(bill.totalServiceBase)} />
                     {bill.totalPartsBase > 0 && <MoneyRow label="Parts" value={rupees(bill.totalPartsBase)} />}
                     {extraCharges > 0 && <MoneyRow label="Visiting / transport" value={rupees(extraCharges)} />}
-                    {gst > 0 && <MoneyRow label="GST" value={rupees(gst)} />}
                     <div className="border-t border-dashed border-gray-200 my-1" />
                     <MoneyRow label="Vendor received" value={rupees(bill.vendorTotalEarning)} strong tone="text-green-700" hint={vendorPct ? `${vendorPct}% of service` : null} />
                     <MoneyRow label="Admin commission" value={rupees(commission)} strong tone="text-blue-700" hint={vendorPct ? `${100 - vendorPct}% of service` : null} />
-                    {gst > 0 && <MoneyRow label="GST collected by admin" value={rupees(gst)} />}
-                    <MoneyRow label="Admin total" value={rupees(bill.companyRevenue)} strong />
                   </>
                 ) : (
                   <p className="text-[10px] text-gray-400 mt-1">Vendor/admin split will show once the vendor generates the bill.</p>

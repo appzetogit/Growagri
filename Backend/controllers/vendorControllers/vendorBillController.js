@@ -9,9 +9,8 @@ const { BILL_STATUS } = require('../../utils/constants');
  * Create or Update Vendor Bill
  * ────────────────────────────
  * Revenue Model:
- *   Vendor → 70% of total service BASE (excl GST)
- *   Vendor → 10% of total parts BASE  (excl GST)
- *   GST   → 100% retained by company
+ *   Vendor → 70% of total service BASE
+ *   Vendor → 10% of total parts BASE
  *
  * VendorBill is the SINGLE source of truth for earnings.
  * Booking does NOT store vendorEarnings/adminCommission.
@@ -59,24 +58,12 @@ const createOrUpdateBill = async (req, res) => {
       : require('../../utils/constants').serviceSplitPct(settings);
     const partsSplitPct = settings?.partsPayoutPercentage ?? 10;
 
-    // GST is no longer charged. Only bookings created while it was (booking.tax > 0) keep that tax.
-    let serviceGstPct = 0;
-    if (booking.tax && booking.tax > 0 && booking.basePrice && booking.basePrice > 0) {
-      serviceGstPct = Math.round((booking.tax * 100) / booking.basePrice);
-    }
-    const partsGstPct = 0;
-
     // ═══════════════════════════════════════
     // 1. ORIGINAL SERVICE (from booking)
     // ═══════════════════════════════════════
     const isPlanBooking = booking.paymentMethod === 'plan_benefit';
     const originalServiceBaseForBill = isPlanBooking ? 0 : (booking.basePrice || 0);
     const originalServiceBaseForEarnings = booking.basePrice || 0;
-    const originalGST = isPlanBooking 
-      ? 0 
-      : (booking.tax && booking.tax > 0)
-        ? Number(booking.tax)
-        : 0;
     const visitingCharges = Number(booking.visitingCharges) || 0;
 
     // ═══════════════════════════════════════
@@ -84,7 +71,6 @@ const createOrUpdateBill = async (req, res) => {
     // ═══════════════════════════════════════
     const processedServices = [];
     let vendorServiceBase = 0;
-    let vendorServiceGST = 0;
 
     if (services && Array.isArray(services)) {
       for (const item of services) {
@@ -93,22 +79,17 @@ const createOrUpdateBill = async (req, res) => {
         const quantity = Number(item.quantity) || 1;
 
         const base = unitBasePrice * quantity;
-        const gst = 0; // no GST on services added by the vendor
-        const totalInclusive = parseFloat((base + gst).toFixed(2));
 
         processedServices.push({
           catalogId: item.catalogId,
           name,
           price: unitBasePrice,
-          gstPercentage: 0,
           quantity,
-          gstAmount: gst,
-          total: totalInclusive,
+          total: parseFloat(base.toFixed(2)),
           isOriginal: false
         });
 
         vendorServiceBase += base;
-        vendorServiceGST += gst;
       }
     }
 
@@ -117,30 +98,23 @@ const createOrUpdateBill = async (req, res) => {
     // ═══════════════════════════════════════
     const processedParts = [];
     let totalPartsBase = 0;
-    let partsGST = 0;
 
     if (parts && Array.isArray(parts)) {
       for (const item of parts) {
         const name = item.name;
         const unitBasePrice = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 1;
-        const pGstPct = partsGstPct; // GST not charged
-
         const base = unitBasePrice * quantity;
-        const gst = parseFloat(((base * pGstPct) / 100).toFixed(2));
 
         processedParts.push({
           catalogId: item.catalogId,
           name,
           price: unitBasePrice,
-          gstPercentage: pGstPct,
           quantity,
-          gstAmount: gst,
-          total: parseFloat((base + gst).toFixed(2))
+          total: parseFloat(base.toFixed(2))
         });
 
         totalPartsBase += base;
-        partsGST += gst;
       }
     }
 
@@ -154,23 +128,17 @@ const createOrUpdateBill = async (req, res) => {
         const name = item.name || 'Custom Item';
         const unitBasePrice = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 1;
-        const cGstPct = partsGstPct; // GST not charged
-
         const base = unitBasePrice * quantity;
-        const gst = parseFloat(((base * cGstPct) / 100).toFixed(2));
 
         processedCustomItems.push({
           name,
           price: unitBasePrice,
-          gstPercentage: cGstPct,
           quantity,
-          gstAmount: gst,
-          total: parseFloat((base + gst).toFixed(2))
+          total: parseFloat(base.toFixed(2))
         });
 
         // Add to PARTS totals
         totalPartsBase += base;
-        partsGST += gst;
       }
     }
 
@@ -181,9 +149,8 @@ const createOrUpdateBill = async (req, res) => {
     const totalServiceBaseForEarnings = parseFloat((originalServiceBaseForEarnings + vendorServiceBase).toFixed(2));
     totalPartsBase = parseFloat(totalPartsBase.toFixed(2));
 
-    const totalGST = parseFloat((originalGST + vendorServiceGST + partsGST).toFixed(2));
     const finalTransportCharges = Number(transportCharges) || 0;
-    const grandTotal = parseFloat((totalServiceBaseForBill + totalPartsBase + totalGST + visitingCharges + finalTransportCharges).toFixed(2));
+    const grandTotal = parseFloat((totalServiceBaseForBill + totalPartsBase + visitingCharges + finalTransportCharges).toFixed(2));
 
     // ═══════════════════════════════════════
     // 5. REVENUE SPLIT (% applied on BASE only)
@@ -200,10 +167,8 @@ const createOrUpdateBill = async (req, res) => {
       {
         name: booking.serviceName || 'Original Service',
         price: originalServiceBaseForBill,
-        gstPercentage: serviceGstPct,
         quantity: 1,
-        gstAmount: originalGST,
-        total: parseFloat((originalServiceBaseForBill + originalGST).toFixed(2)),
+        total: originalServiceBaseForBill,
         isOriginal: true
       },
       ...processedServices
@@ -223,18 +188,12 @@ const createOrUpdateBill = async (req, res) => {
       vendorServiceBase: parseFloat(vendorServiceBase.toFixed(2)),
       totalServiceBase: totalServiceBaseForBill,
       totalPartsBase,
-      originalGST,
-      vendorServiceGST: parseFloat(vendorServiceGST.toFixed(2)),
-      partsGST: parseFloat(partsGST.toFixed(2)),
-      totalGST,
       visitingCharges,
       transportCharges: finalTransportCharges,
       grandTotal,
       payoutConfig: {
         serviceSplitPercentage: serviceSplitPct,
-        partsSplitPercentage: partsSplitPct,
-        serviceGstPercentage: serviceGstPct,
-        partsGstPercentage: partsGstPct
+        partsSplitPercentage: partsSplitPct
       },
       vendorServiceEarning,
       vendorPartsEarning,
@@ -269,8 +228,7 @@ const createOrUpdateBill = async (req, res) => {
         companyRevenue,
         breakdown: {
           serviceBase: totalServiceBaseForBill,
-          partsBase: totalPartsBase,
-          totalGST
+          partsBase: totalPartsBase
         }
       }
     });

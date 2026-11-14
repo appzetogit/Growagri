@@ -21,8 +21,6 @@ const BillingPage = () => {
 
   // Settings
   const [payoutSettings, setPayoutSettings] = useState({
-    serviceGstPct: 0,
-    partsGstPct: 0,
     servicePayoutPct: 90,
     partsPayoutPct: 100
   });
@@ -60,14 +58,7 @@ const BillingPage = () => {
       const billRes = await vendorBillService.getBill(id);
       if (billRes.success && billRes.bill && billRes.bill.payoutConfig) {
         const pc = billRes.bill.payoutConfig;
-        let gst = pc.serviceGstPercentage;
-        if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
-          gst = Math.round((bData.tax * 100) / bData.basePrice);
-        }
-
         setPayoutSettings({
-          serviceGstPct: gst ?? 0,
-          partsGstPct: pc.partsGstPercentage ?? 0,
           servicePayoutPct: isRental ? (pc.serviceSplitPercentage ?? 90) : (pc.serviceSplitPercentage ?? 90),
           partsPayoutPct: pc.partsSplitPercentage ?? 10
         });
@@ -79,14 +70,7 @@ const BillingPage = () => {
           const data = await res.json();
           if (data.success && data.data?.global) {
             const g = data.data.global;
-            let gst = isRental ? (g.rentalGstPercentage ?? 0) : (g.serviceGstPercentage ?? 0);
-            if ((gst === 0 || gst === undefined) && bData?.tax && bData?.basePrice) {
-              gst = Math.round((bData.tax * 100) / bData.basePrice);
-            }
-
             setPayoutSettings({
-              serviceGstPct: gst,
-              partsGstPct: g.partsGstPercentage ?? 0,
               servicePayoutPct: isRental ? (g.rentalPayoutPercentage ?? 90) : (g.servicePayoutPercentage ?? 90),
               partsPayoutPct: g.partsPayoutPercentage ?? 10
             });

@@ -62,7 +62,6 @@ const generateInvoicePDF = (bill, booking, res) => {
         .text('Description', 50, tableTop)
         .text('Qty', 280, tableTop)
         .text('Rate', 330, tableTop)
-        .text('GST %', 400, tableTop)
         .text('Amount', 480, tableTop, { align: 'right' });
 
     doc.strokeColor('#aaaaaa').lineWidth(1).moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
@@ -75,7 +74,6 @@ const generateInvoicePDF = (bill, booking, res) => {
             .text(item.name, 50, y, { width: 220 })
             .text(item.quantity, 280, y)
             .text(`Rs. ${item.price}`, 330, y)
-            .text(`${item.gstPercentage}%`, 400, y)
             .text(`Rs. ${item.total}`, 480, y, { align: 'right' });
         y += 20;
     });
@@ -85,7 +83,6 @@ const generateInvoicePDF = (bill, booking, res) => {
         doc.text(item.name, 50, y, { width: 220 })
             .text(item.quantity, 280, y)
             .text(`Rs. ${item.price}`, 330, y)
-            .text(`${item.gstPercentage}%`, 400, y)
             .text(`Rs. ${item.total}`, 480, y, { align: 'right' });
         y += 20;
     });
@@ -95,7 +92,6 @@ const generateInvoicePDF = (bill, booking, res) => {
         doc.text(item.name, 50, y, { width: 220 })
             .text(item.quantity, 280, y)
             .text(`Rs. ${item.price}`, 330, y)
-            .text(`${item.gstPercentage}%`, 400, y)
             .text(`Rs. ${item.total}`, 480, y, { align: 'right' });
         y += 20;
     });
@@ -105,7 +101,6 @@ const generateInvoicePDF = (bill, booking, res) => {
         doc.text('Visiting/Service Charges', 50, y)
             .text('1', 280, y)
             .text(`Rs. ${bill.visitingCharges}`, 330, y)
-            .text('0%', 400, y)
             .text(`Rs. ${bill.visitingCharges}`, 480, y, { align: 'right' });
         y += 20;
     }
@@ -114,7 +109,6 @@ const generateInvoicePDF = (bill, booking, res) => {
         doc.text('Transport Charges', 50, y)
             .text('1', 280, y)
             .text(`Rs. ${bill.transportCharges}`, 330, y)
-            .text('0%', 400, y)
             .text(`Rs. ${bill.transportCharges}`, 480, y, { align: 'right' });
         y += 20;
     }
@@ -127,13 +121,10 @@ const generateInvoicePDF = (bill, booking, res) => {
         .text('Subtotal:', 350, subtotalOver + 15)
         .font('Helvetica').text(`Rs. ${(bill.totalServiceBase + bill.totalPartsBase + bill.visitingCharges + bill.transportCharges).toFixed(2)}`, 480, subtotalOver + 15, { align: 'right' })
 
-        .font('Helvetica-Bold').text('Total GST:', 350, subtotalOver + 30)
-        .font('Helvetica').text(`Rs. ${bill.totalGST.toFixed(2)}`, 480, subtotalOver + 30, { align: 'right' })
-
         .fontSize(12)
-        .font('Helvetica-Bold').text('Grand Total:', 350, subtotalOver + 50)
+        .font('Helvetica-Bold').text('Grand Total:', 350, subtotalOver + 35)
         .fillColor('#00a6a6')
-        .text(`Rs. ${bill.grandTotal.toFixed(2)}`, 480, subtotalOver + 50, { align: 'right' });
+        .text(`Rs. ${bill.grandTotal.toFixed(2)}`, 480, subtotalOver + 35, { align: 'right' });
 
     // --- Vendor Settlement Summary ---
     if (bill.vendorTotalEarning !== undefined) {
@@ -151,7 +142,7 @@ const generateInvoicePDF = (bill, booking, res) => {
            
         vsY += 20;
         doc.font('Helvetica').fontSize(9).fillColor('#4b5563')
-           .text('Total Service & Parts Base (excl. GST):', 50, vsY)
+           .text('Total Service & Parts Base:', 50, vsY)
            .text(`Rs. ${(bill.totalServiceBase + bill.totalPartsBase).toFixed(2)}`, 480, vsY, { align: 'right' });
            
         vsY += 15;

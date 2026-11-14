@@ -1116,7 +1116,7 @@ const SettlementManagement = () => {
                               <p className="font-semibold text-gray-900">{rupees(b.finalAmount)} • Pay at Home (Cash)</p>
                               {bill ? (
                                 <p className="text-gray-500">
-                                  Vendor {rupees(bill.vendorTotalEarning)} • Admin {rupees(bill.companyRevenue)}{bill.totalGST ? ` (incl. GST ${rupees(bill.totalGST)})` : ''}
+                                  Vendor {rupees(bill.vendorTotalEarning)} • Admin {rupees(bill.companyRevenue)}
                                 </p>
                               ) : (
                                 <p className="text-gray-500">Bill not generated</p>

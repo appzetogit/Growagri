@@ -421,7 +421,6 @@ const getPublicServices = async (req, res) => {
       parentSourceId: svc.parentSourceId ? svc.parentSourceId.toString() : null,
       categoryId: svc.categoryId ? svc.categoryId.toString() : null,
       brandId: svc.brandId ? svc.brandId.toString() : null,
-      gstPercentage: svc.gstPercentage,
       description: svc.description,
       isVendorEquipment: false
     }));
@@ -527,7 +526,6 @@ const getPublicServices = async (req, res) => {
         categoryId: eq.categoryId?._id ? eq.categoryId._id.toString() : (eq.categoryId ? eq.categoryId.toString() : (categoryId ? categoryId.toString() : null)),
         categoryTitle: eq.categoryId?.title || resolvedCategory?.title || eq.requestedCategoryName || 'Machinery',
         brandId: null,
-        gstPercentage: 18,
         description: eq.description || (eq.modelNumber ? `Model: ${eq.modelNumber}` : `Listed by ${vendorName}`),
         vendorId: eq.vendorId?._id ? eq.vendorId._id.toString() : (eq.vendorId ? eq.vendorId.toString() : null),
         vendorName: vendorName,
@@ -575,7 +573,6 @@ const getPublicServices = async (req, res) => {
         categoryId: p.categoryId ? p.categoryId.toString() : (categoryId ? categoryId.toString() : null),
         categoryTitle: resolvedCategory?.title || 'Machinery',
         brandId: null,
-        gstPercentage: 18,
         description: p.description || 'Admin Machinery',
         vendorId: null,
         vendorName: 'GrooAgri Official',

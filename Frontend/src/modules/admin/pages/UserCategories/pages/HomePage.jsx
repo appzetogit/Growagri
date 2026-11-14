@@ -1,13 +1,66 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { FiGrid, FiPlus, FiTrash2, FiSave, FiEdit2, FiX, FiArrowUp, FiArrowDown } from "react-icons/fi";
+import { FiGrid, FiPlus, FiTrash2, FiSave, FiEdit2, FiX, FiArrowUp, FiArrowDown, FiChevronUp } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import CardShell from "../components/CardShell";
 import Modal from "../components/Modal";
 import ToggleSwitch from "../components/ToggleSwitch";
 import { ensureIds, saveCatalog, slugify, toAssetUrl } from "../utils";
 
-import { homeContentService, serviceService } from "../../../../../services/catalogService";
+import { homeContentService, serviceService, categoryService } from "../../../../../services/catalogService";
 import { getYouTubeVideoId } from "../../../../../utils/videoUtils";
+import adminProductService from "../../../../../services/adminProductService";
+
+const PRODUCT_CATEGORIES = [
+  { value: 'seeds', label: 'Seeds' },
+  { value: 'fertilizer', label: 'Fertilizer' },
+  { value: 'pesticide', label: 'Pesticide' }
+];
+
+// Native <select> can't be forced to open upward, so the banner modal uses this small list that opens above the field
+const UpSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  const pick = (v) => { onChange(v); setOpen(false); };
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-sm text-left focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      >
+        <span className={`truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+          {selected ? selected.label : placeholder}
+          {selected?.sublabel && <span className="text-gray-400"> · {selected.sublabel}</span>}
+        </span>
+        <FiChevronUp className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? '' : 'rotate-180'}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <ul className="absolute bottom-full mb-1 left-0 right-0 z-20 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+            <li>
+              <button type="button" onClick={() => pick("")} className="w-full text-left px-3 py-2 text-sm text-gray-400 hover:bg-gray-50">{placeholder}</button>
+            </li>
+            {options.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">No options found</li>}
+            {options.map((o) => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  onClick={() => pick(o.value)}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 ${o.value === value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-800'}`}
+                >
+                  <span className="block truncate">{o.label}</span>
+                  {o.sublabel && <span className="block text-xs text-gray-500 truncate">{o.sublabel}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+};
 
 const RedirectionSelector = ({
   targetCategoryId,
@@ -130,6 +183,9 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
     targetCategoryId: "",
     slug: "",
     targetServiceId: "",
+    targetSectionTab: "",
+    targetProductCategory: "",
+    targetProductId: "",
     scrollToSection: ""
   });
   const [editingPromoId, setEditingPromoId] = useState(null);
@@ -170,17 +226,54 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
   const [isFetchingCityData, setIsFetchingCityData] = useState(false);
   const [allServices, setAllServices] = useState([]);
 
+  const [apiCategories, setApiCategories] = useState([]);
   const categories = useMemo(() => {
-    const list = ensureIds(catalog).categories || [];
-    return [...list].sort((a, b) => {
+    return [...apiCategories].sort((a, b) => {
       const ao = Number.isFinite(a.homeOrder) ? a.homeOrder : 0;
       const bo = Number.isFinite(b.homeOrder) ? b.homeOrder : 0;
       if (ao !== bo) return ao - bo;
       return (a.title || "").localeCompare(b.title || "");
     });
-  }, [catalog]);
+  }, [apiCategories]);
+
+  // Real categories from backend (ids match service.categoryId)
+  useEffect(() => {
+    categoryService.getAll()
+      .then((res) => {
+        if (res?.success) {
+          setApiCategories((res.categories || []).map((c) => ({ ...c, id: String(c._id || c.id) })));
+        }
+      })
+      .catch((error) => console.error("Failed to fetch categories for redirection:", error));
+  }, []);
 
   const home = ensureIds(catalog).home;
+
+  // Banner "category" = the admin-created Quick Action tabs (Category.sectionType matches the tab title)
+  const quickActionTabs = useMemo(() => (
+    [...(home?.premiumOfferings || [])]
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map((o) => (o.title || "").trim())
+      .filter(Boolean)
+  ), [home?.premiumOfferings]);
+
+  // The Kisan Bazaar tile is the quick action that routes to the agri marketplace
+  const kisanBazaarTab = useMemo(() => {
+    const o = (home?.premiumOfferings || []).find((x) =>
+      (x.route || "").toLowerCase().includes("agri") || (x.title || "").toLowerCase().includes("kisan")
+    );
+    return (o?.title || "").trim();
+  }, [home?.premiumOfferings]);
+
+  // Live marketplace products (admin + approved vendor) for banner → product redirect
+  const [marketProducts, setMarketProducts] = useState([]);
+  useEffect(() => {
+    adminProductService.getAll()
+      .then((res) => {
+        if (res?.success) setMarketProducts((res.data || []).filter((p) => p.type === "physical_good" && p.approvalStatus === "approved"));
+      })
+      .catch((error) => console.error("Failed to fetch products for banner redirect:", error));
+  }, []);
 
   const getCategoryTitle = (id) => {
     const c = categories.find((x) => x.id === id || x._id === id);
@@ -312,6 +405,9 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
       targetCategoryId: "",
       slug: "",
       targetServiceId: "",
+      targetSectionTab: "",
+      targetProductCategory: "",
+      targetProductId: "",
       scrollToSection: ""
     });
     setIsPromoModalOpen(false);
@@ -440,35 +536,6 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
     <div className="space-y-6">
       <CardShell icon={FiGrid}>
         <div className="space-y-8">
-          {/* Explore Services header + weather tile */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="pb-3 border-b border-gray-200">
-              <div className="text-xl font-bold text-gray-900">Explore Services Header</div>
-              <div className="text-sm text-gray-500 mt-1">Title/subtitle above the service categories, and the weather tile</div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                key={`title-${selectedCity}-${home?.exploreServicesTitle}`}
-                defaultValue={home?.exploreServicesTitle || ''}
-                onBlur={(e) => e.target.value !== (home?.exploreServicesTitle || '') && patchHome({ exploreServicesTitle: e.target.value })}
-                placeholder="Title (e.g. Explore Services)"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm"
-              />
-              <input
-                key={`subtitle-${selectedCity}-${home?.exploreServicesSubtitle}`}
-                defaultValue={home?.exploreServicesSubtitle || ''}
-                onBlur={(e) => e.target.value !== (home?.exploreServicesSubtitle || '') && patchHome({ exploreServicesSubtitle: e.target.value })}
-                placeholder="Subtitle"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm"
-              />
-            </div>
-            <ToggleSwitch
-              label="Show Weather Tile"
-              checked={home?.showWeatherTile !== false}
-              onChange={() => patchHome({ showWeatherTile: home?.showWeatherTile === false })}
-            />
-          </div>
-
           {/* ======================================================== */}
           {/* SECTION 1: Home Promo Carousel */}
           {/* ======================================================== */}
@@ -476,13 +543,13 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3 pb-3 mb-4 border-b border-gray-200">
                 <div>
-                  <div className="text-xl font-bold text-gray-900">Home Promo Carousel</div>
+                  <div className="text-xl font-bold text-gray-900">Banner Setting</div>
                   <div className="text-sm text-gray-500 mt-1">Manage carousel banners shown at the top of the user home screen</div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <ToggleSwitch
-                  label="Show Promos"
+                  label="Show Banners"
                   checked={home?.isPromosVisible !== false}
                   onChange={() => patchHome({ isPromosVisible: !home?.isPromosVisible })}
                 />
@@ -503,13 +570,13 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                   }}
                 >
                   <FiPlus className="w-4 h-4" style={{ display: 'block', color: '#ffffff' }} />
-                  <span>Add Promo</span>
+                  <span>Add Banner</span>
                 </button>
               </div>
             </div>
 
             {(home.promoCarousel || []).length === 0 ? (
-              <div className="text-base text-gray-500 py-6 text-center">No promo cards added yet</div>
+              <div className="text-base text-gray-500 py-6 text-center">No banners added yet</div>
             ) : (
               <div className="overflow-x-auto mt-4">
                 <table className="w-full">
@@ -518,8 +585,6 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700 w-12">#</th>
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700 w-24">Image</th>
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Title</th>
-                      <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Subtitle</th>
-                      <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Button Text</th>
                       <th className="text-left py-3 px-4 text-sm font-bold text-gray-700">Redirect</th>
                       <th className="text-center py-3 px-4 text-sm font-bold text-gray-700 w-32">Actions</th>
                     </tr>
@@ -541,17 +606,11 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                           <div className="text-sm font-semibold text-gray-900">{p.title || "—"}</div>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-sm text-gray-600">{p.subtitle || "—"}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="text-sm text-gray-600">{p.buttonText || "—"}</div>
-                        </td>
-                        <td className="py-4 px-4">
                           <div className="text-sm text-gray-600">
-                            {p.slug
-                              ? `Equipment: ${allServices.find(s => s.slug === p.slug)?.title || p.slug}`
-                              : (p.targetCategoryId ? getCategoryTitle(p.targetCategoryId) : "—")
-                            }
+                            {p.targetSectionTab || (p.targetCategoryId ? getCategoryTitle(p.targetCategoryId) : "—")}
+                            {p.targetProductId
+                              ? ` → ${marketProducts.find((x) => x._id === p.targetProductId)?.title || "Product"}`
+                              : p.targetProductCategory ? ` → ${PRODUCT_CATEGORIES.find((c) => c.value === p.targetProductCategory)?.label}` : ""}
                           </div>
                         </td>
                         <td className="py-4 px-4">
@@ -594,13 +653,13 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3 pb-3 mb-4 border-b border-gray-200">
                 <div>
-                  <div className="text-xl font-bold text-gray-900">Explore Services (Quick Actions Grid)</div>
-                  <div className="text-sm text-gray-500 mt-1">Manage the quick actions and services shown right under promo carousel</div>
+                  <div className="text-xl font-bold text-gray-900">Category</div>
+                  <div className="text-sm text-gray-500 mt-1">Manage the categories shown right under the banners</div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <ToggleSwitch
-                  label="Show Quick Actions"
+                  label="Show Categories"
                   checked={home?.isPremiumOfferingsVisible !== false}
                   onChange={() => patchHome({ isPremiumOfferingsVisible: !home?.isPremiumOfferingsVisible })}
                 />
@@ -621,13 +680,13 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
                   }}
                 >
                   <FiPlus className="w-4 h-4" style={{ display: 'block', color: '#ffffff' }} />
-                  <span>Add Action</span>
+                  <span>Add Category</span>
                 </button>
               </div>
             </div>
 
             {(home.premiumOfferings || []).length === 0 ? (
-              <div className="text-base text-gray-500 py-6 text-center">No quick actions added yet</div>
+              <div className="text-base text-gray-500 py-6 text-center">No categories added yet</div>
             ) : (
               <div className="overflow-x-auto mt-4">
                 <table className="w-full">
@@ -951,7 +1010,7 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
       <Modal
         isOpen={isPromoModalOpen}
         onClose={resetPromoForm}
-        title={editingPromoId ? "Edit Promo" : "Add Promo"}
+        title={editingPromoId ? "Edit Banner" : "Add Banner"}
       >
         <div className="space-y-4">
           <div>
@@ -1017,62 +1076,67 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Title</label>
-              <input
-                value={promoForm.title}
-                onChange={(e) => setPromoForm((p) => ({ ...p, title: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
-                placeholder="Title"
-              />
-            </div>
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Subtitle</label>
-              <input
-                value={promoForm.subtitle}
-                onChange={(e) => setPromoForm((p) => ({ ...p, subtitle: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
-                placeholder="Subtitle"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Button Text</label>
-              <input
-                value={promoForm.buttonText}
-                onChange={(e) => setPromoForm((p) => ({ ...p, buttonText: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
-                placeholder="Explore"
-              />
-            </div>
-            <div>
-              <label className="block text-base font-bold text-gray-900 mb-2">Gradient Class</label>
-              <input
-                value={promoForm.gradientClass}
-                onChange={(e) => setPromoForm((p) => ({ ...p, gradientClass: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
-                placeholder="from-blue-600 to-blue-800"
-              />
-            </div>
-          </div>
-          <RedirectionSelector
-            categories={categories}
-            allServices={allServices}
-            targetCategoryId={promoForm.targetCategoryId}
-            slug={promoForm.slug}
-            onChange={(patch) => setPromoForm((p) => ({ ...p, ...patch }))}
-            label="Redirect to..."
-          />
           <div>
-            <label className="block text-base font-bold text-gray-900 mb-2">Scroll To Section (optional)</label>
+            <label className="block text-base font-bold text-gray-900 mb-2">Title</label>
             <input
-              value={promoForm.scrollToSection}
-              onChange={(e) => setPromoForm((p) => ({ ...p, scrollToSection: e.target.value }))}
+              value={promoForm.title}
+              onChange={(e) => setPromoForm((p) => ({ ...p, title: e.target.value }))}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all bg-white"
-              placeholder="Soil Testing"
+              placeholder="Title"
             />
+          </div>
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+            <label className="block text-sm font-bold text-gray-700">Redirect to...</label>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Select Category</label>
+              <UpSelect
+                value={promoForm.targetSectionTab || ""}
+                onChange={(v) => setPromoForm((p) => ({ ...p, targetSectionTab: v, targetCategoryId: "", slug: "", targetServiceId: "", targetProductCategory: "", targetProductId: "" }))}
+                options={quickActionTabs.map((t) => ({ value: t, label: t }))}
+                placeholder="-- Choose Category --"
+              />
+            </div>
+            {kisanBazaarTab && promoForm.targetSectionTab === kisanBazaarTab && (() => {
+              const productCategory = promoForm.targetProductCategory
+                || marketProducts.find((p) => p._id === promoForm.targetProductId)?.productCategory || "";
+              const productOptions = marketProducts
+                .filter((p) => p.productCategory === productCategory)
+                .map((p) => ({
+                  value: p._id,
+                  label: p.title,
+                  sublabel: p.vendorId ? (p.vendorId.shopDetails?.shopName || p.vendorId.businessName || p.vendorId.name || "Vendor") : "Admin Store"
+                }));
+              return (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Product Category</label>
+                    <UpSelect
+                      value={productCategory}
+                      onChange={(v) => setPromoForm((p) => ({ ...p, targetProductCategory: v, targetProductId: "" }))}
+                      options={PRODUCT_CATEGORIES}
+                      placeholder="-- All Products --"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Product</label>
+                    <UpSelect
+                      value={promoForm.targetProductId || ""}
+                      onChange={(v) => setPromoForm((p) => ({ ...p, targetProductCategory: productCategory, targetProductId: v }))}
+                      options={productOptions}
+                      placeholder={productCategory ? "-- Select Product --" : "Select a product category first"}
+                      disabled={!productCategory}
+                    />
+                    <p className="text-xs text-blue-600 mt-1 font-medium">
+                      {promoForm.targetProductId
+                        ? "* Banner will open this product's page"
+                        : productCategory
+                          ? "* Banner will open Kisan Bazaar with this category selected"
+                          : "* Banner will open Kisan Bazaar"}
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div className="flex gap-3 pt-4">
             <button
@@ -1084,7 +1148,7 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
               {(uploading || isSyncing) ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : <FiSave className="w-5 h-5" />}
-              {uploading ? "Uploading..." : isSyncing ? "Saving..." : (editingPromoId ? "Update Promo" : "Add Promo")}
+              {uploading ? "Uploading..." : isSyncing ? "Saving..." : (editingPromoId ? "Update Banner" : "Add Banner")}
             </button>
             <button
               onClick={resetPromoForm}
@@ -1103,7 +1167,7 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
       <Modal
         isOpen={isPremiumOfferingsModalOpen}
         onClose={resetPremiumOfferingsForm}
-        title={editingPremiumOfferingsId ? "Edit Action / Service" : "Add Action / Service"}
+        title={editingPremiumOfferingsId ? "Edit Category" : "Add Category"}
       >
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
@@ -1202,7 +1266,7 @@ const HomePage = ({ catalog, setCatalog, selectedCity }) => {
               {isSyncing ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : <FiSave className="w-5 h-5" />}
-              {isSyncing ? "Saving..." : (editingPremiumOfferingsId ? "Update Action" : "Add Action")}
+              {isSyncing ? "Saving..." : (editingPremiumOfferingsId ? "Update Category" : "Add Category")}
             </button>
             <button
               onClick={resetPremiumOfferingsForm}

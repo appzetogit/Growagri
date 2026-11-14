@@ -10,7 +10,7 @@ const getCart = async (req, res) => {
         let cart = await EcommerceCart.findOne({ userId })
             .populate({
                 path: 'items.productId',
-                select: 'title price discountPrice unit bagWeight stock imageUrl images gstPercentage commissionPercentage shippingCharge approvalStatus status'
+                select: 'title price discountPrice unit bagWeight stock imageUrl images commissionPercentage shippingCharge approvalStatus status'
             });
 
         if (!cart) {

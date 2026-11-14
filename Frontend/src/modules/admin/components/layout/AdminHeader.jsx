@@ -58,7 +58,7 @@ const AdminHeader = ({ onMenuClick }) => {
       { path: '/admin/payments', title: 'Payments', description: 'Monitor transactions and revenue' },
       { path: '/admin/reports', title: 'Reports', description: 'Analyze platform performance with data insights' },
       { path: '/admin/notifications', title: 'Notifications', description: 'Stay updated with platform activities' },
-      { path: '/admin/admin-revenue', title: 'Admin Revenue', description: 'Vendor-wise booking revenue: vendor earning, GST and admin commission' },
+      { path: '/admin/admin-revenue', title: 'Admin Revenue', description: 'Vendor-wise booking revenue: vendor earning and admin commission' },
       { path: '/admin/soil-testing-revenue', title: 'Admin Soil Testing Revenue', description: 'Lab-wise soil test revenue: farmer paid, vendor earning and admin commission' },
       { path: '/admin/settings', title: 'Settings', description: 'Configure platform preferences' },
       { path: '/admin/plans', title: 'Subscription Plans', description: 'Manage farmer subscription plans' },

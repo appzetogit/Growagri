@@ -85,7 +85,6 @@ const createService = async (req, res) => {
       categoryId,
       title,
       basePrice,
-      gstPercentage,
       description,
       status,
       iconUrl,
@@ -115,7 +114,6 @@ const createService = async (req, res) => {
       categoryId,
       title,
       basePrice: basePrice || hourly_price || daily_price || land_price || 0,
-      gstPercentage: gstPercentage || 18,
       description,
       status: status || SERVICE_STATUS.ACTIVE,
       iconUrl,
@@ -181,7 +179,6 @@ const updateService = async (req, res) => {
     if (updates.title) service.title = updates.title;
     if (updates.categoryId) service.categoryId = updates.categoryId;
     if (updates.basePrice !== undefined) service.basePrice = updates.basePrice;
-    if (updates.gstPercentage !== undefined) service.gstPercentage = updates.gstPercentage;
     if (updates.description !== undefined) service.description = updates.description;
     if (updates.status) service.status = updates.status;
     if (updates.iconUrl !== undefined) service.iconUrl = updates.iconUrl;

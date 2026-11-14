@@ -28,10 +28,6 @@ const getSettings = async (req, res) => {
         settings: vendor.settings || {},
         businessHours: vendor.businessHours || {},
         global: {
-          // GST is not charged on bookings
-          serviceGstPercentage: 0,
-          partsGstPercentage: 0,
-          rentalGstPercentage: 0,
           rentalPayoutPercentage: globalSettings?.rentalPayoutPercentage ?? 90,
           servicePayoutPercentage: globalSettings?.servicePayoutPercentage ?? 70,
           partsPayoutPercentage: globalSettings?.partsPayoutPercentage ?? 10,

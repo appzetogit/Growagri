@@ -22,6 +22,12 @@ import { publicCatalogService } from '../../../../services/catalogService';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const PRODUCT_CATEGORIES = [
+    { value: 'seeds', label: 'Seeds' },
+    { value: 'fertilizer', label: 'Fertilizer' },
+    { value: 'pesticide', label: 'Pesticide' }
+];
+
 const MyStore = () => {
     const navigate = useNavigate();
     const [products, setProducts] = useState([]);
@@ -35,6 +41,7 @@ const MyStore = () => {
     const [formData, setFormData] = useState({
         title: '',
         categoryId: '',
+        productCategory: '',
         brandName: '',
         description: '',
         price: '',
@@ -149,6 +156,9 @@ const MyStore = () => {
         e.preventDefault();
         if (!formData.title || !formData.price) {
             return toast.error("Please fill Title and Price");
+        }
+        if (!formData.productCategory) {
+            return toast.error("Please select a category");
         }
 
         try {
@@ -348,7 +358,7 @@ const MyStore = () => {
                         onClick={() => {
                             setEditMode(false);
                             setFormData({
-                                title: '', categoryId: '', brandName: '', description: '', price: '', unit: 'bag', bagWeight: 50, stock: 1,
+                                title: '', categoryId: '', productCategory: '', brandName: '', description: '', price: '', unit: 'bag', bagWeight: 50, stock: 1,
                                 shippingCharge: 0, imageUrl: '', images: [], specifications: []
                             });
                             setShowModal(true);
@@ -401,7 +411,7 @@ const MyStore = () => {
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0">
                                                     <h3 className="font-semibold text-slate-900 text-sm truncate">{product.title}</h3>
-                                                    <p className="text-xs text-slate-500">{product.brandName || 'Local Brand'} · {product.bagWeight} kg</p>
+                                                    <p className="text-xs text-slate-500">{PRODUCT_CATEGORIES.find(c => c.value === product.productCategory)?.label || 'Uncategorized'} · {product.brandName || 'Local Brand'} · {product.bagWeight} kg</p>
                                                 </div>
                                                 <p className="font-semibold text-slate-900 text-sm flex-shrink-0">₹{product.price}</p>
                                             </div>
@@ -449,7 +459,7 @@ const MyStore = () => {
                                 </button>
                                 <div className="flex-1">
                                     <h1 className="text-lg font-semibold text-slate-900 leading-tight">{editMode ? 'Edit Product' : 'Add Product'}</h1>
-                                    <p className="text-xs text-slate-500">Seeds & fertilizers details</p>
+                                    <p className="text-xs text-slate-500">Seeds, fertilizers & pesticides details</p>
                                 </div>
                             </div>
 
@@ -486,6 +496,13 @@ const MyStore = () => {
                                     {/* Details */}
                                     <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
                                         <h2 className="text-sm font-semibold text-slate-900">Product Details</h2>
+                                        <div>
+                                            <label className={labelClass}>Category <span className="text-red-500">*</span></label>
+                                            <select required className={inputClass} value={formData.productCategory || ''} onChange={e => setFormData({ ...formData, productCategory: e.target.value })}>
+                                                <option value="" disabled>Select category</option>
+                                                {PRODUCT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                            </select>
+                                        </div>
                                         <div>
                                             <label className={labelClass}>Product Name <span className="text-red-500">*</span></label>
                                             <input required type="text" className={inputClass} placeholder="e.g. Zinc Phosphide, Wheat Seeds" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
@@ -548,7 +565,7 @@ const MyStore = () => {
                                         </div>
                                         <p className="text-xs text-slate-500 flex gap-1.5 col-span-2">
                                             <FiInfo className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" />
-                                            Admin adds GST and commission to your base price before the product goes live.
+                                            Admin adds commission to your base price before the product goes live.
                                         </p>
                                     </div>
                                 </div>

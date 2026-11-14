@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiBell, FiCheck, FiArrowLeft, FiTrash2, FiX } from 'react-icons/fi';
+import { FiBell, FiArrowLeft, FiTrash2 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
 import BottomNav from '../../components/layout/BottomNav';
 import {
   getNotifications,
-  markAsRead,
   markAllAsRead,
-  deleteNotification,
   deleteAllNotifications
 } from '../../services/notificationService';
 
@@ -42,6 +40,8 @@ const Notifications = () => {
       setLoading(true);
       const data = await getNotifications();
       setNotifications(data || []);
+      // Opening the page = seen; clears the bell badge (unread highlight stays for this visit)
+      if ((data || []).some(n => !n.read)) markAllAsRead().catch(() => {});
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -61,18 +61,6 @@ const Notifications = () => {
     };
   }, []);
 
-  const handleMarkAsRead = async (id) => {
-    try {
-      await markAsRead(id);
-      // Update local state to reflect change immediately
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-    } catch (error) {
-      console.error('Failed to mark as read', error);
-    }
-  };
-
   const handleMarkAllRead = async () => {
     try {
       await markAllAsRead();
@@ -81,22 +69,6 @@ const Notifications = () => {
     } catch (error) {
       console.error('Failed to mark all as read', error);
       toast.error('Failed to mark all as read');
-    }
-  };
-
-  const handleDelete = async (e, id) => {
-    e.stopPropagation();
-    try {
-      // Professional confirmation could be a custom modal, but native confirm is robust for now
-      // Or just delete with undo toast.
-      // User asked for "professionally". Often direct delete is preferred for single items, confirmation for "Clear All".
-      // But let's add no confirm for single item for speed, or a simple one.
-      await deleteNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      toast.success('Notification removed');
-    } catch (error) {
-      console.error('Failed to delete notification', error);
-      toast.error('Failed to delete');
     }
   };
 
@@ -277,7 +249,7 @@ const Notifications = () => {
                   >
                     {getNotificationIcon(notif.type)}
                   </div>
-                  <div className="flex-1 pr-6"> {/* Added pr-6 to avoid overlap with delete btn */}
+                  <div className="flex-1">
                     <div className="flex items-start justify-between mb-1">
                       <div>
                         <p className={`font-semibold text-gray-800 ${!notif.read ? 'font-bold' : ''}`}>{notif.title}</p>
@@ -332,25 +304,6 @@ const Notifications = () => {
                   </div>
                 </div>
 
-                {/* Actions: Mark Read & Delete */}
-                <div className="absolute top-3 right-3 flex gap-2">
-                  {!notif.read && (
-                    <button
-                      onClick={() => handleMarkAsRead(notif.id)}
-                      className="p-1.5 rounded-full bg-gray-50 hover:bg-gray-100 text-green-600 transition-colors shadow-sm"
-                      title="Mark as read"
-                    >
-                      <FiCheck className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => handleDelete(e, notif.id)}
-                    className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shadow-sm"
-                    title="Delete"
-                  >
-                    <FiX className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
             ))}
           </div>

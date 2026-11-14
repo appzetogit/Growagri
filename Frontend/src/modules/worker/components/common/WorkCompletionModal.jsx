@@ -67,7 +67,7 @@ const WorkCompletionModal = ({ isOpen, onClose, job, onComplete, loading }) => {
       return job.finalAmount;
     }
 
-    return ((job?.basePrice || 0) + (job?.tax || 0) - (job?.discount || 0));
+    return ((job?.basePrice || 0) - (job?.discount || 0));
   };
 
   const handleSubmit = () => {

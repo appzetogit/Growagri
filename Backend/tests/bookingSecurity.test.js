@@ -42,7 +42,7 @@ const call = (handler, req) => new Promise((resolve, reject) => {
   assert.deepStrictEqual(slots.effectiveSlot({ start: 'Forenoon (10AM-2PM)', end: 'x' }), { start: '10:00', end: '14:00' });
 
   // ── Fixtures ──
-  await db.collection('settings').insertOne({ type: 'global', visitedCharges: 50, serviceGstPercentage: 18, rentalGstPercentage: 5 });
+  await db.collection('settings').insertOne({ type: 'global', visitedCharges: 50 });
   const categoryId = oid();
   await db.collection('categories').insertOne({ _id: categoryId, title: 'Tractor', status: 'active' });
   const ownerId = oid();
@@ -76,18 +76,17 @@ const call = (handler, req) => new Promise((resolve, reject) => {
     ...extra
   });
 
-  // ── 1. Client prices, discounts, GST and free membership are ignored ──
+  // ── 1. Client prices, discounts and free membership are ignored ──
   const tampered = await call(userBooking.createBooking, {
     ...asUser,
     body: baseBooking({ start: '07:00', end: '08:00' }, {
-      amount: 1, basePrice: 1, discount: 99999, tax: -5, visitingCharges: -1000, isPlusAdded: true,
+      amount: 1, basePrice: 1, discount: 99999, visitingCharges: -1000, isPlusAdded: true,
       bookedItems: [{ serviceId: String(machineId), title: 'Mahindra 575', price: 1, quantity: 1 }]
     })
   });
   assert.strictEqual(tampered.code, 201, JSON.stringify(tampered.data));
   const created = tampered.data.data;
-  assert.strictEqual(created.finalAmount, 2050, '2h x 1000 + 50 visit fee, no GST');
-  assert.strictEqual(created.tax, 0, 'GST is not charged');
+  assert.strictEqual(created.finalAmount, 2050, '2h x 1000 + 50 visit fee');
   assert.strictEqual(created.discount, 0);
   assert.strictEqual(String(created.vendorId), String(ownerId), 'machine booking goes to its owner');
   assert.strictEqual(String(created.equipmentId), String(machineId));

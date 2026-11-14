@@ -194,7 +194,6 @@ export default function BookingDetails() {
           },
           // Price Breakdown
           basePrice: parseFloat(apiData.basePrice || 0),
-          tax: parseFloat(apiData.tax || 0),
           visitingCharges: parseFloat(apiData.visitingCharges || apiData.visitationFee || (apiData.paymentMethod === 'plan_benefit' ? 49 : 0)),
           discount: parseFloat(apiData.discount || 0),
           platformCommission: parseFloat(apiData.adminCommission || apiData.platformFee || apiData.commission || 0),
@@ -1232,7 +1231,6 @@ export default function BookingDetails() {
                     <div key={`c-${i}`} className="flex justify-between text-gray-600">
                       <div>
                         <span>{c.name} x {c.quantity}</span>
-                        {c.hsnCode && <p className="text-[9px] text-gray-400">HSN: {c.hsnCode}</p>}
                       </div>
                       <span className="font-mono">₹{(c.price * c.quantity).toFixed(2)}</span>
                     </div>

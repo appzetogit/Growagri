@@ -531,7 +531,6 @@ const getEarningsSummary = async (req, res) => {
       amount: b.vendorTotalEarning || 0,
       totalAmount: b.grandTotal || 0,
       commission: b.companyRevenue || 0,
-      tax: b.totalGST || 0,
       date: b.paidAt || b.createdAt,
       status: b.status,
       customerName: b.bookingId?.customerName || 'Farmer'

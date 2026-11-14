@@ -220,6 +220,23 @@ body::-webkit-scrollbar {
   height: 0;
 }
 
+/* User app: no scrollbars anywhere (class toggled by user routes) */
+html.user-app,
+html.user-app body,
+html.user-app * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+html.user-app::-webkit-scrollbar,
+html.user-app body::-webkit-scrollbar,
+html.user-app *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
 /* Hide scrollbar utility classes */
 .scrollbar-hide,
 .no-scrollbar {

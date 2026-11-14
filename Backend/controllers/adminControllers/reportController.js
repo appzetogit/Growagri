@@ -33,7 +33,6 @@ const getFinanceOverview = async (req, res) => {
           totalTransactionValue: { $sum: '$totalRevenue' },
           totalPlatformRevenue: { $sum: '$platformCommission' },
           totalVendorEarnings: { $sum: '$vendorEarnings' },
-          totalTaxCollected: { $sum: '$totalGST' },
           totalTDSCollected: { $sum: '$totalTDS' },
           count: { $sum: '$totalBookings' },
           totalSettlementReceived: { $sum: '$totalSettlementReceived' },
@@ -46,7 +45,6 @@ const getFinanceOverview = async (req, res) => {
       totalTransactionValue: 0,
       totalPlatformRevenue: 0,
       totalVendorEarnings: 0,
-      totalTaxCollected: 0,
       totalTDSCollected: 0,
       count: 0,
       totalSettlementReceived: 0,
@@ -176,7 +174,6 @@ const getPaymentTransactions = async (req, res) => {
         amount: bill?.grandTotal || b.finalAmount || 0,
         platformFee: bill?.companyRevenue || (b.finalAmount ? b.finalAmount * 0.2 : 0),
         vendorEarnings: bill?.vendorTotalEarning || (b.finalAmount ? b.finalAmount * 0.8 : 0),
-        tax: bill?.totalGST || 0,
         paymentMethod: b.paymentMethod || 'N/A',
         paymentStatus: b.paymentStatus || 'N/A',
         bookingStatus: b.status,
@@ -189,9 +186,8 @@ const getPaymentTransactions = async (req, res) => {
       acc.totalAmount += row.amount;
       acc.totalCommission += row.platformFee;
       acc.totalVendorEarnings += row.vendorEarnings;
-      acc.totalTax += row.tax;
       return acc;
-    }, { totalAmount: 0, totalCommission: 0, totalVendorEarnings: 0, totalTax: 0 });
+    }, { totalAmount: 0, totalCommission: 0, totalVendorEarnings: 0 });
 
     if (format === 'csv') {
       return sendCSV(res, reportData, 'payment_transactions');
@@ -212,103 +208,6 @@ const getPaymentTransactions = async (req, res) => {
   } catch (error) {
     console.error('Payment transactions error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch payment transactions' });
-  }
-};
-
-/**
- * Get GSTR-1 Style Report (Sales)
- * Uses global GST Settings (Common GST)
- */
-const getGSTRReport = async (req, res) => {
-  try {
-    const { startDate, endDate, format = 'json' } = req.query;
-
-    // Fetch global GST setting
-    const settings = await Settings.findOne({ type: 'global' });
-    const gstRate = settings?.serviceGstPercentage || 18; // Default 18% if not set
-
-    // CGST/SGST split logic implies 50-50 split of the total GST rate
-    const halfRate = gstRate / 2;
-
-    const query = {
-      status: BOOKING_STATUS.COMPLETED
-    };
-
-    if (startDate && endDate) {
-      query.completedAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
-      };
-    }
-
-    // Fetch bills alongside bookings for GST data
-    const bookings = await Booking.find(query)
-      .populate('userId', 'name phone')
-      .select('bookingNumber finalAmount completedAt paymentMethod address vendorBillId')
-      .sort({ completedAt: -1 })
-      .lean();
-
-    // Get VendorBills for these bookings
-    const billBookingIds = bookings.map(b => b._id);
-    const gstBills = await VendorBill.find({ bookingId: { $in: billBookingIds } }).lean();
-    const gstBillMap = {};
-    gstBills.forEach(b => { gstBillMap[b.bookingId.toString()] = b; });
-
-    // Map to GSTR format
-    const reportData = bookings.map(b => {
-      const bill = gstBillMap[b._id.toString()];
-
-      // Use VendorBill GST data if available, otherwise fallback
-      let taxAmount = bill?.totalGST || 0;
-      let taxableValue = (bill?.totalServiceBase || 0) + (bill?.totalPartsBase || 0);
-
-      // Fallback if no bill exists
-      if (!bill && b.finalAmount > 0) {
-        taxableValue = b.finalAmount / (1 + (gstRate / 100));
-        taxAmount = b.finalAmount - taxableValue;
-      }
-
-      return {
-        invoiceDate: b.completedAt ? new Date(b.completedAt).toISOString().split('T')[0] : '',
-        invoiceNumber: b.bookingNumber,
-        customerName: b.userId?.name || 'Guest',
-        placeOfSupply: b.address?.state || 'Madhya Pradesh',
-        hsnSac: '9988',
-        taxableValue: parseFloat(taxableValue.toFixed(2)),
-        gstRate: `${gstRate}%`,
-        cgst: parseFloat((taxAmount / 2).toFixed(2)),
-        sgst: parseFloat((taxAmount / 2).toFixed(2)),
-        igst: 0,
-        totalTax: parseFloat(taxAmount.toFixed(2)),
-        invoiceValue: bill?.grandTotal || b.finalAmount,
-        paymentMode: b.paymentMethod
-      };
-    });
-
-    // Summary totals
-    const summary = reportData.reduce((acc, row) => {
-      acc.totalTaxableValue += row.taxableValue;
-      acc.totalCGST += row.cgst;
-      acc.totalSGST += row.sgst;
-      acc.totalIGST += row.igst;
-      acc.totalTax += row.totalTax;
-      acc.totalInvoiceValue += row.invoiceValue;
-      return acc;
-    }, { totalTaxableValue: 0, totalCGST: 0, totalSGST: 0, totalIGST: 0, totalTax: 0, totalInvoiceValue: 0 });
-
-    if (format === 'csv') {
-      return sendCSV(res, reportData, 'gstr1_sales_report');
-    }
-
-    res.status(200).json({
-      success: true,
-      data: reportData,
-      summary
-    });
-
-  } catch (error) {
-    console.error('GSTR report error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate GSTR report' });
   }
 };
 
@@ -670,7 +569,6 @@ const sendCSV = (res, data, filename) => {
 module.exports = {
   getFinanceOverview,
   getPaymentTransactions,
-  getGSTRReport,
   getTDSReport,
   getCODReport,
   getRevenueBreakdown

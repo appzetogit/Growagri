@@ -195,7 +195,6 @@ export const CSV_COLUMNS = {
     { key: 'worker.name', label: 'Worker' },
     { key: 'status', label: 'Status' },
     { key: 'pricing.subtotal', label: 'Subtotal', type: 'currency' },
-    { key: 'pricing.gst', label: 'GST', type: 'currency' },
     { key: 'pricing.total', label: 'Total', type: 'currency' },
     { key: 'paymentMethod', label: 'Payment Mode' },
     { key: 'paymentStatus', label: 'Payment Status' }

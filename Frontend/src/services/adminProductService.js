@@ -32,7 +32,7 @@ const adminProductService = {
     },
 
     approveProduct: async (id, data) => {
-        // data: { commissionPercentage, gstPercentage }
+        // data: { commissionPercentage }
         const response = await api.post(`/admin/vendor-submissions/${id}/approve`, data);
         return response.data;
     },

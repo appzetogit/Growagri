@@ -4,14 +4,13 @@ const Vendor = require('../../models/Vendor');
 // Never sent to the browser
 const SECRET_FIELDS = '-razorpayKeySecret -razorpayWebhookSecret -cloudinaryApiSecret';
 
-// GST percentages are intentionally not updatable: GST is not charged on bookings
 const UPDATABLE_FIELDS = [
   'visitedCharges', 'servicePayoutPercentage', 'partsPayoutPercentage',
   'rentalPayoutPercentage', 'tdsPercentage', 'platformFeePercentage', 'vendorCashLimit', 'minWithdrawalAmount',
   'cancellationPenalty', 'bookingCommissionPercentage',
   'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret', 'cloudinaryCloudName', 'cloudinaryApiKey', 'cloudinaryApiSecret',
-  'companyName', 'companyGSTIN', 'companyPAN', 'companyAddress', 'companyCity', 'companyState', 'companyPincode',
-  'companyPhone', 'companyEmail', 'invoicePrefix', 'sacCode',
+  'companyName', 'companyPAN', 'companyAddress', 'companyCity', 'companyState', 'companyPincode',
+  'companyPhone', 'companyEmail', 'invoicePrefix',
   'supportEmail', 'supportPhone', 'supportWhatsapp'
 ];
 
@@ -66,7 +65,7 @@ exports.updateSettings = async (req, res, next) => {
     });
   }
 };
-// Get Public Settings (Visited Charges, GST)
+// Get Public Settings (Visited Charges)
 exports.getPublicSettings = async (req, res, next) => {
   try {
     let settings = await Settings.findOne({ type: 'global' }).select('visitedCharges supportEmail supportPhone supportWhatsapp cancellationPenalty bookingCommissionPercentage').lean();
@@ -78,8 +77,7 @@ exports.getPublicSettings = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      // GST is not charged on bookings; 0 keeps older app builds from adding it
-      settings: { ...settings, serviceGstPercentage: 0, partsGstPercentage: 0, rentalGstPercentage: 0 }
+      settings
     });
   } catch (error) {
     console.error('Error fetching public settings:', error);

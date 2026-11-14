@@ -51,11 +51,11 @@ const getVendorProducts = async (req, res) => {
 };
 
 /**
- * Admin: Approve vendor product & set tax/commission
+ * Admin: Approve vendor product & set commission
  */
 const approveProduct = async (req, res) => {
     try {
-        const { commissionPercentage, gstPercentage } = req.body;
+        const { commissionPercentage } = req.body;
         
         const product = await Product.findOneAndUpdate(
             { _id: req.params.id, vendorId: { $ne: null } },
@@ -63,7 +63,6 @@ const approveProduct = async (req, res) => {
                 approvalStatus: 'approved', 
                 rejectionReason: null,
                 commissionPercentage: Number(commissionPercentage) || 0,
-                gstPercentage: Number(gstPercentage) || 5,
                 status: 'active'
             },
             { new: true }

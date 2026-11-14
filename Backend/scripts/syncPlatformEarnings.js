@@ -59,7 +59,6 @@ const syncPlatformEarnings = async () => {
           totalBookings: 0,
           platformCommission: 0,
           vendorEarnings: 0,
-          totalGST: 0,
           totalTDS: 0,
           totalSettlementReceived: 0,
           totalAmountPaidToVendors: 0
@@ -72,14 +71,12 @@ const syncPlatformEarnings = async () => {
       const revenue = bill?.grandTotal || finalAmount;
       const commission = bill?.companyRevenue || (finalAmount * 0.2);
       const vendorEarn = bill?.vendorTotalEarning || (finalAmount * 0.8);
-      const gst = bill?.totalGST || 0;
       // Note: TDS usually isn't in VendorBill, handled separately in Withdrawals but we leave it at 0 here
 
       dailyEarnings[dateStr].totalRevenue += revenue;
       dailyEarnings[dateStr].totalBookings += 1;
       dailyEarnings[dateStr].platformCommission += commission;
       dailyEarnings[dateStr].vendorEarnings += vendorEarn;
-      dailyEarnings[dateStr].totalGST += gst;
     });
 
     // 4. Incorporate Settlements
@@ -87,7 +84,7 @@ const syncPlatformEarnings = async () => {
     const settlements = await Settlement.find({ status: 'completed' }).lean();
     settlements.forEach(settlement => {
       const dateStr = getTodayDateString(settlement.processedAt || settlement.createdAt);
-      if (!dailyEarnings[dateStr]) dailyEarnings[dateStr] = { totalRevenue: 0, totalBookings: 0, platformCommission: 0, vendorEarnings: 0, totalGST: 0, totalTDS: 0, totalSettlementReceived: 0, totalAmountPaidToVendors: 0 };
+      if (!dailyEarnings[dateStr]) dailyEarnings[dateStr] = { totalRevenue: 0, totalBookings: 0, platformCommission: 0, vendorEarnings: 0, totalTDS: 0, totalSettlementReceived: 0, totalAmountPaidToVendors: 0 };
 
       dailyEarnings[dateStr].totalSettlementReceived = (dailyEarnings[dateStr].totalSettlementReceived || 0) + settlement.amount;
     });
@@ -97,7 +94,7 @@ const syncPlatformEarnings = async () => {
     const withdrawals = await Withdrawal.find({ status: 'approved' }).lean();
     withdrawals.forEach(withdrawal => {
       const dateStr = getTodayDateString(withdrawal.processedDate || withdrawal.createdAt);
-      if (!dailyEarnings[dateStr]) dailyEarnings[dateStr] = { totalRevenue: 0, totalBookings: 0, platformCommission: 0, vendorEarnings: 0, totalGST: 0, totalTDS: 0, totalSettlementReceived: 0, totalAmountPaidToVendors: 0 };
+      if (!dailyEarnings[dateStr]) dailyEarnings[dateStr] = { totalRevenue: 0, totalBookings: 0, platformCommission: 0, vendorEarnings: 0, totalTDS: 0, totalSettlementReceived: 0, totalAmountPaidToVendors: 0 };
 
       dailyEarnings[dateStr].totalAmountPaidToVendors = (dailyEarnings[dateStr].totalAmountPaidToVendors || 0) + withdrawal.amount;
       dailyEarnings[dateStr].totalTDS = (dailyEarnings[dateStr].totalTDS || 0) + (withdrawal.tdsAmount || 0); // Include TDS from withdrawals
@@ -116,7 +113,6 @@ const syncPlatformEarnings = async () => {
               totalBookings: dailyEarnings[dateStr].totalBookings,
               platformCommission: dailyEarnings[dateStr].platformCommission,
               vendorEarnings: dailyEarnings[dateStr].vendorEarnings,
-              totalGST: dailyEarnings[dateStr].totalGST,
               totalTDS: dailyEarnings[dateStr].totalTDS || 0,
               totalSettlementReceived: dailyEarnings[dateStr].totalSettlementReceived || 0,
               totalAmountPaidToVendors: dailyEarnings[dateStr].totalAmountPaidToVendors || 0

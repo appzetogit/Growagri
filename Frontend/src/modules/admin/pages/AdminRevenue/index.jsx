@@ -13,7 +13,6 @@ const toRow = (txn) => {
   const b = txn.bookingId || {};
   const bill = b.vendorBillId || {};
   const farmerPaid = bill.grandTotal ?? b.finalAmount ?? 0;
-  const gst = bill.totalGST ?? b.tax ?? 0;
   const vendorEarning = txn.amount || 0;
   return {
     id: txn._id,
@@ -25,10 +24,8 @@ const toRow = (txn) => {
     duration: b.estimatedDuration,
     payment: paymentInfo(b),
     farmerPaid,
-    gst,
     vendorEarning,
-    commission: farmerPaid - gst - vendorEarning,
-    adminTotal: farmerPaid - vendorEarning
+    commission: farmerPaid - vendorEarning
   };
 };
 
@@ -56,19 +53,15 @@ const AdminRevenue = () => {
 
   const totals = rows.reduce((t, r) => ({
     farmerPaid: t.farmerPaid + r.farmerPaid,
-    gst: t.gst + r.gst,
     vendorEarning: t.vendorEarning + r.vendorEarning,
-    commission: t.commission + r.commission,
-    adminTotal: t.adminTotal + r.adminTotal
-  }), { farmerPaid: 0, gst: 0, vendorEarning: 0, commission: 0, adminTotal: 0 });
+    commission: t.commission + r.commission
+  }), { farmerPaid: 0, vendorEarning: 0, commission: 0 });
 
   const cards = [
     { label: 'Bookings', value: rows.length, color: 'text-gray-900' },
     { label: 'Farmer Paid', value: rupees(totals.farmerPaid), color: 'text-gray-900' },
     { label: 'Vendor Earning', value: rupees(totals.vendorEarning), color: 'text-blue-600' },
-    { label: 'GST', value: rupees(totals.gst), color: 'text-amber-600' },
-    { label: 'Admin Commission', value: rupees(totals.commission), color: 'text-green-600' },
-    { label: 'Admin Total (Comm. + GST)', value: rupees(totals.adminTotal), color: 'text-emerald-700' }
+    { label: 'Admin Commission', value: rupees(totals.commission), color: 'text-green-600' }
   ];
 
   const th = 'px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap';
@@ -102,7 +95,7 @@ const AdminRevenue = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {cards.map(c => (
               <div key={c.label} className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-200">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{c.label}</p>
@@ -125,9 +118,7 @@ const AdminRevenue = () => {
                       <th className={th}>Payment</th>
                       <th className={`${th} text-right`}>Farmer Paid</th>
                       <th className={`${th} text-right`}>Vendor Earning</th>
-                      <th className={`${th} text-right`}>GST</th>
                       <th className={`${th} text-right`}>Admin Commission</th>
-                      <th className={`${th} text-right`}>Admin Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -153,9 +144,7 @@ const AdminRevenue = () => {
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">{rupees(r.farmerPaid)}</td>
                         <td className="px-4 py-3 text-right text-sm font-semibold text-blue-600">{rupees(r.vendorEarning)}</td>
-                        <td className="px-4 py-3 text-right text-sm text-amber-600">{rupees(r.gst)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{rupees(r.commission)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-black text-emerald-700">{rupees(r.adminTotal)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-black text-green-600">{rupees(r.commission)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -164,9 +153,7 @@ const AdminRevenue = () => {
                       <td className="px-4 py-3" colSpan={4}>Total ({rows.length} bookings)</td>
                       <td className="px-4 py-3 text-right">{rupees(totals.farmerPaid)}</td>
                       <td className="px-4 py-3 text-right text-blue-600">{rupees(totals.vendorEarning)}</td>
-                      <td className="px-4 py-3 text-right text-amber-600">{rupees(totals.gst)}</td>
                       <td className="px-4 py-3 text-right text-green-600">{rupees(totals.commission)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-700">{rupees(totals.adminTotal)}</td>
                     </tr>
                   </tfoot>
                 </table>

@@ -25,7 +25,7 @@ const MachineryCheckout = () => {
     const [showPaymentConfirmModal, setShowPaymentConfirmModal] = useState(false); // Payment confirmation modal
     const [visitFee, setVisitFee] = useState(0);
 
-    // Same visit fee the server adds (no GST on bookings)
+    // Same visit fee the server adds
     useEffect(() => {
         configService.getSettings().then(res => {
             if (res?.success) setVisitFee(Number(res.settings?.visitedCharges) || 0);

@@ -269,10 +269,6 @@ const BookingDetailsPage = () => {
                                 <span className="font-semibold text-gray-800">₹{booking.basePrice?.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-sm text-gray-500">
-                                <span>Taxes</span>
-                                <span className="font-semibold text-gray-800">₹{booking.tax?.toLocaleString() || 0}</span>
-                            </div>
-                            <div className="flex justify-between text-sm text-gray-500">
                                 <span>Service Fee</span>
                                 <span className="font-semibold text-gray-800">₹{booking.visitingCharges?.toLocaleString() || 0}</span>
                             </div>

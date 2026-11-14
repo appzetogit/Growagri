@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 /**
  * EcommerceOrder Model (Fertilizers & Seeds)
- * Handles orders where User pays Admin Fee (Comm + GST) on platform
+ * Handles orders where User pays Admin Fee (commission) on platform
  * and the main balance is settled directly with the Vendor.
  */
 const ecommerceOrderSchema = new mongoose.Schema({
@@ -33,11 +33,10 @@ const ecommerceOrderSchema = new mongoose.Schema({
     pricing: {
         itemsTotal: { type: Number, required: true }, // Sum of all items price * qty
         adminCommission: { type: Number, required: true }, // Platform fee portion
-        gstAmount: { type: Number, required: true }, // Tax portion
-        platformFee: { type: Number, required: true }, // adminCommission + gstAmount
+        platformFee: { type: Number, required: true }, // = adminCommission
         vendorBalance: { type: Number, required: true }, // itemsTotal - adminCommission
         shippingCharges: { type: Number, required: true, default: 0 },
-        orderTotal: { type: Number, required: true, default: 0 } // itemsTotal + gstAmount
+        orderTotal: { type: Number, required: true, default: 0 } // itemsTotal + shippingCharges
     },
     paymentStatus: {
         type: String,

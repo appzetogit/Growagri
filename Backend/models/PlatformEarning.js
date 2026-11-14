@@ -9,7 +9,6 @@ const platformEarningSchema = new mongoose.Schema({
   }, // Format: 'YYYY-MM-DD'
   totalRevenue: { type: Number, default: 0 },
   totalBookings: { type: Number, default: 0 },
-  totalGST: { type: Number, default: 0 },
   totalTDS: { type: Number, default: 0 },
   platformCommission: { type: Number, default: 0 },
   vendorEarnings: { type: Number, default: 0 },

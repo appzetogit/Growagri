@@ -39,12 +39,6 @@ const serviceSchema = new mongoose.Schema({
     required: [true, 'Base price is required'],
     min: [0, 'Price cannot be negative']
   },
-  gstPercentage: {
-    type: Number,
-    required: [true, 'GST percentage is required'],
-    min: 0,
-    default: 18
-  },
   status: {
     type: String,
     enum: Object.values(SERVICE_STATUS),

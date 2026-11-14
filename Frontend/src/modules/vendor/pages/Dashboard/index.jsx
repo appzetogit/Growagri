@@ -101,6 +101,17 @@ const Dashboard = memo(() => {
     };
   }, []);
 
+  const vendorName = useMemo(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('vendorData') || '{}');
+      return (v.name || v.businessName || 'Partner').split(' ')[0];
+    } catch {
+      return 'Partner';
+    }
+  }, []);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+
   // Memoize quickActions to prevent recreation on every render
   const quickActions = useMemo(() => [
     {
@@ -195,9 +206,21 @@ const Dashboard = memo(() => {
 
   return (
     <div className="min-h-screen pb-20 overflow-x-hidden" style={{ background: themeColors.backgroundGradient }}>
-      <Header title="Dashboard" showBack={false} notificationCount={stats.pendingAlerts} />
+      <Header title="Dashboard" showBack={false} />
 
-      <main className="pt-2">
+      <main>
+        {/* Greeting */}
+        <div className="px-4 pb-3">
+          <p className="text-xs font-medium text-gray-500">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+          </p>
+          <h1 className="text-xl font-extrabold text-gray-800 leading-tight truncate">
+            {greeting}, {vendorName} 👋
+          </h1>
+        </div>
+
+        {/* Earnings hero */}
+        <StatsCards stats={stats} />
 
         {/* Compliance Alerts Section */}
         {stats.complianceAlerts && stats.complianceAlerts.length > 0 && (
@@ -226,34 +249,34 @@ const Dashboard = memo(() => {
         )}
 
         {/* Quick Actions Grid */}
-        <div className="px-4 py-2 grid grid-cols-1 gap-2.5">
-          {quickActions.map((action, index) => (
-            <div
-              key={index}
-              onClick={() => navigate(action.path)}
-              className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 active:scale-98 transition-all cursor-pointer flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="px-4 pt-3">
+          <p className="text-sm font-bold text-gray-800 mb-2.5">Quick Actions</p>
+          <div className="grid grid-cols-2 gap-3">
+            {quickActions.map((action) => (
+              <div
+                key={action.title}
+                onClick={() => navigate(action.path)}
+                className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 active:scale-95 transition-transform cursor-pointer relative overflow-hidden"
+              >
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0"
-                  style={{ backgroundColor: action.color }}
-                >
-                  <action.icon className="w-5 h-5" />
+                  className="absolute -top-6 -right-6 w-16 h-16 rounded-full pointer-events-none"
+                  style={{ backgroundColor: hexToRgba(action.color, 0.08) }}
+                />
+                <div className="flex items-start justify-between mb-3">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: hexToRgba(action.color, 0.12), color: action.color }}
+                  >
+                    <action.icon className="w-5 h-5" />
+                  </div>
+                  <FiChevronRight className="w-4 h-4 text-gray-300 mt-1" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-800 leading-tight">
-                    {action.title}
-                  </p>
-                  <p className="text-xs text-gray-500 font-medium truncate mt-0.5">{action.subtitle}</p>
-                </div>
+                <p className="text-sm font-bold text-gray-800 leading-tight truncate">{action.title}</p>
+                <p className="text-xs text-gray-500 font-medium truncate mt-0.5">{action.subtitle}</p>
               </div>
-              <FiChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-
-        {/* Stats Cards - Today's & Monthly Earnings */}
-        <StatsCards stats={stats} />
       </main>
 
       <BookingAlertModal 

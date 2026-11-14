@@ -533,20 +533,6 @@ const JobDetails = () => {
               )}
             </div>
 
-            {(job.tax > 0 || job.paymentMethod === 'plan_benefit') && (
-              <div className="flex justify-between items-center text-gray-600">
-                <span>Tax</span>
-                {job.paymentMethod === 'plan_benefit' ? (
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-gray-400 text-xs">₹{(job.tax || 0).toFixed(2)}</span>
-                    <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">FREE ✓</span>
-                  </div>
-                ) : (
-                  <span>+₹{(job.tax || 0).toFixed(2)}</span>
-                )}
-              </div>
-            )}
-
             <div className="flex justify-between items-center text-gray-600">
               <span>Convenience Fee</span>
               {job.paymentMethod === 'plan_benefit' ? (

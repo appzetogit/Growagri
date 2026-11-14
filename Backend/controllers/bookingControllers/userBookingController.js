@@ -62,7 +62,7 @@ const createBooking = async (req, res) => {
       estimatedDuration, // Agriculture: extract hours
       selectedImplements // MACHINERY: attachments chosen by user
     } = req.body;
-    // NOTE: amount / basePrice / discount / tax / visitingCharges sent by the app are ignored;
+    // NOTE: amount / basePrice / discount / visitingCharges sent by the app are ignored;
     // the price is always computed on the server (services/bookingPricing.js).
 
     if (rental_type && !RENTAL_TYPES.includes(rental_type)) {
@@ -373,7 +373,6 @@ const createBooking = async (req, res) => {
       bookedItems: formattedBookedItems,
       basePrice: price.basePrice,
       discount: price.discount,
-      tax: price.tax,
       visitingCharges: price.visitingCharges,
       penalty: pendingPenalty || 0,
       finalAmount,

@@ -12,19 +12,11 @@ const Header = memo(({
   showBack = true,
   showSearch = false,
   showNotifications = true,
-  notificationCount = 0
 }) => {
   const navigate = useNavigate();
-  const [count, setCount] = useState(notificationCount);
+  const [count, setCount] = useState(0);
 
-  // Sync prop changes
-  useEffect(() => {
-    if (typeof notificationCount !== 'undefined') {
-      setCount(notificationCount);
-    }
-  }, [notificationCount]);
-
-  // Fetch unread count
+  // Real unread count from backend
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
@@ -44,7 +36,11 @@ const Header = memo(({
           fetchUnreadCount();
         }
       }, 60000); // Poll every minute only if app is visible
-      return () => clearInterval(interval);
+      window.addEventListener('vendorNotificationsUpdated', fetchUnreadCount);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('vendorNotificationsUpdated', fetchUnreadCount);
+      };
     }
   }, [showNotifications]);
 
@@ -66,13 +62,13 @@ const Header = memo(({
 
   return (
     <header
-      className="sticky top-0 z-40 w-full bg-white"
-      style={{
+      className={showBack ? 'sticky top-0 z-40 w-full bg-white' : 'relative z-40 w-full bg-transparent'}
+      style={showBack ? {
         borderBottom: '2px solid rgba(156, 163, 175, 0.3)',
         borderBottomLeftRadius: '20px',
         borderBottomRightRadius: '20px',
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.08)',
-      }}
+      } : undefined}
     >
       <div className="px-4 py-3 flex items-center justify-between">
         {/* Left: Back button or Logo */}
@@ -180,7 +176,7 @@ const Header = memo(({
               {/* 4. Active Badge (Moved outside for robustness and to prevent clipping) */}
               {count > 0 && (
                 <span
-                  className="absolute -top-1.5 -right-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center z-20"
+                  className="absolute -top-1.5 -right-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white text-[10px] font-black rounded-full px-1 flex items-center justify-center z-20"
                   style={{
                     minWidth: '20px',
                     height: '20px',
@@ -188,7 +184,7 @@ const Header = memo(({
                     border: '2px solid #fff'
                   }}
                 >
-                  {count > 9 ? '9+' : count}
+                  {count > 99 ? '99+' : count}
                 </span>
               )}
             </motion.div>

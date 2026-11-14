@@ -8,7 +8,6 @@ import { z } from 'zod';
 const serviceSchema = z.object({
   title: z.string().min(2, "Title is required"),
   basePrice: z.number().min(0, "Price must be non-negative"),
-  gstPercentage: z.number().min(0).max(100).default(18),
   discountPrice: z.number().optional(),
   pricing_context: z.enum(['standalone', 'sub-category', 'any']).default('any'),
   parentSourceId: z.string().nullable().optional()
@@ -21,7 +20,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
   const [form, setForm] = useState({
     title: '',
     basePrice: '',
-    gstPercentage: 18,
     discountPrice: '',
     pricing_context: 'any',
     parentSourceId: ''
@@ -56,7 +54,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
     setForm({
       title: '',
       basePrice: '',
-      gstPercentage: 18,
       discountPrice: '',
       pricing_context: 'any',
       parentSourceId: ''
@@ -70,7 +67,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
     const data = {
       title: form.title,
       basePrice: Number(form.basePrice),
-      gstPercentage: 0, // GST is not charged on bookings
       discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
       pricing_context: form.pricing_context,
       parentSourceId: form.parentSourceId || null
@@ -129,7 +125,6 @@ const BrandServicesModal = ({ isOpen, onClose, brand }) => {
     setForm({
       title: service.title,
       basePrice: service.basePrice,
-      gstPercentage: service.gstPercentage || 18,
       discountPrice: service.discountPrice || '',
       pricing_context: service.pricing_context || 'any',
       parentSourceId: service.parentSourceId || ''

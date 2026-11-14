@@ -30,6 +30,12 @@ const productSchema = new mongoose.Schema({
         // Category is optional for some vendor submissions
         index: true
     },
+    // Agri Market bucket; required for new vendor submissions (enforced in controller, legacy docs may lack it)
+    productCategory: {
+        type: String,
+        enum: ['seeds', 'fertilizer', 'pesticide'],
+        index: true
+    },
     vendorId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Vendor',
@@ -73,10 +79,6 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true,
         default: 0
-    },
-    gstPercentage: {
-        type: Number,
-        default: 5 // Agriculture usually has lower GST
     },
     commissionPercentage: {
         type: Number,
