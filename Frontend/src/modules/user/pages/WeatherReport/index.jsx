@@ -1,69 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCloud, FiCloudRain, FiCloudSnow, FiSun, FiWind, FiDroplet, FiChevronLeft, FiAlertTriangle, FiThermometer, FiSun as FiUv, FiEye, FiZap, FiSunrise, FiSunset } from 'react-icons/fi';
+import { FiCloud, FiCloudRain, FiCloudSnow, FiSun, FiWind, FiDroplet, FiChevronLeft, FiAlertTriangle, FiSun as FiUv, FiEye, FiZap, FiSunrise, FiSunset } from 'react-icons/fi';
 import { motion } from 'framer-motion';
-import weatherService from '../../services/weatherService';
+import { useWeather } from '../Home/components/WeatherWidget';
 
 export default function WeatherReport() {
     const navigate = useNavigate();
+    // Shared with Home widgets: cached data renders instantly, fresh data swaps in
+    const { weather, loading, error: fetchError } = useWeather();
+    const error = weather ? null : fetchError;
 
-    // Instant SWR state: Load from cache for 0ms initial render
-    const [weather, setWeather] = useState(() => {
-        try {
-            const cached = localStorage.getItem('cached_weather_report');
-            return cached ? JSON.parse(cached) : null;
-        } catch {
-            return null;
-        }
-    });
-    const [loading, setLoading] = useState(() => {
-        try {
-            return !localStorage.getItem('cached_weather_report');
-        } catch {
-            return true;
-        }
-    });
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        const fetchWeather = () => {
-            if (!weather) setLoading(true);
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        try {
-                            const { latitude, longitude } = position.coords;
-                            const res = await weatherService.getWeather(latitude, longitude);
-                            if (res.success) {
-                                setWeather(res.data);
-                                try {
-                                    localStorage.setItem('cached_weather_report', JSON.stringify(res.data));
-                                } catch {}
-                            } else {
-                                if (!weather) setError(res.message);
-                            }
-                        } catch (err) {
-                            if (!weather) setError("Failed to fetch weather data");
-                        } finally {
-                            setLoading(false);
-                        }
-                    },
-                    (err) => {
-                        if (!weather) setError("Location access denied. Please allow location to see weather for your fields.");
-                        setLoading(false);
-                    }
-                );
-            } else {
-                if (!weather) setError("Geolocation is not supported by your browser");
-                setLoading(false);
-            }
-        };
-
-        fetchWeather();
-    }, []);
-
-    const getWeatherIcon = (description, size = "w-10 h-10") => {
-        const d = description.toLowerCase();
+    const getWeatherIcon = (description = '', size = "w-10 h-10") => {
+        const d = String(description).toLowerCase();
         if (d.includes('rain')) return <FiCloudRain className={`${size} text-blue-500`} />;
         if (d.includes('cloud')) return <FiCloud className={`${size} text-slate-400`} />;
         if (d.includes('snow')) return <FiCloudSnow className={`${size} text-blue-200`} />;

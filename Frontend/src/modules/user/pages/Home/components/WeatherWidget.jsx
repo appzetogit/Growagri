@@ -5,45 +5,65 @@ import { motion } from 'framer-motion';
 import weatherService from '../../../services/weatherService';
 import { useLanguage } from '../../../../../context/LanguageContext';
 
-// One fetch shared by WeatherWidget + WeatherBanner (module-level promise)
+const CACHE_KEY = 'cached_weather_report';
+const COORDS_KEY = 'weather_coords';
+const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
+
+// Fast location: accept a 30-min-old fix, never hang (8s timeout), fall back to last known coords
+const getCoords = () => new Promise((resolve) => {
+    const last = read(COORDS_KEY);
+    if (!("geolocation" in navigator)) return resolve(last);
+    navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+            const c = { lat: coords.latitude, lon: coords.longitude };
+            write(COORDS_KEY, c);
+            resolve(c);
+        },
+        () => resolve(last),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 30 * 60 * 1000 }
+    );
+});
+
+// One fetch shared by WeatherWidget + WeatherBanner + WeatherReport (module-level promise)
 let weatherPromise = null;
-const fetchWeather = () => {
+export const fetchWeather = () => {
     if (!weatherPromise) {
-        weatherPromise = new Promise((resolve) => {
-            if (!("geolocation" in navigator)) return resolve(null);
-            navigator.geolocation.getCurrentPosition(
-                async ({ coords }) => {
-                    try {
-                        const res = await weatherService.getWeather(coords.latitude, coords.longitude);
-                        resolve(res.success ? res.data : null);
-                    } catch (err) {
-                        console.error("Weather error:", err);
-                        resolve(null);
-                    }
-                },
-                () => resolve(null)
-            );
-        }).then((data) => {
-            if (!data) weatherPromise = null; // retry on next mount
-            return data;
+        weatherPromise = getCoords().then(async (c) => {
+            if (!c) return { data: null, error: "Location access denied. Please allow location to see weather for your fields." };
+            try {
+                const res = await weatherService.getWeather(c.lat, c.lon);
+                if (!res.success) return { data: null, error: res.message || "Failed to fetch weather data" };
+                write(CACHE_KEY, res.data);
+                return { data: res.data, error: null };
+            } catch (err) {
+                console.error("Weather error:", err);
+                return { data: null, error: err.response?.data?.error || err.response?.data?.message || "Failed to fetch weather data" };
+            }
+        }).then((r) => {
+            if (!r.data) weatherPromise = null; // retry on next mount
+            return r;
         });
     }
     return weatherPromise;
 };
 
+// Stale-while-revalidate: cached weather renders instantly, fresh data replaces it
 export function useWeather() {
-    const [weather, setWeather] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [weather, setWeather] = useState(() => read(CACHE_KEY));
+    const [loading, setLoading] = useState(() => !read(CACHE_KEY));
+    const [error, setError] = useState(null);
     useEffect(() => {
         let alive = true;
-        fetchWeather().then((data) => {
+        fetchWeather().then(({ data, error }) => {
             if (!alive) return;
-            setWeather(data);
+            if (data) setWeather(data);
+            setError(error);
             setLoading(false);
         });
         return () => { alive = false; };
     }, []);
-    return { weather, loading };
+    return { weather, loading, error };
 }
 
 export default function WeatherWidget() {
