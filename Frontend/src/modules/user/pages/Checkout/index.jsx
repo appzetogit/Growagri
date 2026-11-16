@@ -70,6 +70,7 @@ const Checkout = () => {
   const [endDate, setEndDate] = useState(null);           // Agriculture: end date for ranges
   const [estimatedDuration, setEstimatedDuration] = useState(1); // Agriculture: hours for hourly
   const [localDays, setLocalDays] = useState(1);         // Agriculture: days for daily
+  const [rentalConfirmed, setRentalConfirmed] = useState(false); // user picked rental basis + entered quantity
 
 
   // Check if Razorpay is loaded (defer to avoid blocking initial render)
@@ -1822,9 +1823,9 @@ const Checkout = () => {
                   : cartItems[0].serviceId)
                 : null
             }
-            initialRentalType={rentalType}
+            initialRentalType={rentalConfirmed ? rentalType : ''}
             landUnit={rentalType === 'bigha' ? 'bigha' : 'acre'}
-            initialQuantity={
+            initialQuantity={!rentalConfirmed ? undefined :
               rentalType === 'minute' ? (estimatedDuration || 30)
                 : rentalType === 'hourly' ? (estimatedDuration || 1)
                   : (landSize || 1)
@@ -1832,6 +1833,8 @@ const Checkout = () => {
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onRentalChange={({ type, quantity }) => {
+              setRentalConfirmed(!!type && Number(quantity) > 0);
+              if (!type) return;
               setRentalType(type);
               if (type === 'minute' || type === 'hourly') {
                 setEstimatedDuration(quantity);
@@ -2184,6 +2187,7 @@ const Checkout = () => {
             onClick={
               searchingVendors ? undefined :
                 plan ? () => setShowPaymentConfirmModal(true) :
+                  (cartItems.length > 0 && !cartItems[0]?.isPlan && !rentalConfirmed) ? () => toast.error('Please select rental basis and enter estimated quantity') :
                   !(houseNumber || addressDetails) ? handleProceed :
                     (bookingType === 'scheduled' && (!selectedDate || (rentalType === 'hourly' && !selectedTime))) ?
                       () => setShowTimeSlotModal(true) :

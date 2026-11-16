@@ -61,9 +61,9 @@ const RentalTypeCard = ({
     initialQuantity,
     pricing
 }) => {
-    const normalizedInitial = initialRentalType === 'land_based' ? 'acre' : (initialRentalType || 'hourly');
-    const [selectedRental, setSelectedRental] = useState(normalizedInitial);
-    const [quantity, setQuantity] = useState(initialQuantity || (normalizedInitial === 'minute' ? 30 : 1));
+    // Both fields start empty — user must pick a basis and enter quantity (mandatory)
+    const [selectedRental, setSelectedRental] = useState(initialRentalType === 'land_based' ? 'acre' : (initialRentalType || ''));
+    const [quantity, setQuantity] = useState(initialQuantity || '');
     const [checking, setChecking] = useState(false);
     const [availability, setAvailability] = useState(null);
 
@@ -131,20 +131,12 @@ const RentalTypeCard = ({
         }] : [])
     ];
 
-    const currentConfig = options.find(opt => opt.value === selectedRental) || options[0];
+    const currentConfig = options.find(opt => opt.value === selectedRental);
 
     const handleSelect = (value) => {
         setSelectedRental(value);
-        let newQty = quantity;
-        if (value === 'minute' && (!quantity || Number(quantity) <= 1)) {
-            newQty = 30;
-        } else if (value !== 'minute' && Number(quantity) > 24) {
-            newQty = 1;
-        } else if (!newQty || Number(newQty) <= 0) {
-            newQty = 1;
-        }
-        setQuantity(newQty);
-        onRentalChange?.({ type: value, quantity: newQty });
+        setQuantity('');
+        onRentalChange?.({ type: value, quantity: 0 });
     };
 
     const handleQuantityChange = (val) => {
@@ -157,14 +149,6 @@ const RentalTypeCard = ({
         setQuantity(val);
         if (!isNaN(num)) {
             onRentalChange?.({ type: selectedRental, quantity: num });
-        }
-    };
-
-    const handleQuantityBlur = () => {
-        if (!quantity || parseFloat(quantity) <= 0) {
-            const fallback = selectedRental === 'minute' ? 30 : 1;
-            setQuantity(fallback);
-            onRentalChange?.({ type: selectedRental, quantity: fallback });
         }
     };
 
@@ -184,19 +168,21 @@ const RentalTypeCard = ({
             {/* 1. Dropdown: Minute, Hour, Acre, Bigha */}
             <div className="mb-3">
                 <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-wider mb-1.5 block">
-                    Select Rental Basis
+                    Select Rental Basis <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                     <select
                         value={selectedRental}
                         onChange={(e) => handleSelect(e.target.value)}
-                        className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-300 rounded-lg py-2.5 pl-3 pr-10 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all appearance-none cursor-pointer"
+                        required
+                        className={`w-full bg-slate-50 hover:bg-slate-100/80 border ${selectedRental ? 'border-slate-300 text-slate-800' : 'border-red-300 text-slate-400'} rounded-lg py-2.5 pl-3 pr-10 text-xs font-bold shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all appearance-none cursor-pointer`}
                     >
+                        <option value="" disabled>Select rental basis</option>
                         {options.map((opt) => {
                             const priceVal = pricing?.[opt.priceKey];
                             const priceLabel = priceVal > 0 ? ` (₹${Number(priceVal).toLocaleString('en-IN')}${opt.rateSuffix})` : '';
                             return (
-                                <option key={opt.value} value={opt.value}>
+                                <option key={opt.value} value={opt.value} className="text-slate-800">
                                     {opt.label}{priceLabel}
                                 </option>
                             );
@@ -208,8 +194,8 @@ const RentalTypeCard = ({
                 </div>
             </div>
 
-            {/* 2. Quantity Input Field Directly Below Dropdown */}
-            <div className="mb-3 pt-2.5 border-t border-slate-100">
+            {/* 2. Quantity Input Field Directly Below Dropdown (after basis is chosen) */}
+            {currentConfig && <div className="mb-3 pt-2.5 border-t border-slate-100">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
                         <label className="text-[10px] font-extrabold text-gray-700 uppercase tracking-wider mb-1.5 block">
@@ -218,6 +204,7 @@ const RentalTypeCard = ({
                             {currentConfig.value === 'acre' && 'Enter Land Area (Acres)'}
                             {currentConfig.value === 'bigha' && 'Enter Land Area (Bighas)'}
                             {currentConfig.value === 'daily' && 'Enter Number of Days'}
+                            {' '}<span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                             <input
@@ -226,8 +213,8 @@ const RentalTypeCard = ({
                                 step={selectedRental === 'minute' ? "1" : "0.5"}
                                 value={quantity}
                                 onChange={(e) => handleQuantityChange(e.target.value)}
-                                onBlur={handleQuantityBlur}
-                                className="w-full pl-3 pr-16 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all shadow-2xs"
+                                required
+                                className={`w-full pl-3 pr-16 py-2 bg-slate-50 border ${Number(quantity) > 0 ? 'border-slate-300' : 'border-red-300'} rounded-lg text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all shadow-2xs`}
                                 placeholder={currentConfig.placeholder}
                             />
                             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-600 uppercase tracking-wider bg-slate-200/80 px-2 py-0.5 rounded">
@@ -239,7 +226,7 @@ const RentalTypeCard = ({
                 <p className="text-[9px] text-gray-400 mt-1.5 italic">
                     * Final amount will be calculated by vendor based on actual {currentConfig.helperUnit}.
                 </p>
-            </div>
+            </div>}
 
             {/* 3. Availability Status */}
             {(selectedDate || selectedRental === 'hourly' || selectedRental === 'minute' || selectedRental === 'acre' || selectedRental === 'bigha') ? (

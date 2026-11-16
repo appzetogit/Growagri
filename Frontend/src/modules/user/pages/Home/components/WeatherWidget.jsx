@@ -71,7 +71,7 @@ export default function WeatherWidget() {
             className="relative bg-white border border-slate-100/90 rounded-[20px] sm:rounded-[22px] px-1.5 py-3 sm:px-2.5 sm:py-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-md transition-all active:scale-95 group flex flex-col items-center justify-between text-center cursor-pointer min-h-[114px] sm:min-h-[128px]"
         >
             {/* Circular Weather Badge Matching Reference */}
-            <div className="relative w-16 h-16 min-[390px]:w-[72px] min-[390px]:h-[72px] sm:w-20 sm:h-20 rounded-full p-1 flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-50 via-sky-50 to-blue-50 border border-sky-100 shadow-xs transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+            <div className="relative w-[76px] h-[76px] min-[390px]:w-[88px] min-[390px]:h-[88px] sm:w-24 sm:h-24 rounded-full p-1 flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-amber-50 via-sky-50 to-blue-50 border border-sky-100 shadow-xs transition-transform duration-300 group-hover:scale-105 overflow-hidden">
                 <div className="flex items-center justify-center z-10">
                     {iconToRender}
                 </div>

@@ -17,6 +17,7 @@ import { FiArrowLeft, FiX, FiPlus } from 'react-icons/fi';
 
 import { userAuthService } from '../../../../services/authService';
 import WeatherWidget from './components/WeatherWidget';
+import WeatherBanner from './components/WeatherBanner';
 import LogoLoader from '../../../../components/common/LogoLoader';
 import { prefetchUserRoute } from '../../../../utils/routePrefetcher';
 
@@ -26,7 +27,6 @@ const NewAndNoteworthy = lazy(() => import('./components/NewAndNoteworthy'));
 const CuratedServices = lazy(() => import('./components/CuratedServices'));
 const GovernmentSchemesSection = lazy(() => import('./components/GovernmentSchemesSection'));
 const ReferEarnSection = lazy(() => import('./components/ReferEarnSection'));
-const MachineryDiscoverySection = lazy(() => import('./components/MachineryDiscoverySection'));
 
 // Lazy load modal overlays so they do not bloat the initial chunk
 const CategoryModal = lazy(() => import('./components/CategoryModal'));
@@ -827,7 +827,7 @@ const Home = () => {
                     >
                       {/* Circular Illustration / Image Badge */}
                       <div
-                        className="relative w-16 h-16 min-[390px]:w-[72px] min-[390px]:h-[72px] sm:w-20 sm:h-20 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 overflow-hidden"
+                        className="relative w-[76px] h-[76px] min-[390px]:w-[88px] min-[390px]:h-[88px] sm:w-24 sm:h-24 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105 overflow-hidden"
                         style={{ backgroundColor: item.colorCode ? `${item.colorCode}14` : '#f0fdf4' }}
                       >
                         {item.imageUrl ? (
@@ -898,6 +898,11 @@ const Home = () => {
               );
             })()}
 
+            {/* Weather Banner - below categories */}
+            <motion.section variants={itemVariants} className="px-4 sm:px-5 mb-4">
+              <WeatherBanner className="w-full max-w-[520px]" />
+            </motion.section>
+
             {/* Curated Services */}
             {homeContent?.isCuratedVisible !== false && (
               <motion.div variants={itemVariants}>
@@ -942,13 +947,6 @@ const Home = () => {
             <motion.div variants={itemVariants}>
               <Suspense fallback={<div className="h-32 bg-slate-50 animate-pulse rounded-2xl mx-4 my-2" />}>
                 <GovernmentSchemesSection />
-              </Suspense>
-            </motion.div>
-
-            {/* Machinery Discovery Section */}
-            <motion.div variants={itemVariants}>
-              <Suspense fallback={<div className="h-44 bg-slate-50 animate-pulse rounded-3xl mx-4 my-2" />}>
-                <MachineryDiscoverySection />
               </Suspense>
             </motion.div>
 
