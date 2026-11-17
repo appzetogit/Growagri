@@ -8,7 +8,7 @@ import LocationAccessModal from '../../../../components/common/LocationAccessMod
 
 /**
  * Reusable Visit Verification Modal
- * Used for OTP-based arrival verification by vendors/workers
+ * Simple arrival confirmation (captures location) by vendors/workers
  * 
  * @param {boolean} isOpen - Whether modal is visible
  * @param {function} onClose - Callback to close modal
@@ -16,7 +16,6 @@ import LocationAccessModal from '../../../../components/common/LocationAccessMod
  * @param {function} onSuccess - Callback on successful verification
  */
 const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
-  const [otpInput, setOtpInput] = useState(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [userType, setUserType] = useState('vendor');
@@ -28,34 +27,6 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
     if (workerData._id || workerData.id) setUserType('worker');
     else if (vendorData._id || vendorData.id) setUserType('vendor');
   }, []);
-
-  // Auto-verify as last digit enters
-  React.useEffect(() => {
-    const otpValue = otpInput.join('');
-    if (otpValue.length === 4 && !loading && isOpen) {
-      handleVerify();
-    }
-  }, [otpInput]);
-
-  const handleOtpChange = (index, value) => {
-    const sanitized = value.replace(/[^0-9]/g, '');
-    if (sanitized.length > 1) return;
-
-    const newOtp = [...otpInput];
-    newOtp[index] = sanitized;
-    setOtpInput(newOtp);
-
-    // Auto-focus next input
-    if (sanitized && index < 3) {
-      document.getElementById(`visit-otp-${index + 1}`)?.focus();
-    }
-  };
-
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpInput[index] && index > 0) {
-      document.getElementById(`visit-otp-${index - 1}`)?.focus();
-    }
-  };
 
   /**
    * Use robust Native Bridge with Browser Fallback
@@ -71,12 +42,6 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
   };
 
   const handleVerify = async () => {
-    const otp = otpInput.join('');
-    if (otp.length !== 4) {
-      toast.error('Please enter 4-digit OTP');
-      return;
-    }
-
     setLoading(true);
 
     if (!navigator.geolocation) {
@@ -92,11 +57,10 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
         lng: locationData.longitude
       };
 
-      const response = await verifySelfVisit(bookingId, otp, location);
+      const response = await verifySelfVisit(bookingId, location);
 
       if (response.success) {
-        toast.success('Visit Verified Successfully!');
-        setOtpInput(['', '', '', '']);
+        toast.success('Marked as reached!');
         onClose();
         onSuccess?.();
       } else {
@@ -124,17 +88,13 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
 
   const handleLocationSuccess = async (coords) => {
     setShowLocationModal(false);
-    const otp = otpInput.join('');
-    if (otp.length !== 4) return;
-
     setLoading(true);
     try {
       const location = { lat: coords.latitude || coords.lat, lng: coords.longitude || coords.lng };
-      const response = await verifySelfVisit(bookingId, otp, location);
+      const response = await verifySelfVisit(bookingId, location);
 
       if (response.success) {
-        toast.success('Visit Verified Successfully!');
-        setOtpInput(['', '', '', '']);
+        toast.success('Marked as reached!');
         onClose();
         onSuccess?.();
       } else {
@@ -149,7 +109,6 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
 
   const handleClose = () => {
     if (!loading) {
-      setOtpInput(['', '', '', '']);
       onClose();
     }
   };
@@ -179,7 +138,7 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-2xl font-bold text-gray-900 leading-tight">
-                  Verify Arrival
+                  Mark Arrival
                 </h3>
                 <p className="text-xs text-teal-600 font-bold uppercase tracking-wider mt-1">
                   Check-in Verification
@@ -197,31 +156,8 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
             {/* Description */}
             <div className="mb-8">
               <p className="text-gray-500 font-medium leading-relaxed">
-                Please enter the <span className="text-gray-900 font-bold">4-digit code</span> provided by the customer to confirm your arrival.
+                Confirm that you have <span className="text-gray-900 font-bold">reached the customer's location</span>.
               </p>
-            </div>
-
-            {/* OTP Inputs */}
-            <div className="flex justify-between gap-3 mb-8">
-              {otpInput.map((digit, idx) => (
-                <input
-                  key={idx}
-                  id={`visit-otp-${idx}`}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  autoFocus={idx === 0}
-                  disabled={loading}
-                  className={`w-14 h-16 text-center text-2xl font-bold rounded-2xl transition-all outline-none border-2 disabled:opacity-50
-                    ${digit
-                      ? 'border-teal-500 bg-teal-50 text-teal-900'
-                      : 'border-gray-200 bg-gray-50 text-gray-800 focus:border-teal-400 focus:bg-white focus:shadow-lg focus:shadow-teal-100'
-                    }`}
-                  onChange={(e) => handleOtpChange(idx, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(idx, e)}
-                />
-              ))}
             </div>
 
             {/* Verify Button */}
@@ -235,7 +171,7 @@ const VisitVerificationModal = ({ isOpen, onClose, bookingId, onSuccess }) => {
               ) : (
                 <>
                   <FiCheckCircle className="w-5 h-5" />
-                  <span>Verify & Start Work</span>
+                  <span>Mark Reached</span>
                 </>
               )}
             </button>

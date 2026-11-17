@@ -664,7 +664,7 @@ export default function BookingDetails() {
     setIsTripModalOpen(true);
   };
 
-  const handleTripSubmit = async (photoUrl, otp, workUnits, evidencePhoto) => {
+  const handleTripSubmit = async (photoUrl, workUnits, evidencePhoto) => {
     // Detect if this is a machinery/equipment booking
     const isMachinery = !!(booking?.rental_type ||
       ['equipment', 'machinery', 'tractor', 'agriculture'].some(cat =>
@@ -674,20 +674,18 @@ export default function BookingDetails() {
 
     if (tripMode === 'start') {
       if (isMachinery) {
-        // Machinery: vendor enters farmer's Start OTP + KM photo
-        await machineryStartWork(id, otp, photoUrl, evidencePhoto);
-        toast.success('🚜 Trip Started! OTP verified, work has begun.');
+        await machineryStartWork(id, photoUrl, evidencePhoto);
+        toast.success('🚜 Trip Started! Work has begun.');
       } else {
-        await startTrip(id, photoUrl, otp, evidencePhoto);
-        toast.success('🚜 Trip Started! KM Photo & OTP verified.');
+        await startTrip(id, photoUrl, evidencePhoto);
+        toast.success('🚜 Trip Started!');
       }
     } else {
       if (isMachinery) {
-        // Machinery end: only KM photo needed — system auto-generates End OTP for farmer
         await machineryCompleteWork(id, photoUrl, workUnits, evidencePhoto);
-        toast.success('🏁 Work Completed! End OTP has been sent to the farmer.');
+        toast.success('🏁 Work Completed!');
       } else {
-        await endTrip(id, photoUrl, otp, workUnits, evidencePhoto);
+        await endTrip(id, photoUrl, workUnits, evidencePhoto);
         toast.success('🏁 Trip Ended! Bill Generated & Wallet Settled.');
       }
     }
@@ -1505,7 +1503,7 @@ export default function BookingDetails() {
                       </p>
                       <p className="text-xs text-gray-500 font-medium">
                         {booking.status === 'journey_started' ? 'Tracking is active. Monitor live location.' :
-                          booking.status === 'visited' ? 'Waiting for OTP verification to start work.' :
+                          booking.status === 'visited' ? 'Reached location. Ready to start work.' :
                             booking.status === 'in_progress' ? 'Service is currently being performed.' :
                               ['work_done', 'completed'].includes(booking.status) ? 'Service marked as done. Pending final checks.' :
                                 'Worker is preparing to start the journey.'}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleMap, useJsApiLoader, DirectionsRenderer, OverlayView, PolylineF } from '@react-google-maps/api';
-import { FiArrowLeft, FiNavigation, FiMapPin, FiCrosshair, FiPhone, FiUser, FiStar, FiShield, FiKey, FiCheckCircle, FiLoader, FiMaximize, FiMinimize, FiClock } from 'react-icons/fi';
+import { FiArrowLeft, FiNavigation, FiMapPin, FiCrosshair, FiPhone, FiUser, FiStar, FiShield, FiCheckCircle, FiLoader, FiMaximize, FiMinimize, FiClock } from 'react-icons/fi';
 import { FaRupeeSign } from 'react-icons/fa';
 import { bookingService } from '../../../../services/bookingService';
 import { paymentService } from '../../../../services/paymentService';
@@ -771,57 +771,8 @@ const BookingTrack = () => {
           </div>
         </div>
 
-        {/* Start OTP - Shown for both regular visits and machinery bookings */}
-        {(booking.visitOtp || booking.arrivalOTP || booking.driver_start_otp) && ['confirmed', 'assigned', 'journey_started'].includes(booking?.status?.toLowerCase()) && (
-          <div className="mb-3 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3 shadow-lg">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-10 translate-x-10 blur-xl"></div>
-            <div className="relative z-10 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shrink-0">
-                  <FiKey className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">{booking.driver_start_otp ? 'Machinery Start OTP' : 'Start Code'}</p>
-                  <p className="text-2xl font-black text-white tracking-[0.2em] leading-none mt-0.5">
-                    {booking.driver_start_otp || booking.visitOtp || booking.arrivalOTP}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex flex-col items-center justify-center min-w-[100px]">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)] mb-1"></div>
-                <p className="text-[9px] text-blue-50 font-medium text-center leading-tight">{booking.driver_start_otp ? 'Share with driver\nwhen they arrive' : 'Waiting for\narrival'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Machinery Finish OTP - shown to farmer when vendor marks work as done */}
-        {booking?.driver_end_otp && booking?.status?.toLowerCase() === 'work_done' && (
-          <div className="mb-3 relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 p-3 shadow-lg">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-10 translate-x-10 blur-xl"></div>
-            <div className="relative z-10 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shrink-0">
-                  <FiCheckCircle className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Finish OTP</p>
-                  <p className="text-2xl font-black text-white tracking-[0.2em] leading-none mt-0.5">
-                    {booking.driver_end_otp}
-                  </p>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex flex-col items-center justify-center">
-                <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse mb-1"></div>
-                <p className="text-[9px] text-emerald-50 font-medium text-center leading-tight">Share only if<br />satisfied</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Professional Arrived Notification */}
-        {booking?.status?.toLowerCase() === 'visited' && !(booking.arrivalOTP || booking.visitOtp) && (
+        {booking?.status?.toLowerCase() === 'visited' && (
           <div className="mb-4 relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 p-4 shadow-lg flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shrink-0">
               <FiCheckCircle className="w-5 h-5 text-white" />
@@ -834,7 +785,7 @@ const BookingTrack = () => {
         )}
 
         {/* Waiting for Vendor to initiate Payment */}
-        {!booking.customerConfirmationOTP && booking?.status?.toLowerCase() === 'work_done' && !booking.cashCollected && (
+        {!booking.vendorBillId && booking?.status?.toLowerCase() === 'work_done' && !booking.cashCollected && (
           <div className="bg-white rounded-2xl p-4 shadow-lg border border-teal-100 mb-4 flex items-center gap-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-teal-50 rounded-full -translate-y-10 translate-x-10 blur-2xl"></div>
             <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0 border border-teal-100">
@@ -847,8 +798,8 @@ const BookingTrack = () => {
           </div>
         )}
 
-        {/* Final Payment Card - Show when work is done AND bill is finalized (OTP exists) */}
-        {(booking.customerConfirmationOTP || booking.paymentStatus === 'success') && booking?.status?.toLowerCase() === 'work_done' && !booking?.cashCollected && (
+        {/* Final Payment Card - Show when work is done AND bill is finalized */}
+        {(booking.vendorBillId || booking.paymentStatus === 'success') && booking?.status?.toLowerCase() === 'work_done' && !booking?.cashCollected && (
           <div
             onClick={() => setShowPaymentModal(true)}
             className={`mb-4 relative overflow-hidden rounded-2xl p-5 shadow-lg cursor-pointer active:scale-[0.98] transition-all ${booking.paymentStatus === 'success'
@@ -885,22 +836,9 @@ const BookingTrack = () => {
                     Pay Online Now
                   </button>
 
-                  <div className="mt-6 flex flex-col items-center w-full">
-                    <p className="text-[9px] font-black text-white/60 uppercase tracking-[0.3em] mb-3">Payment Verification OTP</p>
-                    <div className="flex justify-center gap-2.5">
-                      {String(booking.customerConfirmationOTP || booking.paymentOtp || '0000').split('').map((digit, idx) => (
-                        <div
-                          key={idx}
-                          className="w-10 h-12 bg-white/15 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-md"
-                        >
-                          <span className="text-xl font-black text-white">{digit}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-[9px] text-white/70 text-center font-medium bg-black/10 px-4 py-1.5 rounded-full">
-                      Share with professional to confirm cash payment
-                    </p>
-                  </div>
+                  <p className="mt-4 text-[9px] text-white/70 text-center font-medium bg-black/10 px-4 py-1.5 rounded-full">
+                    Or pay cash to the professional
+                  </p>
                 </>
               ) : (
                 <div className="w-full py-4 bg-white/10 backdrop-blur-md text-white rounded-xl font-bold text-sm border border-white/20 flex items-center justify-center gap-2">

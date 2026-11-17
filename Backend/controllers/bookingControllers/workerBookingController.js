@@ -135,7 +135,7 @@ const updateJobStatus = async (req, res) => {
       if (status === BOOKING_STATUS.COMPLETED && !isPaymentSettled(booking)) {
         return res.status(400).json({
           success: false,
-          message: 'Collect payment first (bill + customer OTP) before completing this job'
+          message: 'Collect payment first (bill + cash confirmation) before completing this job'
         });
       }
 
@@ -222,30 +222,25 @@ const startJob = async (req, res) => {
       });
     }
 
-    // Generate Visit OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
     // Update booking
     booking.status = BOOKING_STATUS.JOURNEY_STARTED;
     booking.journeyStartedAt = new Date();
-    booking.visitOtp = otp; // In production, hash this!
 
     await booking.save();
 
-    // Notify user with OTP
+    // Notify user
     const { createNotification } = require('../notificationControllers/notificationController');
     await createNotification({
       userId: booking.userId,
       type: 'worker_started',
       title: 'Worker Started Journey',
-      message: `Worker is on the way! specific OTP for site visit verification is: ${otp}. Please share this with worker upon arrival.`,
+      message: `Worker is on the way to your location.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'journey_started',
         bookingId: booking._id.toString(),
-        visitOtp: otp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -270,8 +265,7 @@ const startJob = async (req, res) => {
     if (io) {
       io.to(`user_${booking.userId}`).emit('booking_updated', {
         bookingId: booking._id,
-        status: BOOKING_STATUS.JOURNEY_STARTED,
-        visitOtp: otp
+        status: BOOKING_STATUS.JOURNEY_STARTED
       });
 
       // Socket notification removed - createNotification already handles this
@@ -279,7 +273,7 @@ const startJob = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Journey started, OTP sent to user',
+      message: 'Journey started',
       data: booking
     });
   } catch (error) {
@@ -293,15 +287,14 @@ const startJob = async (req, res) => {
 
 /**
  * Worker Reached Location
- * Notify user to share OTP
+ * Notify user that professional has arrived
  */
 const workerReachedLocation = async (req, res) => {
   try {
     const workerId = req.user.id;
     const { id } = req.params;
 
-    // Need visitOtp to resend it
-    const booking = await Booking.findOne({ _id: id, workerId }).select('+visitOtp');
+    const booking = await Booking.findOne({ _id: id, workerId });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Job not found' });
@@ -311,22 +304,19 @@ const workerReachedLocation = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Journey not started yet' });
     }
 
-    const otp = booking.visitOtp;
-
     // Notify user
     const { createNotification } = require('../notificationControllers/notificationController');
     await createNotification({
       userId: booking.userId,
       type: 'vendor_reached',
       title: 'Professional has Reached!',
-      message: `Professional has reached your location. Please share this OTP: ${otp}`,
+      message: `Professional has reached your location.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'vendor_reached',
         bookingId: booking._id.toString(),
-        visitOtp: otp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -339,16 +329,15 @@ const workerReachedLocation = async (req, res) => {
 };
 
 /**
- * Verify Site Visit with OTP
+ * Mark Site Visit (arrived)
  */
 const verifyVisit = async (req, res) => {
   try {
     const workerId = req.user.id;
     const { id } = req.params;
-    const { otp, location } = req.body;
+    const { location } = req.body;
 
-    // Use query to select visitOtp which is usually hidden
-    const booking = await Booking.findOne({ _id: id, workerId }).select('+visitOtp');
+    const booking = await Booking.findOne({ _id: id, workerId });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Job not found' });
@@ -358,15 +347,10 @@ const verifyVisit = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Worker has not started journey yet' });
     }
 
-    if (booking.visitOtp !== otp) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
-    }
-
     // Update status
     booking.status = BOOKING_STATUS.VISITED;
     booking.visitedAt = new Date();
     booking.startedAt = new Date(); // Legacy compatibility
-    booking.visitOtp = undefined; // Clear OTP
     if (location) {
       booking.visitLocation = {
         ...location,
@@ -417,7 +401,7 @@ const verifyVisit = async (req, res) => {
 };
 
 /**
- * Mark job as completed (Work Done) & Generate Payment OTP
+ * Mark job as completed (Work Done)
  */
 const completeJob = async (req, res) => {
   try {
@@ -443,10 +427,6 @@ const completeJob = async (req, res) => {
 
     // Update booking
     booking.status = BOOKING_STATUS.WORK_DONE;
-
-    // Generate Payment OTP
-    const payOtp = Math.floor(1000 + Math.random() * 9000).toString();
-    booking.paymentOtp = payOtp;
 
     if (workPhotos && Array.isArray(workPhotos)) {
       booking.workPhotos = workPhotos;
@@ -476,19 +456,18 @@ const completeJob = async (req, res) => {
       }
     });
 
-    // 2. Notify user with Final Bill and OTP
+    // 2. Notify user with Final Bill
     await createNotification({
       userId: booking.userId,
       type: 'work_done',
       title: 'Billing Ready',
-      message: `Bill Generated: ₹${booking.finalAmount}. Your verification OTP is ${payOtp}. Please verify and share OTP to complete.`,
+      message: `Bill Generated: ₹${booking.finalAmount}. Please verify the bill and complete payment.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'work_done',
         bookingId: booking._id.toString(),
-        paymentOtp: payOtp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -521,7 +500,7 @@ const completeJob = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Work done marked, OTP sent to user',
+      message: 'Work done marked',
       data: booking
     });
   } catch (error) {
@@ -659,22 +638,22 @@ const respondToJob = async (req, res) => {
 
 /**
  * Start Machinery Work (For Drivers)
- * Requires Start OTP from Farmer + KM/Meter Photo
+ * Requires KM/Meter Photo
  */
 const startMachineryWork = async (req, res) => {
   try {
     const workerId = req.user.id;
     const { id } = req.params;
-    const { otp, startKmPhoto } = req.body;
+    const { startKmPhoto } = req.body;
 
-    const booking = await Booking.findOne({ _id: id, workerId }).select('+driver_start_otp');
+    if (!startKmPhoto) {
+      return res.status(400).json({ success: false, message: 'Start KM/Meter photo is required.' });
+    }
+
+    const booking = await Booking.findOne({ _id: id, workerId });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
-    }
-
-    if (!otp || booking.driver_start_otp !== String(otp)) {
-      return res.status(400).json({ success: false, message: 'Invalid Start OTP. Please ask farmer for correct OTP.' });
     }
     if ([BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED].includes(booking.status)) {
       return res.status(400).json({ success: false, message: `Cannot start work on a ${booking.status} booking` });
@@ -682,8 +661,7 @@ const startMachineryWork = async (req, res) => {
 
     booking.status = BOOKING_STATUS.IN_PROGRESS;
     booking.startedAt = new Date();
-    booking.start_kilometer_photo = startKmPhoto || null;
-    booking.driver_start_otp = undefined; // Clear OTP after use
+    booking.start_kilometer_photo = startKmPhoto;
 
     await booking.save();
 
@@ -708,13 +686,17 @@ const startMachineryWork = async (req, res) => {
 
 /**
  * Complete Machinery Work (For Drivers)
- * Requires Finish KM/Meter Photo - Generates End OTP for Farmer
+ * Requires Finish KM/Meter Photo
  */
 const completeMachineryWork = async (req, res) => {
   try {
     const workerId = req.user.id;
     const { id } = req.params;
     const { endKmPhoto } = req.body;
+
+    if (!endKmPhoto) {
+      return res.status(400).json({ success: false, message: 'End KM/Meter photo is required.' });
+    }
 
     const booking = await Booking.findOne({ _id: id, workerId });
 
@@ -725,28 +707,24 @@ const completeMachineryWork = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Work has not started or is already completed' });
     }
 
-    // Generate End-Work OTP for Farmer to confirm completion
-    const endOtp = Math.floor(1000 + Math.random() * 9000).toString();
-
     booking.status = BOOKING_STATUS.WORK_DONE;
-    booking.end_kilometer_photo = endKmPhoto || null;
-    booking.driver_end_otp = endOtp;
+    booking.end_kilometer_photo = endKmPhoto;
 
     await booking.save();
 
-    // Notify Farmer with End OTP
+    // Notify Farmer
     const { createNotification } = require('../notificationControllers/notificationController');
     await createNotification({
       userId: booking.userId,
       type: 'work_completed',
       title: 'Machinery Work Finished',
-      message: `Machinery work is done. Please verify and share the Finish OTP: ${endOtp} with the driver only if satisfied.`,
+      message: `Machinery work is done for your booking.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high'
     });
 
-    res.status(200).json({ success: true, message: 'Work marked as finished. Finish OTP sent to farmer.', data: booking });
+    res.status(200).json({ success: true, message: 'Work marked as finished.', data: booking });
   } catch (error) {
     console.error('Complete machinery work error:', error);
     res.status(500).json({ success: false, message: 'Failed to complete machinery work' });

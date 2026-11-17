@@ -43,10 +43,9 @@ const vendorWalletService = {
   /**
    * Confirm cash collection
    */
-  confirmCashCollection: async (bookingId, amount, otp = '', extraItems = []) => {
+  confirmCashCollection: async (bookingId, amount, extraItems = []) => {
     const response = await api.post(`/bookings/cash/${bookingId}/confirm`, {
       amount,
-      otp,
       extraItems
     });
     return response.data;

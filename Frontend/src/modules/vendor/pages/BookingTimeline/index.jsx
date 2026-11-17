@@ -114,7 +114,7 @@ const RentalTimer = ({ booking }) => {
         </h4>
         <p className="text-xs font-semibold opacity-95">
           {isExpired
-            ? 'Please collect the equipment from the farmer & verify OTP to end trip.'
+            ? 'Please collect the equipment from the farmer & end the trip.'
             : `Time Remaining: ${formatTime()}`}
         </p>
       </div>
@@ -158,9 +158,7 @@ const BookingTimeline = () => {
   const navigate = useNavigate();
   const [booking, setBooking] = useState(null);
   const [currentStage, setCurrentStage] = useState(1);
-  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isWorkDoneModalOpen, setIsWorkDoneModalOpen] = useState(false);
-  const [otpInput, setOtpInput] = useState(['', '', '', '']);
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -279,7 +277,7 @@ const BookingTimeline = () => {
 
   // Lock scroll when modals are open
   useEffect(() => {
-    const shouldLock = isVisitModalOpen || isWorkDoneModalOpen || isTripModalOpen || confirmDialog.isOpen;
+    const shouldLock = isWorkDoneModalOpen || isTripModalOpen || confirmDialog.isOpen;
     if (shouldLock) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -288,7 +286,7 @@ const BookingTimeline = () => {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isVisitModalOpen, isWorkDoneModalOpen, isTripModalOpen, confirmDialog.isOpen]);
+  }, [isWorkDoneModalOpen, isTripModalOpen, confirmDialog.isOpen]);
 
   /* Handlers */
 
@@ -369,19 +367,15 @@ const BookingTimeline = () => {
   };
 
   const handleVerifyVisit = async () => {
-    const otp = otpInput.join('');
-    if (otp.length !== 4) return toast.error('Enter 4-digit OTP');
-
     setActionLoading(true);
     // Location check for vendor? Optional or same as worker.
-    if (!navigator.geolocation) return toast.error('Geolocation required');
+    if (!navigator.geolocation) { setActionLoading(false); return toast.error('Geolocation required'); }
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
         const location = { lat: position.coords.latitude, lng: position.coords.longitude };
-        await verifySelfVisit(id, otp, location);
-        toast.success('Visit Verified');
-        setIsVisitModalOpen(false);
+        await verifySelfVisit(id, location);
+        toast.success('Marked as reached');
         safeReload();
       } catch (err) {
         toast.error(err.response?.data?.message || 'Verification failed');
@@ -408,7 +402,7 @@ const BookingTimeline = () => {
     }
   };
 
-  const handleTripSubmit = async (photoFile, otp, workUnits, evidenceFile) => {
+  const handleTripSubmit = async (photoFile, workUnits, evidenceFile) => {
     try {
       setActionLoading(true);
       
@@ -434,10 +428,10 @@ const BookingTimeline = () => {
 
       // 2. Call API with URLs
       if (tripModalMode === 'start') {
-        await startTrip(id, photoUrl, otp, evidenceUrl);
+        await startTrip(id, photoUrl, evidenceUrl);
         toast.success(requiresDriver === false ? 'Equipment Handover Successful' : 'Engine started successfully');
       } else {
-        await endTrip(id, photoUrl, otp, workUnits, evidenceUrl);
+        await endTrip(id, photoUrl, workUnits, evidenceUrl);
         toast.success('Work ended and bill generated successfully');
       }
       
@@ -487,7 +481,7 @@ const BookingTimeline = () => {
       id: 5,
       title: 'Visited Site',
       icon: FiMapPin,
-      action: (currentStage === 4) ? () => setIsVisitModalOpen(true) : null,
+      action: (currentStage === 4) ? handleVerifyVisit : null,
       description: 'Arrived at location',
     },
     {
@@ -513,7 +507,7 @@ const BookingTimeline = () => {
           return null;
       })(),
       description: isAgriBooking 
-        ? (requiresDriver === false ? 'Confirm delivery of equipment to farmer' : 'Verify OTP and start engine') 
+        ? (requiresDriver === false ? 'Confirm delivery of equipment to farmer' : 'Add photos and start engine') 
         : 'Service work in progress',
     },
     {
@@ -529,7 +523,7 @@ const BookingTimeline = () => {
           return null;
       })(),
       description: isAgriBooking 
-        ? (requiresDriver === false ? 'Confirm return/collection of equipment from farmer' : 'Submit ending KM and verify OTP') 
+        ? (requiresDriver === false ? 'Confirm return/collection of equipment from farmer' : 'Submit ending KM photo and end trip') 
         : 'Complete the service work',
     },
     {
@@ -597,22 +591,6 @@ const BookingTimeline = () => {
     
     return true;
   });
-
-  // Auto-verify as last digit enters
-  useEffect(() => {
-    const otpValue = otpInput.join('');
-    if (otpValue.length === 4 && !actionLoading && isVisitModalOpen) {
-      handleVerifyVisit();
-    }
-  }, [otpInput]);
-
-  const handleOtpChange = (index, value) => {
-    if (value.length > 1) return;
-    const newOtp = [...otpInput];
-    newOtp[index] = value;
-    setOtpInput(newOtp);
-    if (value && index < 3) document.getElementById(`otp-${index + 1}`).focus();
-  };
 
   async function handleVisitSite() {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${booking.location?.lat || 22.7196},${booking.location?.lng || 75.8577}`;
@@ -769,25 +747,6 @@ const BookingTimeline = () => {
       </main>
 
       <BottomNav />
-
-      {/* Visit OTP Modal */}
-      {isVisitModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-black text-slate-800 text-lg">Verify Self Visit</h3>
-              <button onClick={() => setIsVisitModalOpen(false)}><FiX /></button>
-            </div>
-            <p className="text-sm text-slate-500 mb-6">Enter user OTP to verify arrival.</p>
-            <div className="flex gap-2 justify-center mb-4">
-              {[0, 1, 2, 3].map((i) => (
-                <input key={i} id={`otp-${i}`} type="number" value={otpInput[i]} onChange={(e) => handleOtpChange(i, e.target.value)} className="w-14 h-14 border border-slate-300 rounded-2xl text-center text-xl font-black bg-slate-50 focus:bg-white focus:border-blue-500/20 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" maxLength={1} />
-              ))}
-            </div>
-            <button onClick={handleVerifyVisit} disabled={actionLoading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-all mt-4">{actionLoading ? 'Verifying...' : 'Verify'}</button>
-          </div>
-        </div>
-      )}
 
       {/* Work Done Modal */}
       <WorkCompletionModal

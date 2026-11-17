@@ -222,32 +222,6 @@ const acceptBooking = async (req, res) => {
       booking.equipmentId = chosenEquipmentId;
     }
 
-    // Automatically generate Handover OTP (driver_start_otp) for Standalone Machinery (ANY category)
-    // This is because we skip the "Assign Operator" step where OTP is normally generated.
-    let shouldGenOtp = false;
-    const Category = require('../../models/Category');
-    const cat = await Category.findById(booking.categoryId);
-    
-    if (cat) {
-      const title = cat.title?.toLowerCase() || '';
-      const slug = cat.slug?.toLowerCase() || '';
-      const serviceCat = (booking.serviceCategory || '').toLowerCase();
-      
-      // If category explicitly says no driver OR if it's one of the machinery/equipment keywords
-      if (cat.requiresDriver === false || 
-          title.includes('machinery') || title.includes('equipment') || 
-          slug.includes('machinery') || slug.includes('equipment') ||
-          serviceCat.includes('agriculture') || serviceCat.includes('machinery')) {
-        shouldGenOtp = true;
-      }
-    }
-
-    if (shouldGenOtp && !booking.driver_start_otp) {
-      console.log(`[AcceptBooking] Generating Handover OTP for booking ${booking.bookingNumber}`);
-      const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      booking.driver_start_otp = otp;
-    }
-
     await booking.save();
 
     // Vendor availability is NOT set to ON_JOB here: nothing ever reset it, so one accepted
@@ -741,7 +715,7 @@ const updateBookingStatus = async (req, res) => {
       if (status === BOOKING_STATUS.COMPLETED && !isPaymentSettled(booking)) {
         return res.status(400).json({
           success: false,
-          message: 'Collect payment first (bill + customer OTP) before completing this booking'
+          message: 'Collect payment first (bill + cash confirmation) before completing this booking'
         });
       }
 
@@ -898,13 +872,9 @@ const startSelfJob = async (req, res) => {
       return res.status(400).json({ success: false, message: `Cannot start a ${booking.status} booking` });
     }
 
-    // Generate Visit OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
     // Update booking
     booking.status = BOOKING_STATUS.JOURNEY_STARTED;
     booking.journeyStartedAt = new Date();
-    booking.visitOtp = otp;
     booking.assignedAt = new Date(); // Implicitly assigned to self now
 
     await booking.save();
@@ -915,14 +885,13 @@ const startSelfJob = async (req, res) => {
       userId: booking.userId,
       type: 'worker_started',
       title: 'Vendor Started Journey',
-      message: `Vendor is on the way! OTP for verification: ${otp}.`,
+      message: `Vendor is on the way to your location.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'journey_started',
         bookingId: booking._id.toString(),
-        visitOtp: otp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -935,13 +904,12 @@ const startSelfJob = async (req, res) => {
     if (io) {
       io.to(`user_${booking.userId}`).emit('booking_updated', {
         bookingId: booking._id,
-        status: BOOKING_STATUS.JOURNEY_STARTED,
-        visitOtp: otp
+        status: BOOKING_STATUS.JOURNEY_STARTED
       });
       // Socket notification removed - createNotification already handles this
     }
 
-    res.status(200).json({ success: true, message: 'Journey started, OTP sent', data: booking });
+    res.status(200).json({ success: true, message: 'Journey started', data: booking });
   } catch (error) {
     console.error('Start self job error:', error);
     res.status(500).json({ success: false, message: 'Failed to start job' });
@@ -950,15 +918,14 @@ const startSelfJob = async (req, res) => {
 
 /**
  * Vendor Reached Location
- * Notify user to share OTP
+ * Notify user that vendor has arrived
  */
 const vendorReachedLocation = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
 
-    // Need visitOtp to resend it
-    const booking = await Booking.findOne({ _id: id, vendorId }).select('+visitOtp');
+    const booking = await Booking.findOne({ _id: id, vendorId });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -968,22 +935,19 @@ const vendorReachedLocation = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Journey not started yet' });
     }
 
-    const otp = booking.visitOtp;
-
     // Notify user
     const { createNotification } = require('../notificationControllers/notificationController');
     await createNotification({
       userId: booking.userId,
       type: 'vendor_reached',
       title: 'Vendor has Reached!',
-      message: `Vendor has reached your location. Please share this OTP: ${otp}`,
+      message: `Vendor has reached your location.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'vendor_reached',
         bookingId: booking._id.toString(),
-        visitOtp: otp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -1004,18 +968,16 @@ const verifySelfVisit = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { otp, location } = req.body;
+    const { location } = req.body;
 
-    const booking = await Booking.findOne({ _id: id, vendorId }).select('+visitOtp');
+    const booking = await Booking.findOne({ _id: id, vendorId });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     if (booking.status !== BOOKING_STATUS.JOURNEY_STARTED) return res.status(400).json({ success: false, message: 'Journey not started' });
-    if (booking.visitOtp !== otp) return res.status(400).json({ success: false, message: 'Invalid OTP' });
 
     booking.status = BOOKING_STATUS.VISITED;
     booking.visitedAt = new Date();
     booking.startedAt = new Date();
-    booking.visitOtp = undefined;
     if (location) {
       booking.visitLocation = { ...location, verifiedAt: new Date() };
     }
@@ -1229,10 +1191,6 @@ const completeSelfJob = async (req, res) => {
     booking.finalAmount = grandTotal;
     booking.userPayableAmount = grandTotal; // Ensure consistency
     booking.vendorBillId = bill._id;
-
-    // Generate Payment OTP for cash collection
-    const payOtp = Math.floor(1000 + Math.random() * 9000).toString();
-    booking.paymentOtp = payOtp;
 
     if (workPhotos) booking.workPhotos = workPhotos;
 
@@ -1504,15 +1462,14 @@ const startTrip = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { start_kilometer_photo, driver_start_otp, handover_proof_photo } = req.body;
+    const { start_kilometer_photo, handover_proof_photo } = req.body;
+
+    if (!start_kilometer_photo || !handover_proof_photo) {
+      return res.status(400).json({ success: false, message: 'Both photos are required to start.' });
+    }
 
     const booking = await Booking.findOne({ _id: id, vendorId }).populate('categoryId');
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
-
-    // --- 1. VERIFY OTP ---
-    if (booking.driver_start_otp && booking.driver_start_otp !== driver_start_otp) {
-      return res.status(400).json({ success: false, message: 'Invalid Start OTP. Please check with the farmer.' });
-    }
 
     // --- 2. VALIDATE STATUS BASED ON TYPE ---
     const requiresDriver = booking.requiresDriver !== undefined ? booking.requiresDriver : (booking.categoryId?.requiresDriver !== false);
@@ -1531,16 +1488,10 @@ const startTrip = async (req, res) => {
     }
 
     // --- 3. KILOMETER VALIDATION ---
-    booking.start_kilometer_photo = start_kilometer_photo || null;
-    booking.handover_proof_photo = handover_proof_photo || null;
-    // OTP already verified, we can save the provided one if needed but usually it stays the same
+    booking.start_kilometer_photo = start_kilometer_photo;
+    booking.handover_proof_photo = handover_proof_photo;
     booking.status = BOOKING_STATUS.IN_PROGRESS;
     booking.startedAt = new Date();
-    
-    // Auto-generate End/Return OTP once the trip starts (if not already exists)
-    if (!booking.driver_end_otp) {
-      booking.driver_end_otp = Math.floor(1000 + Math.random() * 9000).toString();
-    }
 
     await booking.save();
     res.status(200).json({ success: true, message: requiresDriver ? 'Engine started successfully' : 'Equipment handed over successfully', data: booking });
@@ -1558,21 +1509,21 @@ const endTrip = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { id } = req.params;
-    const { end_kilometer_photo, driver_end_otp, workUnits, work_evidence_photo, workEvidencePhoto } = req.body;
+    const { end_kilometer_photo, workUnits, work_evidence_photo, workEvidencePhoto } = req.body;
 
-    if (!driver_end_otp) {
-      return res.status(400).json({ success: false, message: 'End OTP from the farmer is required.' });
+    if (!end_kilometer_photo || !(work_evidence_photo || workEvidencePhoto)) {
+      return res.status(400).json({ success: false, message: 'Both photos are required to end the trip.' });
     }
 
-    // Verify and consume the End OTP atomically, so billing/crediting can only run once
+    // Claim the trip end atomically, so billing/crediting can only run once
     claimed = await Booking.findOneAndUpdate(
-      { _id: id, vendorId, driver_end_otp: String(driver_end_otp), status: { $in: [BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE] } },
-      { $set: { driver_end_otp: null } }
+      { _id: id, vendorId, tripEndedAt: null, status: { $in: [BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE] } },
+      { $set: { tripEndedAt: new Date() } }
     );
     if (!claimed) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid End OTP, or this trip has already ended.'
+        message: 'This trip has already ended or has not started.'
       });
     }
 
@@ -1682,9 +1633,8 @@ const endTrip = async (req, res) => {
         booking.workPhotos.push(evidence);
       }
     }
-    const isCashPayment = booking.paymentMethod === 'cash' || booking.paymentMethod === 'pay_at_home';
     const isPrepaid = booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.paymentMethod === 'plan_benefit';
-    
+
     if (isPrepaid) {
       booking.status = BOOKING_STATUS.COMPLETED;
       booking.cashCollected = false;
@@ -1693,13 +1643,6 @@ const endTrip = async (req, res) => {
       booking.status = BOOKING_STATUS.WORK_DONE;
       booking.paymentStatus = PAYMENT_STATUS.PENDING;
       booking.cashCollected = false;
-      
-      if (isCashPayment) {
-        // Generate Payment OTP for manual cash collection step
-        const payOtp = Math.floor(1000 + Math.random() * 9000).toString();
-        booking.paymentOtp = payOtp;
-        booking.customerConfirmationOTP = payOtp;
-      }
     }
     
     booking.finalAmount = finalAmount;
@@ -1709,34 +1652,29 @@ const endTrip = async (req, res) => {
     await booking.save();
 
     // 6. NOTIFY USER
-    const isCashBooking = booking.paymentMethod === 'cash' || booking.paymentMethod === 'pay_at_home';
     await createNotification({
       userId: booking.userId,
       type: 'work_completed',
       title: 'Work Completed & Bill Generated',
-      message: isCashBooking && booking.customerConfirmationOTP
-        ? `Your equipment trip has ended. Total Bill: \u20b9${finalAmount}. Payment OTP: ${booking.customerConfirmationOTP}. Share this OTP with the operator to confirm cash payment.`
-        : `Your equipment trip for ${service?.title || booking.serviceName} has ended. Total Bill: \u20b9${finalAmount}.`,
+      message: `Your equipment trip for ${service?.title || booking.serviceName} has ended. Total Bill: \u20b9${finalAmount}.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'work_done',
         bookingId: booking._id.toString(),
-        paymentOtp: booking.customerConfirmationOTP || undefined,
         link: `/user/booking/${booking._id}`
       }
     });
 
-    // 7. SOCKET: Real-time update to user — includes OTP for cash bookings
+    // 7. SOCKET: Real-time update to user
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${booking.userId}`).emit('booking_updated', {
         bookingId: booking._id,
         status: booking.status,
         finalAmount,
-        customerConfirmationOTP: booking.customerConfirmationOTP || undefined,
-        paymentOtp: booking.customerConfirmationOTP || undefined,
+        vendorBillId: vendorBill._id,
         workDoneDetails: booking.workDoneDetails
       });
     }
@@ -1747,8 +1685,8 @@ const endTrip = async (req, res) => {
       data: { finalAmount, vendorEarning, billId: vendorBill._id }
     });
   } catch (error) {
-    // Give the OTP back so the vendor can retry after a failure
-    if (claimed) await Booking.updateOne({ _id: claimed._id }, { $set: { driver_end_otp: claimed.driver_end_otp } }).catch(() => {});
+    // Release the claim so the vendor can retry after a failure
+    if (claimed) await Booking.updateOne({ _id: claimed._id }, { $set: { tripEndedAt: null } }).catch(() => {});
     console.error('End trip billing error EXTREME LOG:', {
       error: error.message,
       stack: error.stack,

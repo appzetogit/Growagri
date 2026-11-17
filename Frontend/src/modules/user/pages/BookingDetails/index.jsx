@@ -15,7 +15,6 @@ import {
   FiEdit2,
   FiPhone,
   FiMail,
-  FiKey,
   FiStar,
   FiAward,
   FiX,
@@ -239,19 +238,19 @@ const BookingDetails = () => {
     const isPaymentDone = booking?.paymentStatus === 'success' || booking?.cashCollected === true;
 
     // Open logic: 
-    // 1. Has verification OTP (Work is done)
+    // 1. Bill is generated (Work is done)
     // 2. Payment is NOT done (Pending)
     // 3. Haven't shown modal automatically in this session yet
     // Check session storage to see if we already showed it this session
     const hasShown = booking ? sessionStorage.getItem(`payment_modal_shown_${booking._id}`) : false;
 
-    if (booking && booking.customerConfirmationOTP && !isPaymentDone && !hasShown) {
+    if (booking && booking.vendorBillId && !isPaymentDone && !hasShown) {
       setShowPaymentModal(true);
       sessionStorage.setItem(`payment_modal_shown_${booking._id}`, 'true');
     }
     // Close logic:
-    // If payment becomes done or OTP missing, close it.
-    else if (!booking?.customerConfirmationOTP || isPaymentDone) {
+    // If payment becomes done or bill missing, close it.
+    else if (!booking?.vendorBillId || isPaymentDone) {
       setShowPaymentModal(false);
     }
   }, [booking]);
@@ -883,91 +882,7 @@ const BookingDetails = () => {
             </div>
           )}
 
-          {/* Arrival/Start OTP Card - Show during early stages until verified */}
-          {(booking.arrivalOTP || booking.visitOtp || booking.driver_start_otp || (['confirmed', 'accepted'].includes(booking.status?.toLowerCase()) && (booking.requiresDriver === false || booking.categoryId?.requiresDriver === false))) && ['confirmed', 'accepted', 'assigned', 'journey_started', 'visited'].includes(booking.status?.toLowerCase()) && (
-            <div className="relative overflow-hidden rounded-3xl shadow-lg border border-blue-100 mb-6 active:scale-[0.99] transition-all">
-              {/* Animated gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 opacity-95"></div>
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.15)_0%,transparent_50%)]"></div>
-
-              <div className="relative z-10 p-6 flex flex-col items-center">
-                {(() => {
-                  const isAgri = ['agriculture', 'agri', 'equipment', 'machinery', 'tractor'].includes(booking.serviceCategory?.toLowerCase()) ||
-                    ['agriculture', 'agri', 'equipment', 'machinery', 'tractor'].includes(booking.categoryTitle?.toLowerCase());
-
-                  // Logic to prioritize correct OTP
-                  let otpValue = null;
-                  let otpTitle = '';
-                  let otpDesc = '';
-
-                  if (booking.status?.toLowerCase() === 'journey_started' && booking.visitOtp) {
-                    otpValue = booking.visitOtp;
-                    otpTitle = 'Arrival OTP';
-                    otpDesc = 'Share when professional arrives';
-                  } else if (booking.driver_start_otp && ['visited', 'confirmed', 'accepted', 'assigned'].includes(booking.status?.toLowerCase())) {
-                    otpValue = booking.driver_start_otp;
-                    otpTitle = (booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Handover OTP' : (isAgri ? 'Start Trip OTP' : 'Verification OTP');
-                    otpDesc = (booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Share for equipment handover' : (isAgri ? 'Share to start engine' : 'Share to start work');
-                  } else {
-                    otpValue = booking.arrivalOTP || booking.visitOtp || booking.driver_start_otp;
-                    otpTitle = 'Verification OTP';
-                    otpDesc = 'Share when professional reaches';
-                  }
-
-                  return (
-                    <>
-                      <div className="flex items-center gap-3 w-full mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                          <FiMapPin className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-white tracking-tight">
-                            {otpTitle}
-                          </h3>
-                          <p className="text-xs text-blue-100 font-medium">
-                            {otpDesc}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* OTP Display */}
-                      <div className="flex justify-center gap-3 mb-5">
-                        {(() => {
-                          if (!otpValue) return (
-                            <div className="py-2 px-4 bg-white/10 rounded-xl border border-white/20">
-                              <p className="text-sm text-white font-bold animate-pulse">Generating code...</p>
-                            </div>
-                          );
-
-                          return String(otpValue).split('').map((digit, idx) => (
-                            <div
-                              key={idx}
-                              className="w-14 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border-2 border-white/40 shadow-xl"
-                            >
-                              <span className="text-3xl font-black text-white drop-shadow-md">{digit}</span>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-
-                      <div className="w-full bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20">
-                        <div className="flex items-center justify-center gap-2 text-white text-sm">
-                          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
-                          <p className="font-medium">
-                            {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
-                              ? 'Ready for equipment handover'
-                              : (isAgri ? 'Waiting for equipment to reach your farm' : 'Waiting for professional to reach your location')}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-
-          {/* Professional Arrived Notification - Only after OTP verified */}
+          {/* Professional Arrived Notification */}
           {booking?.status?.toLowerCase() === 'visited' && (
             <div className="relative overflow-hidden rounded-3xl shadow-lg mb-6 active:scale-[0.98] transition-all">
               <div className="absolute inset-0 bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-700 opacity-95"></div>
@@ -984,7 +899,7 @@ const BookingDetails = () => {
           )}
 
           {/* Waiting for Vendor to initiate Payment */}
-          {!booking.vendorBillId && !booking.customerConfirmationOTP && ['work_done'].includes(booking.status?.toLowerCase()) && !booking.cashCollected && (
+          {!booking.vendorBillId && ['work_done'].includes(booking.status?.toLowerCase()) && !booking.cashCollected && (
             <div className="bg-white rounded-3xl p-6 shadow-lg border border-teal-100 mb-6 flex items-center gap-4 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-teal-50 rounded-full -translate-y-12 translate-x-12 blur-2xl"></div>
               <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center shrink-0 border border-teal-100">
@@ -997,10 +912,10 @@ const BookingDetails = () => {
             </div>
           )}
 
-          {/* Plan Covered Card - Show for plan_benefit bookings (before OTP is sent) */}
+          {/* Plan Covered Card - Show for plan_benefit bookings (before bill is generated) */}
           {(booking.paymentStatus === 'plan_covered' || (booking.paymentMethod === 'plan_benefit' && booking.paymentStatus !== 'success')) &&
             ['visited', 'in_progress', 'work_done', 'completed'].includes(booking.status?.toLowerCase()) &&
-            !booking.customerConfirmationOTP && (
+            !booking.vendorBillId && (
               <div className="relative overflow-hidden rounded-3xl shadow-lg border border-emerald-100 mb-6">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-teal-600 to-green-700 opacity-95"></div>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(255,255,255,0.15)_0%,transparent_50%)]"></div>
@@ -1040,8 +955,8 @@ const BookingDetails = () => {
               </div>
             )}
 
-          {/* Payment Card - Show when work is done AND bill is finalized (OTP exists) or paid */}
-          {(booking.vendorBillId || booking.customerConfirmationOTP || booking.paymentStatus === 'success' || booking.status?.toLowerCase() === 'completed') && ['work_done', 'completed'].includes(booking.status?.toLowerCase()) && !booking.cashCollected && (
+          {/* Payment Card - Show when work is done AND bill is finalized or paid */}
+          {(booking.vendorBillId || booking.paymentStatus === 'success' || booking.status?.toLowerCase() === 'completed') && ['work_done', 'completed'].includes(booking.status?.toLowerCase()) && !booking.cashCollected && (
             <div
               onClick={() => setShowPaymentModal(true)}
               className={`relative overflow-hidden rounded-3xl shadow-lg border cursor-pointer active:scale-[0.98] transition-all ${booking.paymentStatus === 'success' ? 'border-green-100' : 'border-orange-100'
@@ -1084,24 +999,6 @@ const BookingDetails = () => {
                       <FiChevronRight className="w-4 h-4" />
                     </button>
 
-                    {booking.status?.toLowerCase() !== 'completed' && (booking.customerConfirmationOTP || booking.paymentOtp) && (
-                      <div className="flex flex-col items-center mb-6">
-                        <p className="text-[10px] font-bold text-orange-100 uppercase tracking-[0.2em] mb-3 opacity-90">Verification Code</p>
-                        <div className="flex justify-center gap-2">
-                          {String(booking.customerConfirmationOTP || booking.paymentOtp || '0000').split('').map((digit, idx) => (
-                            <div
-                              key={idx}
-                              className="w-12 h-14 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 shadow-lg"
-                            >
-                              <span className="text-2xl font-black text-white">{digit}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-orange-50 mt-3 font-medium bg-black/10 px-3 py-1 rounded-full backdrop-blur-sm">
-                          Share this code with the professional ONLY after your satisfaction
-                        </p>
-                      </div>
-                    )}
                   </>
                 )}
 
@@ -1181,44 +1078,6 @@ const BookingDetails = () => {
               </section>
             );
           })()}
-
-          {/* Agriculture Completion OTP - Share only when work is done */}
-          {['in_progress', 'work_done'].includes(booking.status?.toLowerCase()) && booking.driver_end_otp && (
-            <div className="bg-gradient-to-br from-teal-600 to-emerald-700 rounded-3xl p-6 shadow-xl relative overflow-hidden mb-6">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 blur-2xl"></div>
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                    <FiKey className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-bold">
-                      {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Return Verification' : 'Completion Verification'}
-                    </h3>
-                    <p className="text-teal-50 text-[10px] font-medium opacity-80 uppercase tracking-widest">
-                      {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false) ? 'Return OTP' : 'Agriculture OTP'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 justify-center mb-4">
-                  {String(booking.driver_end_otp).split('').map((digit, idx) => (
-                    <div key={idx} className="w-12 h-14 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30">
-                      <span className="text-2xl font-black text-white">{digit}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-center text-[10px] text-teal-100 font-medium bg-black/10 rounded-lg py-2 px-3 border border-white/5">
-                  {(booking.requiresDriver === false || booking.categoryId?.requiresDriver === false)
-                    ? "Share this OTP with the professional ONLY after the equipment is returned and you have verified its condition."
-                    : "Share this OTP with the driver ONLY after equipment has finished and you have verified the end KM."
-                  }
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Location & Time Section */}
           <section className="space-y-4">

@@ -12,10 +12,8 @@ const JobTimeline = () => {
   const navigate = useNavigate();
   const [job, setJob] = useState(null);
   const [currentStage, setCurrentStage] = useState(1);
-  const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isWorkDoneModalOpen, setIsWorkDoneModalOpen] = useState(false);
-  const [otpInput, setOtpInput] = useState(['', '', '', '']);
   const [actionLoading, setActionLoading] = useState(false);
   const [workPhotos, setWorkPhotos] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -120,9 +118,6 @@ const JobTimeline = () => {
   };
 
   const verifyVisit = async () => {
-    const otp = otpInput.join('');
-    if (otp.length !== 4) return toast.error('Enter 4-digit OTP');
-
     setActionLoading(true);
     if (!navigator.geolocation) {
       setActionLoading(false);
@@ -132,11 +127,9 @@ const JobTimeline = () => {
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
         const location = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const response = await workerService.verifyVisit(id, otp, location);
+        const response = await workerService.verifyVisit(id, location);
         if (response.success) {
-          toast.success('Visit Verified');
-          setIsVisitModalOpen(false);
-          setOtpInput(['', '', '', '']);
+          toast.success('Marked as reached');
           fetchJobDetails();
         }
       } catch (error) {
@@ -144,7 +137,10 @@ const JobTimeline = () => {
       } finally {
         setActionLoading(false);
       }
-    });
+    }, () => {
+      toast.error('Could not get your location. Please enable GPS.');
+      setActionLoading(false);
+    }, { timeout: 10000 });
   };
 
   const handleCompleteJob = async () => {
@@ -170,7 +166,7 @@ const JobTimeline = () => {
       if (res.success) {
         return res;
       } else {
-        throw new Error(res.message || 'Failed to send OTP');
+        throw new Error(res.message || 'Failed to finalize bill');
       }
     } catch (err) {
       console.error('Initiate cash error:', err);
@@ -180,10 +176,10 @@ const JobTimeline = () => {
     }
   };
 
-  const handleCollectCash = async (totalAmount, extraItems, otp) => {
+  const handleCollectCash = async (totalAmount, extraItems) => {
     try {
       setActionLoading(true);
-      const response = await workerService.collectCash(id, otp, totalAmount, extraItems);
+      const response = await workerService.collectCash(id, totalAmount, extraItems);
       if (response.success) {
         toast.success('Payment Collected & Job Completed!');
         setIsPaymentModalOpen(false);
@@ -195,22 +191,6 @@ const JobTimeline = () => {
     } finally {
       setActionLoading(false);
     }
-  };
-
-  // Auto-verify as last digit enters
-  useEffect(() => {
-    const otpValue = otpInput.join('');
-    if (otpValue.length === 4 && !actionLoading && isVisitModalOpen) {
-      verifyVisit();
-    }
-  }, [otpInput]);
-
-  const handleOtpChange = (index, value) => {
-    if (value.length > 1) return;
-    const newOtp = [...otpInput];
-    newOtp[index] = value;
-    setOtpInput(newOtp);
-    if (value && index < 3) document.getElementById(`otp-${index + 1}`).focus();
   };
 
   const isPending = (job?.status === 'assigned' || job?.status === 'confirmed' || job?.status === 'pending') && job?.workerResponse !== 'ACCEPTED';
@@ -231,8 +211,8 @@ const JobTimeline = () => {
       id: 2,
       title: 'Journey Started',
       icon: FiNavigation,
-      action: currentStage === 2 ? () => setIsVisitModalOpen(true) : null,
-      actionLabel: 'Verify Arrival (OTP)',
+      action: currentStage === 2 ? verifyVisit : null,
+      actionLabel: 'Mark Reached',
       description: 'On the way to customer location.',
       timestamp: job?.journeyStartedAt
     },
@@ -402,28 +382,6 @@ const JobTimeline = () => {
       </main>
 
       {/* Modals reused from JobDetails but simplified */}
-      {/* Verify Visit Modal */}
-      {isVisitModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl">
-            <div className="flex justify-between mb-4">
-              <h3 className="font-bold text-lg">Verify Arrival</h3>
-              <button onClick={() => setIsVisitModalOpen(false)}><FiX /></button>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Enter customer OTP</p>
-            <div className="flex gap-2 justify-center mb-6">
-              {[0, 1, 2, 3].map(i => (
-                <input key={i} id={`otp-${i}`} type="number" className="w-12 h-12 border rounded text-center text-xl"
-                  value={otpInput[i]} onChange={e => handleOtpChange(i, e.target.value)} maxLength={1} />
-              ))}
-            </div>
-            <button onClick={verifyVisit} disabled={actionLoading} className="w-full py-3 rounded-xl text-white font-bold" style={{ background: themeColors.button }}>
-              {actionLoading ? 'Verifying...' : 'Verify'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Work Done Modal - Reused Component */}
       <WorkCompletionModal
         isOpen={isWorkDoneModalOpen}

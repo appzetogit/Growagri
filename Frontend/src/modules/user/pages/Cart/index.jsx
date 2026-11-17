@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiShoppingCart, FiTrash2, FiPlus, FiMinus, FiLoader, FiBell } from 'react-icons/fi';
+import { FiShoppingCart, FiTrash2, FiPlus, FiMinus, FiLoader, FiBell } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -56,9 +56,6 @@ const Cart = () => {
 
   const cartCount = cartItems.length;
 
-  const handleBack = () => {
-    navigate(-1);
-  };
 
   const handleDeleteCategory = async (category) => {
     try {
@@ -178,12 +175,6 @@ const Cart = () => {
         {/* Modern Glassmorphism Header */}
         <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/40 border-b border-black/[0.03] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleBack}
-              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/[0.02]"
-            >
-              <FiArrowLeft className="w-5 h-5 text-black" />
-            </button>
             <div className="flex items-center gap-2">
               <FiShoppingCart className="w-5 h-5" style={{ color: themeColors.button }} />
               <h1 className="text-xl font-extrabold text-black">{t('Your Cart')}</h1>

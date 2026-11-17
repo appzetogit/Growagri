@@ -34,18 +34,16 @@ const bookingDoc = (extra) => ({
   assert.strictEqual(refunds.filter(r => r.status === 'fulfilled').length, 1, 'exactly one refund');
   assert.strictEqual((await db.collection('users').findOne({ _id: userId })).wallet.balance, 500, 'wallet credited once');
 
-  // 2. Cash confirm: wrong/missing OTP rejected, double confirm counted once, other vendor can't touch it
+  // 2. Cash confirm (no OTP): double confirm counted once, other vendor can't touch it
   const cash = require('../controllers/bookingControllers/cashCollectionController');
   const cashId = oid();
-  await db.collection('bookings').insertOne(bookingDoc({ _id: cashId, userId, vendorId, workerId, bookingNumber: 'BK2', status: 'work_done', paymentStatus: 'pending', paymentMethod: 'pay_at_home', finalAmount: 300, customerConfirmationOTP: '4321' }));
+  await db.collection('bookings').insertOne(bookingDoc({ _id: cashId, userId, vendorId, workerId, bookingNumber: 'BK2', status: 'work_done', paymentStatus: 'pending', paymentMethod: 'pay_at_home', finalAmount: 300 }));
   const vendorReq = (body) => ({ params: { id: String(cashId) }, body, user: { _id: vendorId }, userRole: 'VENDOR', app });
 
-  let res = mockRes(); await cash.confirmCashCollection(vendorReq({ otp: '' }), res);
-  assert.strictEqual(res.code, 400, 'empty OTP rejected');
-  res = mockRes(); await cash.confirmCashCollection({ ...vendorReq({ otp: '4321' }), user: { _id: oid() } }, res);
+  let res = mockRes(); await cash.confirmCashCollection({ ...vendorReq({}), user: { _id: oid() } }, res);
   assert.strictEqual(res.code, 404, 'other vendor cannot confirm');
   const cashRes = [mockRes(), mockRes()];
-  await Promise.all(cashRes.map(r => cash.confirmCashCollection(vendorReq({ otp: '4321', amount: 999999 }), r)));
+  await Promise.all(cashRes.map(r => cash.confirmCashCollection(vendorReq({ amount: 999999 }), r)));
   const v = await db.collection('vendors').findOne({ _id: vendorId });
   assert.strictEqual(v.wallet.dues, 300, 'dues added once, client amount ignored');
 

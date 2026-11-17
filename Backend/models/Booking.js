@@ -337,6 +337,7 @@ const bookingSchema = new mongoose.Schema({
   journeyStartedAt: { type: Date, default: null },
   visitedAt: { type: Date, default: null },
   completedAt: { type: Date, default: null },
+  tripEndedAt: { type: Date, default: null }, // atomic claim for machinery endTrip (prevents double billing)
 
   // ==========================================
   // 8. SECURITY & OTPs

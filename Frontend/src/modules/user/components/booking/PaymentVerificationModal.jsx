@@ -284,24 +284,10 @@ const PaymentVerificationModal = ({ isOpen, onClose, booking, onPayOnline }) => 
                       ✦ Pay Online Securely
                     </button>
                   ) : (
-                    // Cash OTP section
-                    (booking.customerConfirmationOTP || booking.paymentOtp) ? (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-                        <p className="text-xs font-bold text-emerald-800 mb-1">Share this OTP with the Professional</p>
-                        <p className="text-[10px] text-emerald-600 mb-3">Ask them to confirm receipt of cash</p>
-                        <div className="bg-white border-2 border-dashed border-emerald-300 rounded-lg py-3 px-4 inline-block mb-2">
-                          <span className="text-3xl font-black font-mono text-emerald-700 tracking-[0.25em]">
-                            {booking.customerConfirmationOTP || booking.paymentOtp}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">🔒 OTP confirms your cash payment to the professional</p>
-                      </div>
-                    ) : (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-                        <p className="text-xs font-bold text-amber-800">Cash OTP not available yet</p>
-                        <p className="text-[10px] text-amber-600 mt-1">OTP will appear here once work is completed</p>
-                      </div>
-                    )
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                      <p className="text-xs font-bold text-emerald-800 mb-1">Pay cash to the Professional</p>
+                      <p className="text-[10px] text-emerald-600">They will mark the payment as collected</p>
+                    </div>
                   )}
                 </>
               )}

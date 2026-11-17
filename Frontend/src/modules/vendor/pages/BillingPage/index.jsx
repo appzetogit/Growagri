@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiCheck, FiTool, FiArrowLeft, FiDollarSign, FiClock, FiKey } from 'react-icons/fi';
+import { FiCheck, FiTool, FiArrowLeft, FiDollarSign, FiClock } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import vendorBillService from '../../../../services/vendorBillService';
 import vendorWalletService from '../../../../services/vendorWalletService';
 import { getBookingById } from '../../services/bookingService';
-import OtpVerificationModal from './OtpVerificationModal';
 
 const BillingPage = () => {
   const { id } = useParams();
@@ -14,10 +13,8 @@ const BillingPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [booking, setBooking] = useState(null);
 
-  // OTP State
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
+  // Cash collection state
+  const [cashLoading, setCashLoading] = useState(false);
 
   // Settings
   const [payoutSettings, setPayoutSettings] = useState({
@@ -138,10 +135,10 @@ const BillingPage = () => {
     }
   };
 
-  const handleSendOTP = async () => {
+  const handleCollectCash = async () => {
     try {
-      setOtpLoading(true);
-      
+      setCashLoading(true);
+
       // Update bill to ensure accurate amounts
       await vendorBillService.createOrUpdateBill(id, {
         parts: [],
@@ -149,52 +146,24 @@ const BillingPage = () => {
         transportCharges: 0
       });
 
-      const res = await vendorWalletService.initiateCashCollection(
-        id,
-        calculations.finalBillAmount,
-        []
-      );
+      const init = await vendorWalletService.initiateCashCollection(id, calculations.finalBillAmount, []);
+      if (!init.success) return toast.error(init.message || 'Failed to finalize bill');
 
+      const res = await vendorWalletService.confirmCashCollection(id, calculations.finalBillAmount, []);
       if (res.success) {
-        setIsOtpSent(true);
-        setShowOtpModal(true);
-        toast.success('OTP sent to customer!');
-      } else {
-        toast.error(res.message || 'Failed to send OTP');
-      }
-    } catch (error) {
-      console.error('Send OTP error:', error);
-      toast.error('Failed to send OTP');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (code) => {
-    try {
-      setOtpLoading(true);
-      const res = await vendorWalletService.confirmCashCollection(
-        id,
-        calculations.finalBillAmount,
-        code,
-        []
-      );
-
-      if (res.success) {
-        setShowOtpModal(false);
-        toast.success('Payment verified successfully!');
+        toast.success('Cash collected successfully!');
         localStorage.removeItem(`billing_step_${id}`);
         localStorage.removeItem(`billing_max_step_${id}`);
         localStorage.removeItem(`billing_data_${id}`);
         navigate(`/vendor/booking/${id}`);
       } else {
-        toast.error(res.message || 'Invalid OTP');
+        toast.error(res.message || 'Failed to record cash');
       }
     } catch (error) {
-      console.error('Verify OTP error:', error);
-      toast.error('Verification failed');
+      console.error('Collect cash error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to record cash');
     } finally {
-      setOtpLoading(false);
+      setCashLoading(false);
     }
   };
 
@@ -292,24 +261,13 @@ const BillingPage = () => {
       {/* Fixed Bottom Navigation */}
       <div className="fixed bottom-[72px] left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50 flex gap-3">
         {booking.vendorBillId || booking.paymentMethod === 'cash' || booking.paymentMethod === 'pay_at_home' || booking.paymentMethod === 'plan_benefit' ? (
-          isOtpSent ? (
-            <button
-              onClick={() => setShowOtpModal(true)}
-              disabled={otpLoading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:scale-100"
-            >
-              <FiKey className="w-5 h-5" />
-              {otpLoading ? 'Verifying...' : 'Enter OTP to Confirm Cash'}
-            </button>
-          ) : (
-            <button
-              onClick={handleSendOTP}
-              disabled={otpLoading}
-              className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:scale-100"
-            >
-              {otpLoading ? 'Sending...' : <><FiDollarSign className="w-5 h-5" /> Collect Cash (Send OTP)</>}
-            </button>
-          )
+          <button
+            onClick={handleCollectCash}
+            disabled={cashLoading}
+            className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:scale-100"
+          >
+            {cashLoading ? 'Processing...' : <><FiDollarSign className="w-5 h-5" /> Mark Cash Collected</>}
+          </button>
         ) : (
           <button
             onClick={handleSubmit}
@@ -321,12 +279,6 @@ const BillingPage = () => {
         )}
       </div>
 
-      <OtpVerificationModal
-        isOpen={showOtpModal}
-        onClose={() => setShowOtpModal(false)}
-        onVerify={handleVerifyOTP}
-        loading={otpLoading}
-      />
     </div>
   );
 };

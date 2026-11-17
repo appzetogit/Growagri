@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FiCamera, FiX, FiCheck, FiUpload, FiLoader, FiRefreshCw, FiImage, FiKey, FiCheckCircle } from 'react-icons/fi';
+import { FiCamera, FiX, FiCheck, FiUpload, FiLoader, FiRefreshCw, FiImage, FiCheckCircle } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { uploadToCloudinary } from '../../../../utils/cloudinaryUpload';
 import { flutterBridge } from '../../../../utils/flutterBridge';
 
 /**
  * TripFlowModal - Unified single-screen modal for Start Trip / Handover / End Trip / Collect Equipment
- * Displays both photo capture inputs (Condition/KM & Evidence) + Farmer OTP on ONE screen.
+ * Displays both (mandatory) photo capture inputs (Condition/KM & Evidence) on ONE screen.
  */
 const TripFlowModal = ({
     isOpen,
@@ -25,16 +25,13 @@ const TripFlowModal = ({
     const [photoFile, setPhotoFile] = useState(null);
     const [evidencePreview, setEvidencePreview] = useState(null);
     const [evidenceFile, setEvidenceFile] = useState(null);
-    const [otp, setOtp] = useState(['', '', '', '']);
     const [workUnits, setWorkUnits] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     const kmInputRef = useRef(null);
     const evidenceInputRef = useRef(null);
-    const otpRefs = [useRef(), useRef(), useRef(), useRef()];
 
     const isStart = mode === 'start';
-    const skipOtpStep = isStart ? !booking?.driver_start_otp : !booking?.driver_end_otp;
     const isMeterBased = trackingType === 'odometer';
 
     const title = isStart
@@ -58,7 +55,6 @@ const TripFlowModal = ({
             setPhotoFile(null);
             setEvidencePreview(null);
             setEvidenceFile(null);
-            setOtp(['', '', '', '']);
             setSubmitting(false);
 
             if (!isStart && rentalType === 'land_based' && booking?.landSize) {
@@ -114,41 +110,9 @@ const TripFlowModal = ({
         reader.readAsDataURL(file);
     };
 
-    const handleOtpChange = (idx, val) => {
-        if (!/^\d*$/.test(val)) return;
-
-        // Handle pasting of full 4-digit OTP
-        if (val.length > 1) {
-            const digits = val.slice(0, 4).split('');
-            const newOtp = [...otp];
-            digits.forEach((d, i) => {
-                if (i < 4) newOtp[i] = d;
-            });
-            setOtp(newOtp);
-            const focusIdx = Math.min(digits.length, 3);
-            otpRefs[focusIdx].current?.focus();
-            return;
-        }
-
-        const newOtp = [...otp];
-        newOtp[idx] = val;
-        setOtp(newOtp);
-
-        if (val && idx < 3) {
-            otpRefs[idx + 1].current?.focus();
-        }
-    };
-
-    const handleOtpKeyDown = (idx, e) => {
-        if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
-            otpRefs[idx - 1].current?.focus();
-        }
-    };
-
     const handleSubmit = async () => {
-        const otpStr = otp.join('');
-        if (!skipOtpStep && otpStr.length !== 4) {
-            return toast.error('Please enter the 4-digit OTP from farmer');
+        if (!photoFile || !evidenceFile) {
+            return toast.error('Please add both photos');
         }
 
         if (!isStart && rentalType === 'land_based' && !workUnits) {
@@ -189,7 +153,6 @@ const TripFlowModal = ({
 
             await onSubmit(
                 photoUrl || photoFile,
-                otpStr,
                 workUnits ? parseFloat(workUnits) : undefined,
                 evidenceUrl || evidenceFile
             );
@@ -240,7 +203,7 @@ const TripFlowModal = ({
                                         {title}
                                     </h2>
                                     <p className="text-[11px] font-semibold text-gray-500">
-                                        Fill photo details & verify OTP in one step
+                                        Add both photos and confirm
                                     </p>
                                 </div>
                             </div>
@@ -260,9 +223,9 @@ const TripFlowModal = ({
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
                                         <FiImage className="w-3.5 h-3.5 text-gray-500" />
-                                        Equipment Photos (Optional)
+                                        Equipment Photos <span className="text-red-500">*</span>
                                     </label>
-                                    <span className="text-[10px] text-gray-400 font-bold">2 Photos max</span>
+                                    <span className="text-[10px] text-gray-400 font-bold">Both required</span>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -375,48 +338,6 @@ const TripFlowModal = ({
                                 </div>
                             )}
 
-                            {/* Section 3: Farmer's OTP */}
-                            <div className="p-4 bg-gray-50/90 rounded-2xl border border-gray-200/80 space-y-2.5">
-                                {skipOtpStep ? (
-                                    <div className="flex items-center gap-2 text-xs font-bold text-gray-600 py-1">
-                                        <span className="text-base">ℹ️</span>
-                                        <span>No OTP verification required. Verify details and submit.</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="text-center space-y-0.5">
-                                            <p className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center justify-center gap-1.5">
-                                                <FiKey className="w-3.5 h-3.5" style={{ color: themeColor }} />
-                                                Enter Customer OTP
-                                            </p>
-                                            <p className="text-[11px] text-gray-500 font-medium">
-                                                Ask the farmer for their 4-digit {isStart ? 'Start / Handover' : 'Return / End'} OTP
-                                            </p>
-                                        </div>
-
-                                        <div className="flex justify-center gap-2.5 pt-1">
-                                            {otp.map((digit, idx) => (
-                                                <input
-                                                    key={idx}
-                                                    ref={otpRefs[idx]}
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    maxLength={4}
-                                                    value={digit}
-                                                    onChange={(e) => handleOtpChange(idx, e.target.value)}
-                                                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                                                    className="w-12 h-12 sm:w-14 sm:h-14 text-center text-xl sm:text-2xl font-black border-2 rounded-xl focus:outline-none transition-all shadow-sm bg-white"
-                                                    style={{
-                                                        borderColor: digit ? themeColor : '#e5e7eb',
-                                                        color: digit ? themeColor : '#111827'
-                                                    }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-
                         </div>
 
                         {/* Footer Action Button */}
@@ -424,7 +345,7 @@ const TripFlowModal = ({
                             <button
                                 type="button"
                                 onClick={handleSubmit}
-                                disabled={submitting || (!skipOtpStep && otp.join('').length < 4)}
+                                disabled={submitting || !photoFile || !evidenceFile}
                                 className="w-full py-3.5 sm:py-4 rounded-2xl font-black text-white text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                                 style={{ background: themeColor }}
                             >

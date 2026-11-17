@@ -23,7 +23,6 @@ const JobDetails = () => {
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [otpInput, setOtpInput] = useState(['', '', '', '']); // Array for 4 digit OTP
   const [workPhotos, setWorkPhotos] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [collectionAmount, setCollectionAmount] = useState('');
@@ -112,7 +111,7 @@ const JobDetails = () => {
       if (res.success) {
         return res;
       } else {
-        throw new Error(res.message || 'Failed to send OTP');
+        throw new Error(res.message || 'Failed to finalize bill');
       }
     } catch (error) {
       throw error;
@@ -121,10 +120,10 @@ const JobDetails = () => {
     }
   };
 
-  const handleConfirmCash = async (totalAmount, extraItems, otp) => {
+  const handleConfirmCash = async (totalAmount, extraItems) => {
     try {
       setActionLoading(true);
-      const response = await workerService.collectCash(id, otp, totalAmount, extraItems);
+      const response = await workerService.collectCash(id, totalAmount, extraItems);
       if (response.success) {
         toast.success('Payment collected & Job Completed!');
         setIsPaymentModalOpen(false);
@@ -176,7 +175,6 @@ const JobDetails = () => {
     }
 
     if (type === 'collect' && !isPaymentModalOpen) {
-      setOtpInput(['', '', '', '']);
       setCollectionAmount(job.finalAmount);
       setIsPaymentModalOpen(true);
       return;
@@ -636,7 +634,7 @@ const JobDetails = () => {
         />
       </Suspense>
 
-      {/* Visit OTP Modal - REUSABLE COMPONENT */}
+      {/* Mark Arrival Modal - REUSABLE COMPONENT */}
       <Suspense fallback={null}>
         <VisitVerificationModal
           isOpen={isVisitModalOpen}

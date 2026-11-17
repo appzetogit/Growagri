@@ -10,7 +10,7 @@ const CLOSED_STATUSES = [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOO
 
 /**
  * Initiate Cash Collection
- * Optional: Sends OTP to customer
+ * Finalizes the bill and notifies the customer
  */
 exports.initiateCashCollection = async (req, res) => {
   try {
@@ -72,41 +72,31 @@ exports.initiateCashCollection = async (req, res) => {
       booking.markModified('extraCharges');
     }
 
-    // For backwards compatibility and future use, we can still generate it but not force it
-    let otp = booking.driver_end_otp;
-    if (!otp) {
-      otp = Math.floor(1000 + Math.random() * 9000).toString();
-    }
-    booking.customerConfirmationOTP = otp;
-    booking.paymentOtp = otp;
     await booking.save();
 
-    // Emit socket event to user with full bill details and OTP
+    // Emit socket event to user with full bill details
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${booking.userId}`).emit('booking_updated', {
         bookingId: booking._id,
         finalAmount: booking.finalAmount,
-        customerConfirmationOTP: booking.customerConfirmationOTP,
-        paymentOtp: booking.paymentOtp,
         workDoneDetails: booking.workDoneDetails
       });
     }
 
-    // Send Push Notification with OTP
+    // Send Push Notification
     const { createNotification } = require('../notificationControllers/notificationController');
     await createNotification({
       userId: booking.userId,
       type: 'work_done',
       title: 'Payment Request & Bill Ready',
-      message: `Bill: ₹${booking.finalAmount}. OTP: ${otp}. Please verify bill and share OTP to complete payment.`,
+      message: `Bill: ₹${booking.finalAmount}. Please pay the amount in cash to complete payment.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high',
       pushData: {
         type: 'work_done',
         bookingId: booking._id.toString(),
-        paymentOtp: otp,
         link: `/user/booking/${booking._id}`
       }
     });
@@ -129,7 +119,7 @@ exports.initiateCashCollection = async (req, res) => {
 exports.confirmCashCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    const { otp, extraItems } = req.body;
+    const { extraItems } = req.body;
     const userId = req.user._id;
     const userRole = req.userRole === USER_ROLES.VENDOR ? 'vendor' : 'worker';
 
@@ -142,15 +132,8 @@ exports.confirmCashCollection = async (req, res) => {
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
       return res.status(400).json({ success: false, message: 'Payment has already been completed online.' });
     }
-    if (!booking.customerConfirmationOTP) {
-      return res.status(400).json({ success: false, message: 'Send the bill OTP to the customer first.' });
-    }
-
-    // OTP Verification (always required; '0000' only for plan-benefit with nothing to pay, or in development)
-    const isPlanBenefitNoExtras = booking.paymentMethod === 'plan_benefit' && otp === '0000';
-    const isDevBypass = process.env.NODE_ENV === 'development' && otp === '0000';
-    if (!isPlanBenefitNoExtras && !isDevBypass && (!otp || booking.customerConfirmationOTP !== String(otp))) {
-      return res.status(400).json({ success: false, message: 'Invalid OTP. Please enter the code sent to the customer.' });
+    if (CLOSED_STATUSES.includes(booking.status)) {
+      return res.status(400).json({ success: false, message: `Booking is ${booking.status}` });
     }
 
     // --- ATOMIC LOCK AGAINST RACE CONDITIONS ---

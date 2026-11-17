@@ -203,10 +203,6 @@ exports.respondToRentalBooking = async (req, res) => {
 
     if (status === 'accepted') {
       booking.status = BOOKING_STATUS.CONFIRMED;
-      // Generate Start OTP for farmer
-      const startOtp = Math.floor(1000 + Math.random() * 9000).toString();
-      booking.driver_start_otp = startOtp;
-      
       await booking.save();
 
       // Notify Farmer
@@ -214,7 +210,7 @@ exports.respondToRentalBooking = async (req, res) => {
         userId: booking.userId,
         type: 'worker_accepted',
         title: 'Machinery Booking Confirmed!',
-        message: `Your booking #${booking.bookingNumber} is confirmed. Share OTP ${startOtp} with the driver only when they arrive at your farm.`,
+        message: `Your booking #${booking.bookingNumber} is confirmed.`,
         relatedId: booking._id,
         relatedType: 'booking',
         priority: 'high'
@@ -242,24 +238,25 @@ exports.respondToRentalBooking = async (req, res) => {
   }
 };
 
-// 2. Start Work (Vendor/Driver inputs Farmer OTP)
+// 2. Start Work
 // For 'service' (Tractor): requires KM/Odometer photo
-// For 'rental' (Tool/Pump): requires condition photo only
+// For 'rental' (Tool/Pump): requires condition photo
 exports.startMachineryWork = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { bookingId } = req.params;
-    const { otp, startKmPhoto, conditionPhoto, handoverProofPhoto } = req.body;
+    const { startKmPhoto, conditionPhoto, handoverProofPhoto } = req.body;
+
+    if (!(startKmPhoto || conditionPhoto) || !handoverProofPhoto) {
+      return res.status(400).json({ success: false, message: 'Both photos are required to start.' });
+    }
 
     const Booking = require('../../models/Booking');
     const { BOOKING_STATUS } = require('../../utils/constants');
 
-    const booking = await Booking.findOne({ _id: bookingId, vendorId }).select('+driver_start_otp');
+    const booking = await Booking.findOne({ _id: bookingId, vendorId });
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    if (!otp || booking.driver_start_otp !== String(otp)) {
-      return res.status(400).json({ success: false, message: 'Invalid Start OTP from Farmer' });
-    }
     if ([BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.WORK_DONE, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED].includes(booking.status)) {
       return res.status(400).json({ success: false, message: `Cannot start work on a ${booking.status} booking` });
     }
@@ -279,7 +276,6 @@ exports.startMachineryWork = async (req, res) => {
 
     booking.status = BOOKING_STATUS.IN_PROGRESS;
     booking.startedAt = new Date();
-    booking.driver_start_otp = undefined;
     await booking.save();
 
     const { createNotification } = require('../notificationControllers/notificationController');
@@ -300,12 +296,16 @@ exports.startMachineryWork = async (req, res) => {
   }
 };
 
-// 3. Complete Work (Vendor inputs Final KM - Sends End OTP to Farmer)
+// 3. Complete Work (Vendor inputs Final KM)
 exports.completeMachineryWork = async (req, res) => {
   try {
     const vendorId = req.user.id;
     const { bookingId } = req.params;
     const { endKmPhoto, workUnits, evidencePhoto } = req.body;
+
+    if (!endKmPhoto || !evidencePhoto) {
+      return res.status(400).json({ success: false, message: 'Both photos are required to complete.' });
+    }
 
     const Booking = require('../../models/Booking');
     const { BOOKING_STATUS } = require('../../utils/constants');
@@ -359,7 +359,6 @@ exports.completeMachineryWork = async (req, res) => {
       }
     }
 
-    const endOtp = Math.floor(1000 + Math.random() * 9000).toString();
     booking.status = BOOKING_STATUS.WORK_DONE;
     booking.end_kilometer_photo = endKmPhoto;
     
@@ -371,8 +370,7 @@ exports.completeMachineryWork = async (req, res) => {
     // Store evidence and working units temporarily if needed on details panel
     if (evidencePhoto) booking.work_evidence_photo = evidencePhoto;
     if (workUnits) booking.workUnits = workUnits;
-    
-    booking.driver_end_otp = endOtp;
+
     await booking.save();
 
     const { createNotification } = require('../notificationControllers/notificationController');
@@ -380,13 +378,13 @@ exports.completeMachineryWork = async (req, res) => {
       userId: booking.userId,
       type: 'work_completed',
       title: 'Machine Work Completed!',
-      message: `Work finished for #${booking.bookingNumber}. Please share OTP ${endOtp} with the driver only if you are satisfied.`,
+      message: `Work finished for #${booking.bookingNumber}.`,
       relatedId: booking._id,
       relatedType: 'booking',
       priority: 'high'
     });
 
-    res.status(200).json({ success: true, message: 'Work marked as done. OTP sent to farmer.', data: booking });
+    res.status(200).json({ success: true, message: 'Work marked as done.', data: booking });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Completion failed' });
   }

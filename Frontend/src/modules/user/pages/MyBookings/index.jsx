@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiClock, FiMapPin, FiCheckCircle, FiXCircle, FiLoader, FiCalendar, FiChevronRight, FiSearch } from 'react-icons/fi';
+import { FiClock, FiMapPin, FiCheckCircle, FiXCircle, FiLoader, FiCalendar, FiChevronRight, FiSearch } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { themeColors } from '../../../../theme';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -208,12 +208,6 @@ const MyBookings = () => {
         {/* Modern Glassmorphism Header */}
         <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/40 border-b border-black/[0.03] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/[0.02]"
-            >
-              <FiArrowLeft className="w-5 h-5 text-gray-800" />
-            </button>
             <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">{t('My Farm Orders')}</h1>
           </div>
           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/[0.02] relative">
