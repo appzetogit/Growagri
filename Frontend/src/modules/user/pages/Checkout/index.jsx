@@ -833,12 +833,6 @@ const Checkout = () => {
         return;
       }
 
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!razorpayKey) {
-        toast.error('Razorpay key not configured');
-        return;
-      }
-
       const firstItem = cartItems[0] || {};
       const serviceId = typeof firstItem.serviceId === 'object'
         ? firstItem.serviceId?._id || firstItem.serviceId?.id
@@ -987,7 +981,7 @@ const Checkout = () => {
 
       // 4. Razorpay Checkout Modal
       const options = {
-        key: razorpayKey,
+        key: orderResponse.data.key,
         amount: orderResponse.data.amount * 100,
         currency: orderResponse.data.currency || 'INR',
         order_id: orderResponse.data.orderId,
@@ -1065,7 +1059,7 @@ const Checkout = () => {
 
     } catch (error) {
       toast.dismiss();
-      console.error('Pay Now error:', error);
+      console.error('Pay Now error:', error, error?.response?.data);
       toast.error(error?.response?.data?.message || error?.message || 'Something went wrong with payment. Please try again.');
     }
   };
@@ -1090,20 +1084,13 @@ const Checkout = () => {
 
       toast.dismiss();
 
-      // Get Razorpay key
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!razorpayKey) {
-        toast.error('Razorpay key not configured');
-        return;
-      }
-
       if (!window.Razorpay) {
         toast.error('Razorpay SDK not loaded');
         return;
       }
 
       const options = {
-        key: razorpayKey,
+        key: orderResponse.data.key,
         amount: orderResponse.data.amount * 100,
         currency: orderResponse.data.currency || 'INR',
         order_id: orderResponse.data.orderId,

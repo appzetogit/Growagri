@@ -66,47 +66,6 @@ const BookingTrack = () => {
   const handleOnlinePayment = async () => {
     if (paying) return;
 
-    // If a Razorpay order already exists for this booking, reuse it
-    if (booking.razorpayOrderId) {
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: Math.round((booking.finalAmount || 0) * 100),
-        currency: 'INR',
-        order_id: booking.razorpayOrderId,
-        name: 'GrooAgri',
-        description: `Payment for ${booking.serviceName}`,
-        handler: async function (response) {
-          toast.loading('Verifying payment...');
-          const verifyResponse = await paymentService.verifyPayment({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature
-          });
-          toast.dismiss();
-          if (verifyResponse.success) {
-            toast.success('Payment successful!');
-            navigate(`/user/booking/${booking._id || booking.id}`);
-          } else {
-            toast.error('Payment verification failed');
-          }
-          setPaying(false);
-        },
-        modal: {
-          ondismiss: function () {
-            setPaying(false);
-          }
-        },
-        prefill: { 
-          name: JSON.parse(localStorage.getItem('userData') || '{}').name || 'User', 
-          contact: JSON.parse(localStorage.getItem('userData') || '{}').phone || '' 
-        },
-        theme: { color: "#0F766E" }
-      };
-      setPaying(true);
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-      return;
-    }
 
     try {
       setPaying(true);
@@ -121,7 +80,7 @@ const BookingTrack = () => {
       }
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: orderResponse.data.key,
         amount: orderResponse.data.amount * 100,
         currency: orderResponse.data.currency || 'INR',
         order_id: orderResponse.data.orderId,

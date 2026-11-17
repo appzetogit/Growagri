@@ -54,7 +54,7 @@ export const startEcommercePayment = (orderId) => {
             }
 
             const { order_id, amount, currency, key } = orderRes.data;
-            const razorpayKey = key || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_8sYbzHWidwe5Zw';
+            const razorpayKey = key;
 
             // Prefill user details if available
             let userPrefill = {};
