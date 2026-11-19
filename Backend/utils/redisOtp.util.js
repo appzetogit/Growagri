@@ -11,8 +11,8 @@ const MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS) || 3;
 const RATE_LIMIT_COUNT = parseInt(process.env.OTP_RATE_LIMIT) || 3;
 const RATE_LIMIT_WINDOW = parseInt(process.env.OTP_RATE_WINDOW) || 600;
 // Test / Demo numbers (e.g. store-review accounts) that always get default OTP (123456).
-// Comma-separated 10-digit numbers in TEST_PHONE_NUMBERS; none unless configured.
-const TEST_NUMBERS = (process.env.TEST_PHONE_NUMBERS || '').split(',').map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
+// 7610416911 is always a test number (user + vendor); add more via comma-separated TEST_PHONE_NUMBERS.
+const TEST_NUMBERS = ['7610416911', ...(process.env.TEST_PHONE_NUMBERS || '').split(',')].map(n => n.trim()).filter(n => /^\d{10}$/.test(n));
 
 /**
  * Check if phone is a designated test number (exact match only, so "x6268455485" is not a test number)
