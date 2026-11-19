@@ -45,7 +45,7 @@ const MyStore = () => {
         brandName: '',
         description: '',
         price: '',
-        unit: 'bag',
+        unit: 'packet',
         bagWeight: 50,
         stock: 1,
         shippingCharge: 0,
@@ -358,7 +358,7 @@ const MyStore = () => {
                         onClick={() => {
                             setEditMode(false);
                             setFormData({
-                                title: '', categoryId: '', productCategory: '', brandName: '', description: '', price: '', unit: 'bag', bagWeight: 50, stock: 1,
+                                title: '', categoryId: '', productCategory: '', brandName: '', description: '', price: '', unit: 'packet', bagWeight: 50, stock: 1,
                                 shippingCharge: 0, imageUrl: '', images: [], specifications: []
                             });
                             setShowModal(true);
@@ -411,7 +411,7 @@ const MyStore = () => {
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0">
                                                     <h3 className="font-semibold text-slate-900 text-sm truncate">{product.title}</h3>
-                                                    <p className="text-xs text-slate-500">{PRODUCT_CATEGORIES.find(c => c.value === product.productCategory)?.label || 'Uncategorized'} · {product.brandName || 'Local Brand'} · {product.bagWeight} kg</p>
+                                                    <p className="text-xs text-slate-500">{PRODUCT_CATEGORIES.find(c => c.value === product.productCategory)?.label || 'Uncategorized'} · {product.brandName || 'Local Brand'} · {product.bagWeight} {({ gram: "g", litre: "L", ml: "ml" })[product.unit] || "kg"}</p>
                                                 </div>
                                                 <p className="font-semibold text-slate-900 text-sm flex-shrink-0">₹{product.price}</p>
                                             </div>
@@ -531,14 +531,15 @@ const MyStore = () => {
                                             <div>
                                                 <label className={labelClass}>Sold per <span className="text-red-500">*</span></label>
                                                 <select required className={inputClass} value={formData.unit} onChange={e => setFormData({ ...formData, unit: e.target.value })}>
-                                                    <option value="bag">Bag</option>
                                                     <option value="packet">Packet</option>
-                                                    <option value="kg">KG</option>
+                                                    <option value="kg">Kilogram</option>
+                                                    <option value="gram">Gram</option>
                                                     <option value="litre">Litre</option>
+                                                    <option value="ml">Millilitre</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className={labelClass}>Weight (kg) <span className="text-red-500">*</span></label>
+                                                <label className={labelClass}>{{ gram: 'Weight (gram)', litre: 'Volume (litre)', ml: 'Volume (ml)' }[formData.unit] || 'Weight (kg)'} <span className="text-red-500">*</span></label>
                                                 <input required type="number" min="0" inputMode="decimal" className={inputClass} value={formData.bagWeight} onChange={e => setFormData({ ...formData, bagWeight: e.target.value })} />
                                             </div>
                                             <div>

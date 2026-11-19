@@ -235,7 +235,7 @@ const StoreOrders = () => {
                                                 </h4>
                                                 <p className="text-xs text-slate-500 font-bold mt-1">
                                                     Qty: {order.items[0]?.quantity || 1} {order.items[0]?.productId?.unit || 'bag'}{order.items[0]?.quantity > 1 ? 's' : ''}
-                                                    {order.items[0]?.bagWeight ? ` • ${order.items[0]?.bagWeight}kg` : ''}
+                                                    {order.items[0]?.bagWeight ? ` • ${order.items[0]?.bagWeight}${({ gram: "g", litre: "L", ml: "ml" })[order.items[0]?.productId?.unit] || "kg"}` : ''}
                                                 </p>
                                                 {order.trackingDetails?.courierName && (
                                                     <div className="mt-2 bg-slate-50 border border-slate-100 p-2 rounded-xl inline-block text-[10px]">

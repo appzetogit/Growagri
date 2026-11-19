@@ -479,7 +479,7 @@ const EcommerceOrders = () => {
                                                         <div className="text-[11px] font-bold text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 max-w-[200px] space-y-1">
                                                             {order.items.map((item, idx) => {
                                                                 const unitStr = item.productId?.unit || 'bag';
-                                                                const weightStr = item.bagWeight ? ` (${item.bagWeight}kg)` : '';
+                                                                const weightStr = item.bagWeight ? ` (${item.bagWeight}${({ gram: "g", litre: "L", ml: "ml" })[item.productId?.unit] || "kg"})` : '';
                                                                 return (
                                                                     <div key={idx} className="line-clamp-2">
                                                                         {item.name} <span className="text-teal-700 font-black">x{item.quantity} {unitStr}{item.quantity > 1 ? 's' : ''}{weightStr}</span>
@@ -877,7 +877,7 @@ const EcommerceOrders = () => {
                                                 <p className="text-slate-800 font-extrabold text-sm">{item.name}</p>
                                                 <p className="text-slate-400 mt-0.5 font-bold">
                                                     {item.productId?.unit || 'bag'}
-                                                    {item.bagWeight ? ` • ${item.bagWeight}kg` : ''}
+                                                    {item.bagWeight ? ` • ${item.bagWeight}${({ gram: "g", litre: "L", ml: "ml" })[item.productId?.unit] || "kg"}` : ''}
                                                     {` • ₹${item.price} per unit`}
                                                 </p>
                                             </div>
